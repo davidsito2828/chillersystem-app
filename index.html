@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ChillerSystem · Gestión Integral</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#060f20;--bg2:#0a1c3b;--bg3:#0d2a52;
+  --accent:#3b82f6;--accent2:#60a5fa;--accent3:#93c5fd;
+  --red:#f87171;--yellow:#fbbf24;--green:#34d399;--slate:#94a3b8;
+  --text:#dbeafe;--text-dim:#7db3e8;--border:rgba(255,255,255,0.09);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'IBM Plex Sans',sans-serif;background:linear-gradient(160deg,#060f20 0%,#0a1c3b 40%,#0d2a52 100%);color:var(--text);min-height:100vh;}
+
+/* ── LOGIN ── */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{background:linear-gradient(135deg,rgba(8,24,58,.97),rgba(10,28,59,.95));border:1px solid rgba(96,165,250,0.2);border-radius:18px;padding:40px 36px;width:100%;max-width:400px;text-align:center;}
+.login-box::before{content:'';display:block;height:4px;background:linear-gradient(90deg,#1d4ed8,#3b82f6,#8b5cf6);border-radius:4px 4px 0 0;margin:-40px -36px 32px;}
+.login-logo{height:56px;object-fit:contain;filter:drop-shadow(0 0 14px rgba(96,165,250,0.5));margin-bottom:16px;}
+.login-title{font-size:20px;font-weight:800;color:#f0f9ff;margin-bottom:4px;}
+.login-sub{font-size:12px;color:var(--text-dim);margin-bottom:28px;}
+.login-field{margin-bottom:14px;text-align:left;}
+.login-field label{display:block;font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:5px;}
+.login-field input{width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);color:var(--text);border-radius:8px;padding:10px 13px;font-size:14px;outline:none;font-family:inherit;}
+.login-field input:focus{border-color:var(--accent);}
+.btn-login{width:100%;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;border:none;border-radius:9px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;transition:all 0.2s;}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,0.35);}
+.login-error{color:#f87171;font-size:12px;margin-top:10px;display:none;}
+
+/* ── APP ── */
+#appScreen{display:none;}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,rgba(4,12,32,.98),rgba(8,24,58,.96));border-bottom:1px solid var(--border);padding:14px 28px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.header::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#1d4ed8,#3b82f6,#8b5cf6,#3b82f6,#1d4ed8);}
+.logo-row{display:flex;align-items:center;gap:12px;}
+.logo-wrap{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:9px;padding:6px 11px;}
+.logo-wrap img{height:36px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(96,165,250,0.5));}
+.header-title{font-size:15px;font-weight:800;color:#f0f9ff;}
+.header-sub{font-size:11px;color:var(--text-dim);margin-top:1px;}
+.user-info{display:flex;align-items:center;gap:10px;}
+.user-badge{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;}
+.rol-admin{color:#60a5fa;}
+.rol-tecnico{color:#34d399;}
+.btn-logout{background:rgba(248,113,113,0.12);color:#f87171;border:1px solid rgba(248,113,113,0.3);border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+
+/* ALERTAS */
+.alertas-banner{margin:12px 28px 0;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);border-radius:9px;padding:10px 16px;display:none;}
+.alertas-banner.visible{display:block;}
+.alertas-title{font-size:10px;letter-spacing:2px;color:#f87171;text-transform:uppercase;font-weight:700;margin-bottom:6px;}
+.alerta-item{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(248,113,113,0.08);font-size:12px;flex-wrap:wrap;}
+.alerta-item:last-child{border-bottom:none;}
+
+/* EMPRESA FILTER */
+.empresa-filter{display:flex;gap:7px;padding:14px 28px 0;flex-wrap:wrap;}
+.empresa-pill{padding:6px 16px;border-radius:30px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;font-family:inherit;}
+.pill-all{border-color:rgba(255,255,255,0.2);color:rgba(180,215,255,0.6);background:rgba(255,255,255,0.05);}
+.pill-all.active{background:rgba(255,255,255,0.13);color:#fff;border-color:rgba(255,255,255,0.35);}
+.pill-cs{border-color:rgba(59,130,246,0.4);color:#60a5fa;background:rgba(59,130,246,0.08);}
+.pill-cs.active{background:rgba(59,130,246,0.22);color:#fff;border-color:#3b82f6;}
+.pill-cv{border-color:rgba(139,92,246,0.4);color:#a78bfa;background:rgba(139,92,246,0.08);}
+.pill-cv.active{background:rgba(139,92,246,0.22);color:#fff;border-color:#8b5cf6;}
+
+/* NAV */
+.nav{display:flex;gap:4px;padding:14px 28px 0;flex-wrap:wrap;}
+.nav-btn{padding:8px 18px;border-radius:9px 9px 0 0;border:1px solid rgba(255,255,255,0.1);border-bottom:none;background:rgba(255,255,255,0.04);color:rgba(180,215,255,0.5);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:all 0.2s;}
+.nav-btn.active{background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;border-color:#3b82f6;font-weight:700;}
+.nav-btn.hidden{display:none;}
+
+/* PANEL */
+.panel{margin:0 28px 28px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:0 10px 10px 10px;overflow:hidden;}
+.panel-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:rgba(0,0,0,0.15);}
+.panel-title{font-size:13px;font-weight:700;color:#bfdbfe;}
+.panel-count{font-size:11px;color:var(--text-dim);margin-top:1px;}
+
+/* STATS */
+.stats-bar{display:flex;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:rgba(0,0,0,0.08);}
+.stat-mini{flex:1 1 80px;background:rgba(255,255,255,0.04);border-radius:7px;padding:8px 12px;border-top:2px solid;}
+.stat-mini-num{font-size:20px;font-weight:900;line-height:1;font-family:'IBM Plex Mono',monospace;}
+.stat-mini-lbl{font-size:10px;color:rgba(180,215,255,0.5);margin-top:3px;text-transform:uppercase;letter-spacing:1px;}
+
+/* BTNS */
+.btn-primary{background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.2s;display:inline-flex;align-items:center;gap:5px;}
+.btn-primary:hover{transform:translateY(-1px);}
+.btn-secondary{background:rgba(255,255,255,0.06);color:var(--text-dim);border:1px solid rgba(255,255,255,0.12);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+.btn-danger{background:rgba(248,113,113,0.12);color:#f87171;border:1px solid rgba(248,113,113,0.3);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;}
+.btn-edit{background:rgba(96,165,250,0.12);color:#60a5fa;border:1px solid rgba(96,165,250,0.3);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;}
+.btn-green{background:rgba(52,211,153,0.12);color:#34d399;border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit;}
+.btn-add-eq{background:rgba(52,211,153,0.1);border:1px dashed rgba(52,211,153,0.35);color:#34d399;border-radius:7px;padding:6px 13px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;margin-top:5px;}
+
+/* SEARCH */
+.search-box{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);border-radius:7px;padding:6px 11px;font-size:12px;color:var(--text);outline:none;font-family:inherit;width:180px;}
+.search-box::placeholder{color:rgba(180,215,255,0.35);}
+
+/* BADGES */
+.badge{display:inline-block;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;border:1px solid;white-space:nowrap;}
+.b-op{color:#34d399;background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.35);}
+.b-rev{color:#fbbf24;background:rgba(251,191,36,0.12);border-color:rgba(251,191,36,0.35);}
+.b-fs{color:#f87171;background:rgba(248,113,113,0.12);border-color:rgba(248,113,113,0.35);}
+.b-prev{color:#a78bfa;background:rgba(167,139,250,0.12);border-color:rgba(167,139,250,0.35);}
+.emp-cs{color:#60a5fa;background:rgba(59,130,246,0.12);border-color:rgba(59,130,246,0.35);}
+.emp-cv{color:#a78bfa;background:rgba(139,92,246,0.12);border-color:rgba(139,92,246,0.35);}
+.b-correctivo{color:#f87171;background:rgba(248,113,113,0.12);border-color:rgba(248,113,113,0.3);}
+.b-preventivo2{color:#34d399;background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.3);}
+.b-admin{color:#60a5fa;background:rgba(59,130,246,0.12);border-color:rgba(59,130,246,0.3);}
+.b-tecnico{color:#34d399;background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.3);}
+
+/* CLIENTES */
+.cliente-card{border-bottom:1px solid rgba(255,255,255,0.05);}
+.cliente-row{display:flex;align-items:center;padding:11px 18px;gap:10px;cursor:pointer;transition:background 0.15s;flex-wrap:wrap;}
+.cliente-row:hover{background:rgba(59,130,246,0.04);}
+.cliente-avatar{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0;}
+.av-cs{background:linear-gradient(135deg,#1d4ed8,#3b82f6);}
+.av-cv{background:linear-gradient(135deg,#6d28d9,#8b5cf6);}
+.cliente-info{flex:1;min-width:0;}
+.cliente-nombre{font-weight:700;color:#e0f2fe;font-size:13px;}
+.cliente-meta{font-size:11px;color:var(--text-dim);margin-top:1px;}
+.eq-cnt{background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:20px;padding:2px 9px;font-size:11px;color:var(--accent2);font-weight:700;white-space:nowrap;}
+.chevron{color:var(--text-dim);transition:transform 0.2s;font-size:12px;}
+.chevron.open{transform:rotate(90deg);}
+.equipos-expand{display:none;padding:0 18px 12px 62px;}
+.equipos-expand.open{display:block;}
+
+/* EQUIPO ITEM */
+.equipo-item{border-radius:8px;padding:10px 12px;margin-bottom:7px;border:1px solid rgba(255,255,255,0.07);}
+.alarm-vencido{background:rgba(248,113,113,0.07);border-left:3px solid #f87171;}
+.alarm-proximo{background:rgba(251,191,36,0.05);border-left:3px solid #fbbf24;}
+.equipo-header{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+.equipo-nombre{font-weight:600;color:#bfdbfe;font-size:13px;}
+.equipo-meta{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.prox-prev{font-size:11px;font-family:'IBM Plex Mono',monospace;margin-top:4px;padding:3px 7px;border-radius:5px;display:inline-flex;align-items:center;gap:4px;}
+.prox-vencido{background:rgba(248,113,113,0.12);color:#f87171;}
+.prox-proximo{background:rgba(251,191,36,0.12);color:#fbbf24;}
+.prox-ok{background:rgba(52,211,153,0.1);color:#34d399;}
+
+/* FOTOS */
+.fotos-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.foto-thumb{width:64px;height:64px;border-radius:7px;object-fit:cover;border:1px solid rgba(255,255,255,0.12);cursor:pointer;transition:transform 0.2s;}
+.foto-thumb:hover{transform:scale(1.05);}
+
+/* HISTORIAL */
+.historial-wrap{margin-top:8px;border-top:1px solid rgba(255,255,255,0.07);padding-top:8px;}
+.historial-title{font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:6px;}
+.interv-item{background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);border-radius:7px;padding:8px 11px;margin-bottom:5px;font-size:12px;}
+.interv-header{display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap;}
+.interv-fecha{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);}
+.interv-tecnico{color:#bfdbfe;font-weight:600;}
+.interv-desc{color:var(--text-dim);line-height:1.5;}
+.interv-sol{color:#a7f3d0;font-size:11px;margin-top:2px;}
+.interv-rep{color:#fde68a;font-size:11px;margin-top:2px;}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead tr{border-bottom:2px solid rgba(255,255,255,0.1);}
+th{text-align:left;padding:9px 12px;font-size:10px;letter-spacing:2px;color:rgba(180,215,255,0.45);text-transform:uppercase;font-weight:700;white-space:nowrap;background:rgba(0,0,0,0.1);}
+td{padding:9px 12px;vertical-align:middle;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.04);}
+tbody tr:hover{background:rgba(59,130,246,0.04);}
+.td-name{font-weight:700;color:#e0f2fe;}
+.td-dim{color:var(--text-dim);}
+.td-mono{font-family:'IBM Plex Mono',monospace;color:var(--accent3);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:1000;align-items:center;justify-content:center;padding:14px;}
+.modal-overlay.open{display:flex;}
+.modal{background:linear-gradient(135deg,#0a1c3b,#0d2a52);border:1px solid rgba(96,165,250,0.2);border-radius:14px;padding:22px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;position:relative;}
+.modal-title{font-size:16px;font-weight:800;color:#f0f9ff;margin-bottom:14px;}
+.modal-close{position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.08);border:none;color:var(--text-dim);border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group.full{grid-column:1/-1;}
+.form-label{font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;font-weight:700;}
+.form-input,.form-select,.form-textarea{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);color:var(--text);border-radius:7px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit;transition:border-color 0.2s;}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);}
+.form-textarea{resize:vertical;min-height:58px;}
+.form-select option{background:#0d2a52;}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+.emp-selector{display:flex;gap:7px;}
+.emp-opt{flex:1;padding:7px;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--text-dim);font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:all 0.2s;font-family:inherit;}
+.emp-opt.sel-cs{background:rgba(59,130,246,0.2);border-color:#3b82f6;color:#60a5fa;}
+.emp-opt.sel-cv{background:rgba(139,92,246,0.2);border-color:#8b5cf6;color:#a78bfa;}
+
+/* FOTO UPLOAD */
+.foto-upload-area{border:2px dashed rgba(96,165,250,0.3);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all 0.2s;margin-top:4px;}
+.foto-upload-area:hover{border-color:var(--accent);background:rgba(59,130,246,0.05);}
+.foto-upload-area input{display:none;}
+.foto-preview-grid{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px;}
+.foto-preview{position:relative;width:70px;height:70px;}
+.foto-preview img{width:70px;height:70px;border-radius:7px;object-fit:cover;border:1px solid rgba(255,255,255,0.12);}
+.foto-remove{position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* LIGHTBOX */
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:2000;align-items:center;justify-content:center;}
+#lightbox.open{display:flex;}
+#lightbox img{max-width:90vw;max-height:90vh;border-radius:8px;}
+#lightbox .close-lb{position:absolute;top:16px;right:20px;color:#fff;font-size:28px;cursor:pointer;background:none;border:none;}
+
+/* EMPTY/LOADING */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-dim);}
+.empty-icon{font-size:38px;margin-bottom:10px;}
+.empty-title{font-size:14px;font-weight:700;color:#bfdbfe;margin-bottom:4px;}
+.loading{text-align:center;padding:30px;color:var(--text-dim);font-size:13px;}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(96,165,250,0.3);border-top-color:#60a5fa;border-radius:50%;animation:spin 0.8s linear infinite;margin-right:6px;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;z-index:3000;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.4);transform:translateY(60px);opacity:0;transition:all 0.3s;pointer-events:none;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.error{background:linear-gradient(135deg,#dc2626,#ef4444);}
+.toast.success{background:linear-gradient(135deg,#059669,#10b981);}
+
+@media(max-width:600px){
+  .header,.empresa-filter,.nav,.panel,.alertas-banner{padding-left:12px;padding-right:12px;}
+  .panel{margin-left:12px;margin-right:12px;}
+  .alertas-banner{margin-left:12px;margin-right:12px;}
+  .form-grid{grid-template-columns:1fr;}
+  .search-box{width:100%;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <img src="https://www.chillersystem.com/assets/img/logo.webp" class="login-logo" alt="CS"
+      onerror="this.style.display='none'"/>
+    <div class="login-title">ChillerSystem · Gestión</div>
+    <div class="login-sub">ChillerSystem S.R.L. &amp; ChillerService S.A.</div>
+    <div class="login-field">
+      <label>Usuario</label>
+      <input type="text" id="loginUser" placeholder="Tu usuario" autocomplete="username"/>
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="Tu contraseña" autocomplete="current-password"/>
+    </div>
+    <button class="btn-login" onclick="doLogin()">Ingresar →</button>
+    <div class="login-error" id="loginErr">Usuario o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- ══════════ APP ══════════ -->
+<div id="appScreen">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo-row">
+    <div class="logo-wrap">
+      <img src="https://www.chillersystem.com/assets/img/logo.webp" alt="CS"
+        onerror="this.parentElement.innerHTML='<span style=\'color:#60a5fa;font-size:16px;font-weight:900\'>CS</span>'"/>
+    </div>
+    <div>
+      <div class="header-title">Gestión Integral</div>
+      <div class="header-sub">
+        <span style="color:#60a5fa;font-weight:700;">ChillerSystem</span>
+        <span style="color:rgba(255,255,255,0.2);margin:0 4px;">·</span>
+        <span style="color:#a78bfa;font-weight:700;">ChillerService</span>
+      </div>
+    </div>
+  </div>
+  <div class="user-info">
+    <div id="sDot" style="width:7px;height:7px;border-radius:50%;background:#fbbf24;"></div>
+    <div class="user-badge"><span id="userNombre">—</span> · <span id="userRolBadge" class="rol-admin">—</span></div>
+    <button class="btn-logout" onclick="doLogout()">Salir</button>
+  </div>
+</div>
+
+<!-- ALERTAS -->
+<div class="alertas-banner" id="alertasBanner">
+  <div class="alertas-title">⚠️ Alertas de mantenimiento preventivo</div>
+  <div id="alertasLista"></div>
+</div>
+
+<!-- EMPRESA FILTER (solo admin) -->
+<div class="empresa-filter" id="empresaFilter">
+  <button class="empresa-pill pill-all active" onclick="setFiltro('todas',this)">🏢 Todas</button>
+  <button class="empresa-pill pill-cs" onclick="setFiltro('ChillerSystem',this)">🔵 ChillerSystem</button>
+  <button class="empresa-pill pill-cv" onclick="setFiltro('ChillerService',this)">🟣 ChillerService</button>
+</div>
+
+<!-- TABS -->
+<div class="nav" id="navBar">
+  <button class="nav-btn active" id="tabCli" onclick="showTab('clientes',this)">🏢 Clientes</button>
+  <button class="nav-btn" id="tabEq" onclick="showTab('equipos',this)">⚙️ Equipos</button>
+  <button class="nav-btn" id="tabHist" onclick="showTab('historial',this)">📋 Historial</button>
+  <button class="nav-btn hidden" id="tabUsers" onclick="showTab('usuarios',this)">👥 Usuarios</button>
+</div>
+
+<!-- ═══ CLIENTES ═══ -->
+<div id="tab-clientes" class="panel">
+  <div class="stats-bar">
+    <div class="stat-mini" style="border-color:#60a5fa;"><div class="stat-mini-num" style="color:#60a5fa;" id="stTotal">0</div><div class="stat-mini-lbl">Clientes</div></div>
+    <div class="stat-mini" style="border-color:#3b82f6;"><div class="stat-mini-num" style="color:#3b82f6;" id="stCS">0</div><div class="stat-mini-lbl">ChillerSystem</div></div>
+    <div class="stat-mini" style="border-color:#8b5cf6;"><div class="stat-mini-num" style="color:#8b5cf6;" id="stCV">0</div><div class="stat-mini-lbl">ChillerService</div></div>
+    <div class="stat-mini" style="border-color:#34d399;"><div class="stat-mini-num" style="color:#34d399;" id="stEq">0</div><div class="stat-mini-lbl">Equipos</div></div>
+    <div class="stat-mini" style="border-color:#f87171;"><div class="stat-mini-num" style="color:#f87171;" id="stAlarm">0</div><div class="stat-mini-lbl">Alertas</div></div>
+  </div>
+  <div class="panel-header">
+    <div><div class="panel-title">🏢 Clientes</div><div class="panel-count" id="cliCount">—</div></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <input class="search-box" type="text" placeholder="🔍 Buscar..." oninput="filtrarCli(this.value)"/>
+      <button class="btn-primary admin-only" onclick="abrirModalCli()">＋ Nuevo cliente</button>
+    </div>
+  </div>
+  <div id="clientesList"><div class="loading"><span class="spinner"></span>Cargando...</div></div>
+</div>
+
+<!-- ═══ EQUIPOS ═══ -->
+<div id="tab-equipos" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div><div class="panel-title">⚙️ Equipos</div><div class="panel-count" id="eqCount">—</div></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <input class="search-box" type="text" placeholder="🔍 Buscar..." oninput="filtrarEq(this.value)"/>
+      <button class="btn-primary" onclick="abrirModalEq()">＋ Nuevo equipo</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Equipo</th><th>Cliente</th><th>Empresa</th><th>Tipo</th>
+        <th>Marca/Modelo</th><th>Estado</th><th>Próx. Preventivo</th><th>Acciones</th>
+      </tr></thead>
+      <tbody id="eqBody"><tr><td colspan="8"><div class="loading"><span class="spinner"></span>Cargando...</div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ HISTORIAL ═══ -->
+<div id="tab-historial" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div><div class="panel-title">📋 Historial Técnico</div><div class="panel-count" id="histCount">—</div></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <select class="search-box" style="width:auto;" onchange="filtroHE=this.value;renderHist()" id="filtroEqHist"><option value="">Todos los equipos</option></select>
+      <select class="search-box" style="width:auto;" onchange="filtroHT=this.value;renderHist()">
+        <option value="">Todos los tipos</option><option>Preventivo</option><option>Correctivo</option>
+      </select>
+      <button class="btn-primary" onclick="abrirModalInterv()">＋ Nueva intervención</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Equipo</th><th>Cliente</th><th>Técnico</th><th>Descripción</th><th>Solución</th><th>Repuestos</th><th>Fotos</th><th>Acciones</th></tr></thead>
+      <tbody id="histBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ USUARIOS (solo admin) ═══ -->
+<div id="tab-usuarios" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div><div class="panel-title">👥 Gestión de Usuarios</div><div class="panel-count" id="usersCount">—</div></div>
+    <button class="btn-primary" onclick="abrirModalUser()">＋ Nuevo usuario</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <tbody id="usersBody"></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /appScreen -->
+
+<!-- ══ MODAL CLIENTE ══ -->
+<div class="modal-overlay" id="mCli">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrar('mCli')">✕</button>
+    <div class="modal-title" id="tCli">Nuevo Cliente</div>
+    <input type="hidden" id="cliId"/>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Empresa *</label>
+        <div class="emp-selector">
+          <button class="emp-opt sel-cs" id="optCS" onclick="selEmp('ChillerSystem')">🔵 ChillerSystem S.R.L.</button>
+          <button class="emp-opt" id="optCV" onclick="selEmp('ChillerService')">🟣 ChillerService S.A.</button>
+        </div>
+        <input type="hidden" id="cEmp" value="ChillerSystem"/>
+      </div>
+      <div class="form-group full"><label class="form-label">Nombre / Razón Social *</label><input class="form-input" id="cNom" placeholder="Ej: Hospital Cuenca"/></div>
+      <div class="form-group"><label class="form-label">Contacto</label><input class="form-input" id="cCont" placeholder="Nombre del contacto"/></div>
+      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="cTel" placeholder="+54 11 ..."/></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="cEmail" type="email"/></div>
+      <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="cDir"/></div>
+      <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="cNot"></textarea></div>
+    </div>
+    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mCli')">Cancelar</button><button class="btn-primary" onclick="guardarCli()">💾 Guardar</button></div>
+  </div>
+</div>
+
+<!-- ══ MODAL EQUIPO ══ -->
+<div class="modal-overlay" id="mEq">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrar('mEq')">✕</button>
+    <div class="modal-title" id="tEq">Nuevo Equipo</div>
+    <input type="hidden" id="eqId"/>
+    <div class="form-grid">
+      <div class="form-group full"><label class="form-label">Nombre del equipo *</label><input class="form-input" id="eNom" placeholder="Ej: Chiller York #1"/></div>
+      <div class="form-group full"><label class="form-label">Cliente *</label><select class="form-select" id="eCliId"><option value="">— Seleccioná un cliente —</option></select></div>
+      <div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="eTipo">
+          <option value="">— Seleccionar —</option>
+          <option>Chiller centrífugo</option><option>Chiller tornillo</option><option>Chiller reciprocante</option>
+          <option>Chiller absorción</option><option>Split / Multisplit</option><option>Torre de enfriamiento</option>
+          <option>Fan Coil</option><option>Compresor</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Estado</label>
+        <select class="form-select" id="eEst">
+          <option>Operativo</option><option>En revisión</option><option>Fuera de servicio</option><option>En mantenimiento preventivo</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Marca</label><input class="form-input" id="eMarca" placeholder="York, Carrier..."/></div>
+      <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="eModelo"/></div>
+      <div class="form-group"><label class="form-label">N° de serie</label><input class="form-input" id="eNserie"/></div>
+      <div class="form-group"><label class="form-label">Ubicación</label><input class="form-input" id="eUbic" placeholder="Piso, sala..."/></div>
+      <div class="form-group"><label class="form-label">Frecuencia preventivo (días)</label><input class="form-input" id="eFrec" type="number" value="30" min="1"/></div>
+      <div class="form-group"><label class="form-label">Último preventivo realizado</label><input class="form-input" id="eUltPrev" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Fotos del equipo</label>
+        <div class="foto-upload-area" onclick="document.getElementById('fotoEqInput').click()">
+          <input type="file" id="fotoEqInput" accept="image/*" multiple onchange="previewFotos(this,'eqFotoPreview','eqFotosNuevas')"/>
+          <div style="color:var(--text-dim);font-size:13px;">📷 Tocá para subir fotos del equipo</div>
+          <div style="font-size:11px;color:rgba(180,215,255,0.35);margin-top:4px;">JPG, PNG — Podés subir varias</div>
+        </div>
+        <div class="foto-preview-grid" id="eqFotoPreview"></div>
+      </div>
+      <div class="form-group full"><label class="form-label">Notas técnicas</label><textarea class="form-textarea" id="eNotas"></textarea></div>
+    </div>
+    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mEq')">Cancelar</button><button class="btn-primary" onclick="guardarEq()">💾 Guardar equipo</button></div>
+  </div>
+</div>
+
+<!-- ══ MODAL INTERVENCIÓN ══ -->
+<div class="modal-overlay" id="mInterv">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrar('mInterv')">✕</button>
+    <div class="modal-title" id="tInterv">Nueva Intervención</div>
+    <input type="hidden" id="intervId"/>
+    <div class="form-grid">
+      <div class="form-group full"><label class="form-label">Equipo *</label><select class="form-select" id="iEqId"><option value="">— Seleccioná un equipo —</option></select></div>
+      <div class="form-group"><label class="form-label">Tipo *</label>
+        <select class="form-select" id="iTipo"><option value="Preventivo">Preventivo</option><option value="Correctivo">Correctivo</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Fecha *</label><input class="form-input" id="iFecha" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Técnico responsable</label><input class="form-input" id="iTecnico" placeholder="Nombre del técnico"/></div>
+      <div class="form-group full"><label class="form-label">Descripción del trabajo / problema</label><textarea class="form-textarea" id="iDesc" placeholder="Detallá qué se realizó o el problema encontrado..."></textarea></div>
+      <div class="form-group full"><label class="form-label">Solución aplicada</label><textarea class="form-textarea" id="iSol" placeholder="Cómo se resolvió..."></textarea></div>
+      <div class="form-group"><label class="form-label">Repuestos utilizados</label><input class="form-input" id="iRep" placeholder="Filtro, compresor..."/></div>
+      <div class="form-group"><label class="form-label">Horas de trabajo</label><input class="form-input" id="iHoras" type="number" min="0" step="0.5"/></div>
+      <div class="form-group full"><label class="form-label">Fotos del trabajo realizado</label>
+        <div class="foto-upload-area" onclick="document.getElementById('fotoIntervInput').click()">
+          <input type="file" id="fotoIntervInput" accept="image/*" multiple onchange="previewFotos(this,'intervFotoPreview','intervFotosNuevas')"/>
+          <div style="color:var(--text-dim);font-size:13px;">📷 Subir fotos de la intervención</div>
+          <div style="font-size:11px;color:rgba(180,215,255,0.35);margin-top:4px;">Antes, durante y después del trabajo</div>
+        </div>
+        <div class="foto-preview-grid" id="intervFotoPreview"></div>
+      </div>
+      <div class="form-group full"><label class="form-label">Notas adicionales</label><textarea class="form-textarea" id="iNotas"></textarea></div>
+    </div>
+    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mInterv')">Cancelar</button><button class="btn-primary" onclick="guardarInterv()">💾 Guardar intervención</button></div>
+  </div>
+</div>
+
+<!-- ══ MODAL USUARIO ══ -->
+<div class="modal-overlay" id="mUser">
+  <div class="modal">
+    <button class="modal-close" onclick="cerrar('mUser')">✕</button>
+    <div class="modal-title" id="tUser">Nuevo Usuario</div>
+    <input type="hidden" id="userId"/>
+    <div class="form-grid">
+      <div class="form-group full"><label class="form-label">Nombre completo *</label><input class="form-input" id="uNom" placeholder="Ej: Juan Pérez"/></div>
+      <div class="form-group"><label class="form-label">Usuario *</label><input class="form-input" id="uUser" placeholder="Ej: jperez"/></div>
+      <div class="form-group"><label class="form-label">Contraseña *</label><input class="form-input" id="uPass" type="password" placeholder="Mínimo 4 caracteres"/></div>
+      <div class="form-group"><label class="form-label">Rol</label>
+        <select class="form-select" id="uRol"><option value="tecnico">Técnico</option><option value="admin">Administrador</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Estado</label>
+        <select class="form-select" id="uActivo"><option value="true">Activo</option><option value="false">Inactivo</option></select>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mUser')">Cancelar</button><button class="btn-primary" onclick="guardarUser()">💾 Guardar usuario</button></div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" onclick="closeLB()">
+  <button class="close-lb" onclick="closeLB()">✕</button>
+  <img id="lbImg" src="" alt=""/>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
+const H={'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY};
+
+let clientes=[],equipos=[],intervenciones=[],usuarios=[],expandidos=new Set();
+let filtroEmp='todas',filtroHE='',filtroHT='';
+let usuarioActual=null;
+let eqFotosNuevas=[],intervFotosNuevas=[];
+
+async function api(path,opts={}){
+  const r=await fetch(SURL+'/rest/v1/'+path,{headers:H,...opts});
+  if(!r.ok){const e=await r.json();throw new Error(e.message||'Error');}
+  return r.status===204?null:r.json();
+}
+
+// ── LOGIN ──
+async function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value;
+  try{
+    const res=await api(`usuarios?usuario=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(p)}&activo=eq.true&select=*`);
+    if(!res||!res.length){document.getElementById('loginErr').style.display='block';return;}
+    usuarioActual=res[0];
+    document.getElementById('loginErr').style.display='none';
+    iniciarApp();
+  }catch(e){showToast('Error de conexión',true);}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginScreen').style.display!=='none')doLogin();});
+
+function doLogout(){
+  usuarioActual=null;
+  document.getElementById('appScreen').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+}
+
+async function iniciarApp(){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appScreen').style.display='block';
+  document.getElementById('userNombre').textContent=usuarioActual.nombre;
+  const isAdmin=usuarioActual.rol==='admin';
+  document.getElementById('userRolBadge').textContent=isAdmin?'Admin':'Técnico';
+  document.getElementById('userRolBadge').className=isAdmin?'rol-admin':'rol-tecnico';
+  // Mostrar/ocultar según rol
+  document.getElementById('empresaFilter').style.display=isAdmin?'flex':'none';
+  document.getElementById('tabCli').style.display=isAdmin?'':'none';
+  document.getElementById('tabUsers').classList.toggle('hidden',!isAdmin);
+  document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+  // Si técnico, ir directo a equipos
+  if(!isAdmin){
+    document.getElementById('tab-clientes').style.display='none';
+    document.getElementById('tab-equipos').style.display='block';
+    document.getElementById('tabEq').classList.add('active');
+    document.getElementById('tabCli').classList.remove('active');
+  }
+  try{
+    await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones()]);
+    if(isAdmin) await loadUsuarios();
+    setStatus(true); calcAlertas();
+  }catch(e){setStatus(false);showToast('Error de conexión',true);}
+}
+
+function setStatus(ok){
+  const d=document.getElementById('sDot');
+  d.style.background=ok?'#34d399':'#f87171';
+  d.style.boxShadow=ok?'0 0 6px #34d399':'0 0 6px #f87171';
+}
+
+// ── ALERTAS ──
+function calcAlertas(){
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const alertas=[];
+  equipos.forEach(eq=>{
+    if(!eq.proximo_preventivo)return;
+    const prox=new Date(eq.proximo_preventivo);
+    const dias=Math.ceil((prox-hoy)/(1000*60*60*24));
+    const cli=clientes.find(c=>c.id===eq.cliente_id);
+    if(dias<=7)alertas.push({eq,cli,dias,tipo:dias<=0?'vencido':'proximo'});
+  });
+  document.getElementById('stAlarm').textContent=alertas.length;
+  const banner=document.getElementById('alertasBanner');
+  if(alertas.length){
+    banner.classList.add('visible');
+    document.getElementById('alertasLista').innerHTML=alertas.map(a=>`
+      <div class="alerta-item">
+        <span style="color:${a.tipo==='vencido'?'#f87171':'#fbbf24'}">${a.tipo==='vencido'?'🔴 VENCIDO':'🟡 En '+a.dias+'d'}</span>
+        <span style="font-weight:700;color:#e0f2fe;">${a.eq.nombre}</span>
+        <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
+        <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;" onclick="abrirModalInterv(null,'${a.eq.id}');document.getElementById('iTipo').value='Preventivo'">✓ Registrar</button>
+      </div>`).join('');
+  }else{banner.classList.remove('visible');}
+}
+
+function diasHastaProx(eq){
+  if(!eq.proximo_preventivo)return null;
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  return Math.ceil((new Date(eq.proximo_preventivo)-hoy)/(1000*60*60*24));
+}
+function proxPrevHTML(eq){
+  const d=diasHastaProx(eq);
+  if(d===null)return '<span style="color:var(--text-dim);font-size:11px;">Sin configurar</span>';
+  if(d<=0)return `<span class="prox-prev prox-vencido">🔴 Vencido ${Math.abs(d)}d</span>`;
+  if(d<=7)return `<span class="prox-prev prox-proximo">🟡 En ${d}d</span>`;
+  return `<span class="prox-prev prox-ok">✓ En ${d}d</span>`;
+}
+
+// ── FOTOS ──
+function previewFotos(input,previewId,varName){
+  const files=Array.from(input.files);
+  if(varName==='eqFotosNuevas') eqFotosNuevas=files;
+  else intervFotosNuevas=files;
+  const prev=document.getElementById(previewId);
+  prev.innerHTML=files.map((f,i)=>{
+    const url=URL.createObjectURL(f);
+    return `<div class="foto-preview"><img src="${url}" onclick="openLB('${url}')"/><button class="foto-remove" onclick="removeFotoPreview(${i},'${previewId}','${varName}')">✕</button></div>`;
+  }).join('');
+}
+function removeFotoPreview(idx,previewId,varName){
+  if(varName==='eqFotosNuevas') eqFotosNuevas.splice(idx,1);
+  else intervFotosNuevas.splice(idx,1);
+  const prev=document.getElementById(previewId);
+  const items=prev.querySelectorAll('.foto-preview');
+  if(items[idx]) items[idx].remove();
+}
+async function subirFotos(files,carpeta){
+  const urls=[];
+  for(const f of files){
+    const ext=f.name.split('.').pop();
+    const nombre=`${carpeta}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const r=await fetch(`${SURL}/storage/v1/object/fotos/${nombre}`,{
+      method:'POST',
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':f.type,'x-upsert':'true'},
+      body:f
+    });
+    if(r.ok) urls.push(`${SURL}/storage/v1/object/public/fotos/${nombre}`);
+  }
+  return urls;
+}
+function fotosHTML(fotos){
+  if(!fotos||!fotos.length)return '';
+  return `<div class="fotos-grid">${fotos.map(u=>`<img class="foto-thumb" src="${u}" onclick="openLB('${u}')" loading="lazy"/>`).join('')}</div>`;
+}
+function openLB(url){document.getElementById('lbImg').src=url;document.getElementById('lightbox').classList.add('open');}
+function closeLB(){document.getElementById('lightbox').classList.remove('open');}
+
+// ── CLIENTES ──
+async function loadClientes(){
+  clientes=await api('clientes?select=*&order=nombre.asc');
+  updateStats(); renderCli(clisFiltrados());
+}
+function clisFiltrados(){return filtroEmp==='todas'?clientes:clientes.filter(c=>c.empresa===filtroEmp);}
+function updateStats(){
+  document.getElementById('stTotal').textContent=clientes.length;
+  document.getElementById('stCS').textContent=clientes.filter(c=>c.empresa==='ChillerSystem').length;
+  document.getElementById('stCV').textContent=clientes.filter(c=>c.empresa==='ChillerService').length;
+  document.getElementById('stEq').textContent=equipos.length;
+}
+function renderCli(lista){
+  document.getElementById('cliCount').textContent=lista.length+' cliente(s)';
+  const el=document.getElementById('clientesList');
+  if(!lista.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">Sin clientes</div></div>`;return;}
+  const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
+  el.innerHTML=lista.map(c=>{
+    const eqs=equipos.filter(e=>e.cliente_id===c.id);
+    const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const isCS=c.empresa==='ChillerSystem';
+    const isOpen=expandidos.has(c.id);
+    const alarmas=eqs.filter(e=>{const d=diasHastaProx(e);return d!==null&&d<=7;}).length;
+    return `<div class="cliente-card">
+      <div class="cliente-row" onclick="toggleExp('${c.id}')">
+        <div class="cliente-avatar ${isCS?'av-cs':'av-cv'}">${ini}</div>
+        <div class="cliente-info">
+          <div class="cliente-nombre">${c.nombre}${alarmas?` <span style="color:#f87171;font-size:11px;">⚠️${alarmas}</span>`:''}</div>
+          <div class="cliente-meta">${[c.contacto,c.telefono].filter(Boolean).join(' · ')||'Sin datos'}</div>
+        </div>
+        <span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span>
+        <span class="eq-cnt">⚙️ ${eqs.length}</span>
+        ${isAdmin?`<button class="btn-edit" onclick="event.stopPropagation();abrirModalCli('${c.id}')">✏️</button>
+        <button class="btn-danger" onclick="event.stopPropagation();elimCli('${c.id}','${c.nombre.replace(/'/g,"\\'")}')">🗑</button>`:''}
+        <span class="chevron ${isOpen?'open':''}">▶</span>
+      </div>
+      <div class="equipos-expand ${isOpen?'open':''}" id="exp-${c.id}">
+        ${eqs.map(eq=>{
+          const d=diasHastaProx(eq);
+          const cls=d!==null&&d<=0?'alarm-vencido':d!==null&&d<=7?'alarm-proximo':'';
+          const ultI=intervenciones.filter(i=>i.equipo_id===eq.id).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+          return `<div class="equipo-item ${cls}">
+            <div class="equipo-header">
+              <div style="flex:1;min-width:120px;">
+                <div class="equipo-nombre">⚙️ ${eq.nombre}</div>
+                <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'Sin detalles'}</div>
+                <div>${proxPrevHTML(eq)}</div>
+                ${fotosHTML(eq.fotos)}
+              </div>
+              <span class="badge ${badgeEst(eq.estado)}">${eq.estado||'Operativo'}</span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button class="btn-green" onclick="abrirModalInterv(null,'${eq.id}')">＋ Intervención</button>
+                <button class="btn-edit" onclick="abrirModalEq('${eq.id}')">✏️</button>
+                ${isAdmin?`<button class="btn-danger" onclick="elimEq('${eq.id}','${eq.nombre.replace(/'/g,"\\'")}')">🗑</button>`:''}
+              </div>
+            </div>
+            ${ultI.length?`<div class="historial-wrap">
+              <div class="historial-title">Últimas intervenciones</div>
+              ${ultI.slice(0,3).map(i=>`<div class="interv-item">
+                <div class="interv-header">
+                  <span class="badge ${i.tipo==='Correctivo'?'b-correctivo':'b-preventivo2'}">${i.tipo}</span>
+                  <span class="interv-fecha">${fmtF(i.fecha)}</span>
+                  ${i.tecnico?`<span class="interv-tecnico">· ${i.tecnico}</span>`:''}
+                </div>
+                ${i.descripcion?`<div class="interv-desc">${i.descripcion}</div>`:''}
+                ${i.solucion?`<div class="interv-sol">✓ ${i.solucion}</div>`:''}
+                ${i.repuestos?`<div class="interv-rep">🔩 ${i.repuestos}</div>`:''}
+                ${fotosHTML(i.fotos)}
+              </div>`).join('')}
+            </div>`:''}
+          </div>`;
+        }).join('')||'<div style="color:var(--text-dim);font-size:12px;padding:6px 0;">Sin equipos.</div>'}
+        <button class="btn-add-eq" onclick="abrirModalEq(null,'${c.id}')">＋ Agregar equipo</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleExp(id){expandidos.has(id)?expandidos.delete(id):expandidos.add(id);renderCli(clisFiltrados());}
+function filtrarCli(q){renderCli(clisFiltrados().filter(c=>c.nombre.toLowerCase().includes(q.toLowerCase())));}
+
+async function guardarCli(){
+  const id=document.getElementById('cliId').value;
+  const nom=document.getElementById('cNom').value.trim();
+  if(!nom){showToast('Nombre obligatorio',true);return;}
+  const data={nombre:nom,empresa:document.getElementById('cEmp').value,
+    contacto:document.getElementById('cCont').value.trim()||null,
+    telefono:document.getElementById('cTel').value.trim()||null,
+    email:document.getElementById('cEmail').value.trim()||null,
+    direccion:document.getElementById('cDir').value.trim()||null,
+    notas:document.getElementById('cNot').value.trim()||null};
+  try{
+    if(id) await api(`clientes?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    else    await api('clientes',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    showToast(id?'Cliente actualizado ✓':'Cliente guardado ✓','success');
+    cerrar('mCli');await loadClientes();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+async function elimCli(id,nom){
+  if(!confirm(`¿Eliminar "${nom}"?`))return;
+  try{await api(`clientes?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Eliminado');await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones()]);}
+  catch(e){showToast('Error',true);}
+}
+function abrirModalCli(id=null){
+  ['cliId','cNom','cCont','cTel','cEmail','cDir','cNot'].forEach(x=>document.getElementById(x).value='');
+  selEmp('ChillerSystem');
+  if(id){
+    const c=clientes.find(x=>x.id===id);
+    document.getElementById('tCli').textContent='Editar Cliente';
+    document.getElementById('cliId').value=c.id;
+    document.getElementById('cNom').value=c.nombre||'';
+    document.getElementById('cCont').value=c.contacto||'';
+    document.getElementById('cTel').value=c.telefono||'';
+    document.getElementById('cEmail').value=c.email||'';
+    document.getElementById('cDir').value=c.direccion||'';
+    document.getElementById('cNot').value=c.notas||'';
+    selEmp(c.empresa||'ChillerSystem');
+  }else document.getElementById('tCli').textContent='Nuevo Cliente';
+  document.getElementById('mCli').classList.add('open');
+}
+function selEmp(v){
+  document.getElementById('cEmp').value=v;
+  document.getElementById('optCS').className='emp-opt'+(v==='ChillerSystem'?' sel-cs':'');
+  document.getElementById('optCV').className='emp-opt'+(v==='ChillerService'?' sel-cv':'');
+}
+
+// ── EQUIPOS ──
+async function loadEquipos(){
+  equipos=await api('equipos?select=*&order=nombre.asc');
+  updateStats();renderEq(eqsFiltrados());poblarSelects();
+}
+function eqsFiltrados(){
+  if(filtroEmp==='todas')return equipos;
+  return equipos.filter(e=>{const c=clientes.find(x=>x.id===e.cliente_id);return c&&c.empresa===filtroEmp;});
+}
+function poblarSelects(){
+  const ops=equipos.map(e=>{const c=clientes.find(x=>x.id===e.cliente_id);return `<option value="${e.id}">${e.nombre}${c?' ('+c.nombre+')':''}`;}).join('');
+  document.getElementById('filtroEqHist').innerHTML='<option value="">Todos los equipos</option>'+ops;
+  document.getElementById('iEqId').innerHTML='<option value="">— Seleccioná un equipo —</option>'+ops;
+  document.getElementById('eCliId').innerHTML='<option value="">— Seleccioná un cliente —</option>'+clientes.map(c=>`<option value="${c.id}">${c.nombre} (${c.empresa==='ChillerSystem'?'CS':'CV'})</option>`).join('');
+}
+function badgeEst(e){
+  if(!e||e==='Operativo')return 'b-op';
+  if(e==='En revisión')return 'b-rev';
+  if(e==='Fuera de servicio')return 'b-fs';
+  return 'b-prev';
+}
+function renderEq(lista){
+  document.getElementById('eqCount').textContent=lista.length+' equipo(s)';
+  const tb=document.getElementById('eqBody');
+  const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
+  if(!lista.length){tb.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Sin equipos</div></div></td></tr>`;return;}
+  tb.innerHTML=lista.map(e=>{
+    const c=clientes.find(x=>x.id===e.cliente_id);
+    const isCS=c&&c.empresa==='ChillerSystem';
+    return `<tr>
+      <td class="td-name">${e.nombre}</td>
+      <td class="td-dim">${c?c.nombre:'—'}</td>
+      <td><span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span></td>
+      <td class="td-dim">${e.tipo||'—'}</td>
+      <td class="td-dim">${[e.marca,e.modelo].filter(Boolean).join('/')||'—'}</td>
+      <td><span class="badge ${badgeEst(e.estado)}">${e.estado||'Operativo'}</span></td>
+      <td>${proxPrevHTML(e)}</td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn-green" onclick="abrirModalInterv(null,'${e.id}')">＋</button>
+        <button class="btn-edit" onclick="abrirModalEq('${e.id}')">✏️</button>
+        ${isAdmin?`<button class="btn-danger" onclick="elimEq('${e.id}','${e.nombre.replace(/'/g,"\\'")}')">🗑</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+function filtrarEq(q){renderEq(eqsFiltrados().filter(e=>e.nombre.toLowerCase().includes(q.toLowerCase())||(e.marca||'').toLowerCase().includes(q.toLowerCase())));}
+
+async function guardarEq(){
+  const id=document.getElementById('eqId').value;
+  const nom=document.getElementById('eNom').value.trim();
+  const cid=document.getElementById('eCliId').value;
+  if(!nom){showToast('Nombre obligatorio',true);return;}
+  if(!cid){showToast('Seleccioná un cliente',true);return;}
+  showToast('Guardando...');
+  const frec=parseInt(document.getElementById('eFrec').value)||30;
+  const ultP=document.getElementById('eUltPrev').value||null;
+  const proxP=ultP?calcProx(ultP,frec):null;
+  let fotosUrls=[];
+  if(eqFotosNuevas.length) fotosUrls=await subirFotos(eqFotosNuevas,'equipos');
+  const existentes=id?(equipos.find(e=>e.id===id)||{}).fotos||[]:[];
+  const data={nombre:nom,cliente_id:cid,tipo:document.getElementById('eTipo').value||null,
+    estado:document.getElementById('eEst').value||'Operativo',
+    marca:document.getElementById('eMarca').value.trim()||null,
+    modelo:document.getElementById('eModelo').value.trim()||null,
+    numero_serie:document.getElementById('eNserie').value.trim()||null,
+    ubicacion:document.getElementById('eUbic').value.trim()||null,
+    frecuencia_dias:frec,ultimo_preventivo:ultP,proximo_preventivo:proxP,
+    notas:document.getElementById('eNotas').value.trim()||null,
+    fotos:[...existentes,...fotosUrls]};
+  try{
+    if(id) await api(`equipos?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    else    await api('equipos',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Equipo guardado ✓','success');
+    cerrar('mEq');eqFotosNuevas=[];
+    await Promise.all([loadEquipos(),loadClientes()]);calcAlertas();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+async function elimEq(id,nom){
+  if(!confirm(`¿Eliminar "${nom}"?`))return;
+  try{await api(`equipos?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Eliminado');await Promise.all([loadEquipos(),loadClientes(),loadIntervenciones()]);}
+  catch(e){showToast('Error',true);}
+}
+function abrirModalEq(id=null,cliPre=null){
+  ['eqId','eNom','eMarca','eModelo','eNserie','eUbic','eNotas','eUltPrev'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('eTipo').value='';document.getElementById('eEst').value='Operativo';
+  document.getElementById('eFrec').value='30';document.getElementById('eqFotoPreview').innerHTML='';
+  eqFotosNuevas=[];
+  poblarSelects();
+  if(id){
+    const e=equipos.find(x=>x.id===id);
+    document.getElementById('tEq').textContent='Editar Equipo';
+    document.getElementById('eqId').value=e.id;
+    document.getElementById('eNom').value=e.nombre||'';
+    document.getElementById('eCliId').value=e.cliente_id||'';
+    document.getElementById('eTipo').value=e.tipo||'';
+    document.getElementById('eEst').value=e.estado||'Operativo';
+    document.getElementById('eMarca').value=e.marca||'';
+    document.getElementById('eModelo').value=e.modelo||'';
+    document.getElementById('eNserie').value=e.numero_serie||'';
+    document.getElementById('eUbic').value=e.ubicacion||'';
+    document.getElementById('eFrec').value=e.frecuencia_dias||30;
+    document.getElementById('eUltPrev').value=e.ultimo_preventivo||'';
+    document.getElementById('eNotas').value=e.notas||'';
+    if(e.fotos&&e.fotos.length){
+      document.getElementById('eqFotoPreview').innerHTML=e.fotos.map(u=>`<div class="foto-preview"><img src="${u}" onclick="openLB('${u}')"/></div>`).join('');
+    }
+  }else{
+    document.getElementById('tEq').textContent='Nuevo Equipo';
+    if(cliPre) document.getElementById('eCliId').value=cliPre;
+  }
+  document.getElementById('mEq').classList.add('open');
+}
+
+// ── INTERVENCIONES ──
+async function loadIntervenciones(){
+  intervenciones=await api('intervenciones?select=*&order=fecha.desc');
+  renderHist();
+}
+function renderHist(){
+  const lista=intervenciones.filter(i=>(filtroHE?i.equipo_id===filtroHE:true)&&(filtroHT?i.tipo===filtroHT:true));
+  document.getElementById('histCount').textContent=lista.length+' registro(s)';
+  const tb=document.getElementById('histBody');
+  const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
+  if(!lista.length){tb.innerHTML=`<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Sin intervenciones</div></div></td></tr>`;return;}
+  tb.innerHTML=lista.map(i=>{
+    const eq=equipos.find(e=>e.id===i.equipo_id);
+    const cli=eq?clientes.find(c=>c.id===eq.cliente_id):null;
+    return `<tr>
+      <td class="td-mono">${fmtF(i.fecha)}</td>
+      <td><span class="badge ${i.tipo==='Correctivo'?'b-correctivo':'b-preventivo2'}">${i.tipo}</span></td>
+      <td class="td-name">${eq?eq.nombre:'—'}</td>
+      <td class="td-dim">${cli?cli.nombre:'—'}</td>
+      <td class="td-dim">${i.tecnico||'—'}</td>
+      <td class="td-dim" style="max-width:160px;">${i.descripcion||'—'}</td>
+      <td class="td-dim" style="max-width:160px;">${i.solucion||'—'}</td>
+      <td class="td-dim">${i.repuestos||'—'}</td>
+      <td>${i.fotos&&i.fotos.length?i.fotos.map(u=>`<img class="foto-thumb" src="${u}" style="width:36px;height:36px;" onclick="openLB('${u}')" loading="lazy"/>`).join(''):'—'}</td>
+      <td style="display:flex;gap:4px;">
+        <button class="btn-edit" onclick="abrirModalInterv('${i.id}')">✏️</button>
+        ${isAdmin?`<button class="btn-danger" onclick="elimInterv('${i.id}')">🗑</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function guardarInterv(){
+  const id=document.getElementById('intervId').value;
+  const eqId=document.getElementById('iEqId').value;
+  const fecha=document.getElementById('iFecha').value;
+  const tipo=document.getElementById('iTipo').value;
+  if(!eqId){showToast('Seleccioná un equipo',true);return;}
+  if(!fecha){showToast('Fecha obligatoria',true);return;}
+  showToast('Guardando...');
+  let fotosUrls=[];
+  if(intervFotosNuevas.length) fotosUrls=await subirFotos(intervFotosNuevas,'intervenciones');
+  const existentes=id?(intervenciones.find(i=>i.id===id)||{}).fotos||[]:[];
+  const data={equipo_id:eqId,tipo,fecha,
+    tecnico:document.getElementById('iTecnico').value.trim()||null,
+    descripcion:document.getElementById('iDesc').value.trim()||null,
+    solucion:document.getElementById('iSol').value.trim()||null,
+    repuestos:document.getElementById('iRep').value.trim()||null,
+    horas_trabajo:parseFloat(document.getElementById('iHoras').value)||null,
+    notas:document.getElementById('iNotas').value.trim()||null,
+    fotos:[...existentes,...fotosUrls]};
+  try{
+    if(id) await api(`intervenciones?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    else    await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    if(tipo==='Preventivo'){
+      const eq=equipos.find(e=>e.id===eqId);
+      const frec=eq?eq.frecuencia_dias||30:30;
+      await api(`equipos?id=eq.${eqId}`,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
+    }
+    showToast('Intervención guardada ✓','success');
+    cerrar('mInterv');intervFotosNuevas=[];
+    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes()]);calcAlertas();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+async function elimInterv(id){
+  if(!confirm('¿Eliminar esta intervención?'))return;
+  try{await api(`intervenciones?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Eliminado');await loadIntervenciones();}catch(e){showToast('Error',true);}
+}
+function abrirModalInterv(id=null,eqPre=null){
+  ['intervId','iTecnico','iDesc','iSol','iRep','iHoras','iNotas'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('iTipo').value='Preventivo';
+  document.getElementById('iFecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('intervFotoPreview').innerHTML='';intervFotosNuevas=[];
+  poblarSelects();
+  if(id){
+    const i=intervenciones.find(x=>x.id===id);
+    document.getElementById('tInterv').textContent='Editar Intervención';
+    document.getElementById('intervId').value=i.id;
+    document.getElementById('iEqId').value=i.equipo_id||'';
+    document.getElementById('iTipo').value=i.tipo||'Preventivo';
+    document.getElementById('iFecha').value=i.fecha||'';
+    document.getElementById('iTecnico').value=i.tecnico||'';
+    document.getElementById('iDesc').value=i.descripcion||'';
+    document.getElementById('iSol').value=i.solucion||'';
+    document.getElementById('iRep').value=i.repuestos||'';
+    document.getElementById('iHoras').value=i.horas_trabajo||'';
+    document.getElementById('iNotas').value=i.notas||'';
+    if(i.fotos&&i.fotos.length){
+      document.getElementById('intervFotoPreview').innerHTML=i.fotos.map(u=>`<div class="foto-preview"><img src="${u}" onclick="openLB('${u}')"/></div>`).join('');
+    }
+  }else{
+    document.getElementById('tInterv').textContent='Nueva Intervención';
+    if(eqPre) document.getElementById('iEqId').value=eqPre;
+  }
+  document.getElementById('mInterv').classList.add('open');
+}
+
+// ── USUARIOS ──
+async function loadUsuarios(){
+  usuarios=await api('usuarios?select=*&order=nombre.asc');
+  renderUsers();
+}
+function renderUsers(){
+  document.getElementById('usersCount').textContent=usuarios.length+' usuario(s)';
+  const tb=document.getElementById('usersBody');
+  tb.innerHTML=usuarios.map(u=>`<tr>
+    <td class="td-name">${u.nombre}</td>
+    <td class="td-mono">${u.usuario}</td>
+    <td><span class="badge ${u.rol==='admin'?'b-admin':'b-tecnico'}">${u.rol==='admin'?'Admin':'Técnico'}</span></td>
+    <td><span class="badge ${u.activo?'b-op':'b-fs'}">${u.activo?'Activo':'Inactivo'}</span></td>
+    <td style="display:flex;gap:4px;">
+      <button class="btn-edit" onclick="abrirModalUser('${u.id}')">✏️</button>
+      ${u.usuario!=='admin'?`<button class="btn-danger" onclick="elimUser('${u.id}','${u.nombre.replace(/'/g,"\\'")}')">🗑</button>`:''}
+    </td>
+  </tr>`).join('');
+}
+async function guardarUser(){
+  const id=document.getElementById('userId').value;
+  const nom=document.getElementById('uNom').value.trim();
+  const usr=document.getElementById('uUser').value.trim();
+  const pass=document.getElementById('uPass').value;
+  if(!nom||!usr){showToast('Nombre y usuario obligatorios',true);return;}
+  const data={nombre:nom,usuario:usr,rol:document.getElementById('uRol').value,activo:document.getElementById('uActivo').value==='true'};
+  if(pass) data.password=pass;
+  try{
+    if(id) await api(`usuarios?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    else{
+      if(!pass){showToast('Contraseña obligatoria para nuevo usuario',true);return;}
+      await api('usuarios',{method:'POST',body:JSON.stringify({...data,password:pass}),headers:{...H,'Prefer':'return=minimal'}});
+    }
+    showToast('Usuario guardado ✓','success');cerrar('mUser');await loadUsuarios();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+async function elimUser(id,nom){
+  if(!confirm(`¿Eliminar usuario "${nom}"?`))return;
+  try{await api(`usuarios?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Eliminado');await loadUsuarios();}catch(e){showToast('Error',true);}
+}
+function abrirModalUser(id=null){
+  ['userId','uNom','uUser','uPass'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('uRol').value='tecnico';document.getElementById('uActivo').value='true';
+  if(id){
+    const u=usuarios.find(x=>x.id===id);
+    document.getElementById('tUser').textContent='Editar Usuario';
+    document.getElementById('userId').value=u.id;
+    document.getElementById('uNom').value=u.nombre||'';
+    document.getElementById('uUser').value=u.usuario||'';
+    document.getElementById('uRol').value=u.rol||'tecnico';
+    document.getElementById('uActivo').value=String(u.activo);
+  }else document.getElementById('tUser').textContent='Nuevo Usuario';
+  document.getElementById('mUser').classList.add('open');
+}
+
+// ── UTILS ──
+function setFiltro(v,btn){
+  filtroEmp=v;
+  document.querySelectorAll('.empresa-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCli(clisFiltrados());renderEq(eqsFiltrados());
+}
+function showTab(id,btn){
+  ['clientes','equipos','historial','usuarios'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function cerrar(id){document.getElementById(id).classList.remove('open');}
+function calcProx(desde,dias){const d=new Date(desde);d.setDate(d.getDate()+parseInt(dias));return d.toISOString().split('T')[0];}
+function fmtF(f){if(!f)return '—';const[y,m,d]=f.split('-');return `${d}/${m}/${y}`;}
+let tt;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(type==='success'?' success':type===true||type==='error'?' error':'');
+  clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),3000);
+}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+</script>
+</body>
+</html>
