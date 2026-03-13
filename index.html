@@ -516,7 +516,7 @@ async function doLogin(){
   const u=document.getElementById('loginUser').value.trim();
   const p=document.getElementById('loginPass').value;
   try{
-    const res=await api(`usuarios?usuario=eq.${encodeURIComponent(u)}&password=eq.${encodeURIComponent(p)}&activo=eq.true&select=*`);
+    const res=await api(`usuarios?usuario=eq.${encodeURIComponent(u)}&contraseña=eq.${encodeURIComponent(p)}&activo=eq.true&select=*`);
     if(!res||!res.length){document.getElementById('loginErr').style.display='block';return;}
     usuarioActual=res[0];
     document.getElementById('loginErr').style.display='none';
@@ -1006,12 +1006,12 @@ async function guardarUser(){
   const pass=document.getElementById('uPass').value;
   if(!nom||!usr){showToast('Nombre y usuario obligatorios',true);return;}
   const data={nombre:nom,usuario:usr,rol:document.getElementById('uRol').value,activo:document.getElementById('uActivo').value==='true'};
-  if(pass) data.password=pass;
+  if(pass) data['contraseña']=pass;
   try{
     if(id) await api(`usuarios?id=eq.${id}`,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
     else{
       if(!pass){showToast('Contraseña obligatoria para nuevo usuario',true);return;}
-      await api('usuarios',{method:'POST',body:JSON.stringify({...data,password:pass}),headers:{...H,'Prefer':'return=minimal'}});
+      await api('usuarios',{method:'POST',body:JSON.stringify({...data,'contraseña':pass}),headers:{...H,'Prefer':'return=minimal'}});
     }
     showToast('Usuario guardado ✓','success');cerrar('mUser');await loadUsuarios();
   }catch(e){showToast('Error: '+e.message,true);}
