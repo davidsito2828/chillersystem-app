@@ -621,17 +621,45 @@ function removeFotoPreview(idx,previewId,varName){
   const items=prev.querySelectorAll('.foto-preview');
   if(items[idx]) items[idx].remove();
 }
+async function comprimirFoto(file){
+  return new Promise(resolve=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const MAX=1200;
+      let w=img.width,h=img.height;
+      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>resolve(blob||file),'image/jpeg',0.75);
+      URL.revokeObjectURL(url);
+    };
+    img.onerror=()=>resolve(file);
+    img.src=url;
+  });
+}
 async function subirFotos(files,carpeta){
   const urls=[];
   for(const f of files){
-    const ext=f.name.split('.').pop();
-    const nombre=`${carpeta}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const r=await fetch(`${SURL}/storage/v1/object/fotos/${nombre}`,{
-      method:'POST',
-      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':f.type,'x-upsert':'true'},
-      body:f
-    });
-    if(r.ok) urls.push(`${SURL}/storage/v1/object/public/fotos/${nombre}`);
+    try{
+      const comprimida=await comprimirFoto(f);
+      const nombre=carpeta+'/'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.jpg';
+      const r=await fetch(SURL+'/storage/v1/object/fotos/'+nombre,{
+        method:'POST',
+        headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'image/jpeg','x-upsert':'true'},
+        body:comprimida
+      });
+      if(r.ok){
+        urls.push(SURL+'/storage/v1/object/public/fotos/'+nombre);
+      }else{
+        const err=await r.json().catch(()=>({}));
+        if(r.status===400||r.status===413||(err.error&&err.error.includes('quota'))){
+          showToast('Storage lleno - contacta al administrador',true);
+          break;
+        }
+      }
+    }catch(e){showToast('Error al subir foto: '+e.message,true);}
   }
   return urls;
 }
