@@ -516,8 +516,8 @@ async function doLogin(){
   const u=document.getElementById('loginUser').value.trim();
   const p=document.getElementById('loginPass').value;
   try{
-    const res=await api(`usuarios?usuario=eq.${encodeURIComponent(u)}&contraseña=eq.${encodeURIComponent(p)}&activo=eq.true&select=*`);
-    if(!res||!res.length){document.getElementById('loginErr').style.display='block';return;}
+    const res=await api(`usuarios?usuario=eq.${encodeURIComponent(u)}&activo=eq.true&select=*`);
+    if(!res||!res.length||res[0].password!==p){document.getElementById('loginErr').style.display='block';return;}
     usuarioActual=res[0];
     document.getElementById('loginErr').style.display='none';
     iniciarApp();
