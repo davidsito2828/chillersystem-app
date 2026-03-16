@@ -291,6 +291,7 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
   <button class="nav-btn" id="tabHist" onclick="showTab('historial',this)">📋 Historial</button>
   <button class="nav-btn hidden" id="tabUsers" onclick="showTab('usuarios',this)">👥 Usuarios</button>
   <button class="nav-btn" id="tabService" onclick="showTab('service',this)">🔧 Service</button>
+  <button class="nav-btn" id="tabEventual" onclick="showTab('eventual',this)">🔖 Eventuales</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -488,6 +489,86 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
   </div>
 </div>
 
+
+<!-- ═══ EVENTUALES ═══ -->
+<div id="tab-eventual" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div><div class="panel-title">🔖 Clientes Eventuales</div><div class="panel-count" id="eventualCount">—</div></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <input class="search-box" type="text" placeholder="🔍 Buscar..." oninput="filtrarEventuales(this.value)"/>
+      <button class="btn-primary" onclick="abrirModalEventual()">＋ Nuevo cliente eventual</button>
+    </div>
+  </div>
+  <div id="eventualList"><div class="loading"><span class="spinner"></span>Cargando...</div></div>
+</div>
+
+<!-- MODAL CLIENTE EVENTUAL -->
+<div class="modal-overlay" id="mEventual">
+  <div class="modal" style="max-width:560px;">
+    <button class="modal-close" onclick="cerrar('mEventual')">✕</button>
+    <div class="modal-title" id="tEventual">Nuevo Cliente Eventual</div>
+    <input type="hidden" id="eventualId"/>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Empresa *</label>
+        <div class="emp-selector">
+          <button class="emp-opt sel-cs" id="eOptCS" onclick="selEmpE('ChillerSystem')">🔵 ChillerSystem S.R.L.</button>
+          <button class="emp-opt" id="eOptCV" onclick="selEmpE('ChillerService')">🟣 ChillerService S.A.</button>
+        </div>
+        <input type="hidden" id="eEmpresa" value="ChillerSystem"/>
+      </div>
+      <div class="form-group full"><label class="form-label">Nombre / Razón Social *</label><input class="form-input" id="eNomEvt" placeholder="Ej: Empresa XYZ S.A."/></div>
+      <div class="form-group"><label class="form-label">Contacto</label><input class="form-input" id="eContEvt" placeholder="Nombre del contacto"/></div>
+      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="eTelEvt" placeholder="+54 11 ..."/></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="eEmailEvt" type="email"/></div>
+      <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="eDirEvt"/></div>
+      <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="eNotEvt" placeholder="Información adicional..."></textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mEventual')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarEventual()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TRABAJO EVENTUAL -->
+<div class="modal-overlay" id="mTrabajoEvt">
+  <div class="modal" style="max-width:560px;">
+    <button class="modal-close" onclick="cerrar('mTrabajoEvt')">✕</button>
+    <div class="modal-title" id="tTrabajoEvt">Registrar trabajo</div>
+    <input type="hidden" id="trabajoEvtId"/>
+    <input type="hidden" id="trabajoClienteEvtId"/>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Tipo de trabajo *</label>
+        <select class="form-select" id="tTrabajoTipo">
+          <option value="Preventivo">Preventivo</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Verificación técnica">Verificación técnica</option>
+          <option value="Instalación">Instalación</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Fecha *</label><input class="form-input" id="tTrabajoFecha" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Equipo / Sistema intervenido</label><input class="form-input" id="tTrabajoEquipo" placeholder="Ej: Split 3000 frig, Chiller York..."/></div>
+      <div class="form-group full"><label class="form-label">Técnico responsable</label><input class="form-input" id="tTrabajoTecnico" placeholder="Nombre del técnico"/></div>
+      <div class="form-group full"><label class="form-label">Descripción del trabajo *</label><textarea class="form-textarea" id="tTrabajoDesc" placeholder="Detallá qué se realizó..." style="min-height:80px;"></textarea></div>
+      <div class="form-group full"><label class="form-label">Solución / Resultado</label><textarea class="form-textarea" id="tTrabajoSol" placeholder="Resultado del trabajo..."></textarea></div>
+      <div class="form-group"><label class="form-label">Repuestos utilizados</label><input class="form-input" id="tTrabajoRep" placeholder="Filtro, compresor..."/></div>
+      <div class="form-group"><label class="form-label">Horas de trabajo</label><input class="form-input" id="tTrabajoHoras" type="number" min="0" step="0.5"/></div>
+      <div class="form-group full"><label class="form-label">Fotos</label>
+        <div class="foto-upload-area" onclick="document.getElementById('fotoEvtInput').click()">
+          <input type="file" id="fotoEvtInput" accept="image/*" multiple onchange="previewFotos(this,'evtFotoPreview','evtFotosNuevas')"/>
+          <div style="color:var(--text-dim);font-size:13px;">📷 Subir fotos del trabajo</div>
+        </div>
+        <div class="foto-preview-grid" id="evtFotoPreview"></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mTrabajoEvt')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarTrabajoEvt()">💾 Guardar trabajo</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /appScreen -->
 
 <!-- ══ MODAL CLIENTE ══ -->
@@ -639,6 +720,7 @@ const H={'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer
 
 let clientes=[],equipos=[],intervenciones=[],usuarios=[],expandidos=new Set();
 let serviceFotosNuevas=[];
+let evtFotosNuevas=[];
 let servicePlanilla={}; // {eqId: {trabajo, necesita_correctivo, desc_correctivo, fotos}}
 let serviceClienteActual=null;
 let filtroEmp='todas',filtroHE='',filtroHT='';
@@ -815,7 +897,7 @@ async function loadClientes(){
   clientes=await api('clientes?select=*&order=nombre.asc');
   updateStats(); renderCli(clisFiltrados());
 }
-function clisFiltrados(){return filtroEmp==='todas'?clientes:clientes.filter(c=>c.empresa===filtroEmp);}
+function clisFiltrados(){const base=clientes.filter(c=>c.tipo_cliente!=='eventual');return filtroEmp==='todas'?base:base.filter(c=>c.empresa===filtroEmp);}
 function updateStats(){
   document.getElementById('stTotal').textContent=clientes.length;
   document.getElementById('stCS').textContent=clientes.filter(c=>c.empresa==='ChillerSystem').length;
@@ -1553,15 +1635,182 @@ function setFiltro(v,btn){
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
+  ['clientes','equipos','historial','usuarios','service','eventual'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
   if(id==='historial') renderHist();
+  if(id==='eventual'){renderEventuales(eventualesFiltrados());}
 }
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){const d=new Date(desde);d.setDate(d.getDate()+parseInt(dias));return d.toISOString().split('T')[0];}
 function fmtF(f){if(!f)return '—';const[y,m,d]=f.split('-');return d+'/'+m+'/'+y;}
+
+// ── EVENTUALES ──
+function eventualesFiltrados(q=''){
+  return clientes.filter(c=>c.tipo_cliente==='eventual'&&(!q||c.nombre.toLowerCase().includes(q.toLowerCase())));
+}
+
+function filtrarEventuales(q){renderEventuales(eventualesFiltrados(q));}
+
+function renderEventuales(lista){
+  document.getElementById('eventualCount').textContent=lista.length+' cliente(s) eventual(es)';
+  const el=document.getElementById('eventualList');
+  if(!lista.length){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">🔖</div><div class="empty-title">Sin clientes eventuales</div><div>Registrá trabajos puntuales que no son abonados</div></div>';
+    return;
+  }
+  el.innerHTML=lista.map(c=>{
+    const isCS=c.empresa==='ChillerSystem';
+    const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const trabajos=intervenciones.filter(i=>i.cliente_id===c.id);
+    const ult=trabajos.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))[0];
+    return `<div class="cliente-card">
+      <div style="padding:12px 18px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="cliente-avatar ${isCS?'av-cs':'av-cv'}">${ini}</div>
+          <div class="cliente-info">
+            <div class="cliente-nombre">${c.nombre}</div>
+            <div class="cliente-meta">${[c.contacto,c.telefono,c.direccion].filter(Boolean).join(' · ')||'Sin datos'}</div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">${trabajos.length} trabajo(s) registrado(s)${ult?' · Último: '+fmtF(ult.fecha):''}</div>
+          </div>
+          <span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto;">
+            <button class="btn-primary" style="padding:5px 12px;font-size:12px;" onclick="abrirTrabajoEvt('${c.id}')">＋ Trabajo</button>
+            <button class="btn-green" onclick="convertirAbonado('${c.id}','${c.nombre.replace(/'/g,"")}')" title="Convertir a abonado">⭐ Abonado</button>
+            <button class="btn-edit" onclick="abrirModalEventual('${c.id}')">✏️</button>
+            <button class="btn-danger" onclick="elimEventual('${c.id}','${c.nombre.replace(/'/g,"")}')">🗑</button>
+          </div>
+        </div>
+        ${trabajos.length?`<div style="margin-top:10px;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;">
+          ${trabajos.slice(0,3).map(t=>`
+            <div class="interv-item" style="margin-bottom:5px;">
+              <div class="interv-header">
+                <span class="badge ${t.tipo==='Correctivo'?'b-correctivo':t.tipo==='Verificación técnica'?'b-rev':'b-preventivo2'}">${t.tipo}</span>
+                <span class="interv-fecha">${fmtF(t.fecha)}</span>
+                ${t.tecnico?`<span class="interv-tecnico">· ${t.tecnico}</span>`:''}
+                ${t.descripcion?`<span style="font-size:11px;color:var(--text-dim);margin-left:6px;">${t.descripcion.substring(0,60)}${t.descripcion.length>60?'...':''}</span>`:''}
+                <button class="btn-danger" onclick="elimInterv('${t.id}')" style="padding:2px 7px;font-size:11px;margin-left:auto;">🗑</button>
+              </div>
+              ${fotosHTML(t.fotos)}
+            </div>`).join('')}
+          ${trabajos.length>3?`<div style="font-size:11px;color:var(--text-dim);text-align:center;padding:4px;">... y ${trabajos.length-3} más</div>`:''}
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function abrirModalEventual(id=null){
+  ['eventualId','eNomEvt','eContEvt','eTelEvt','eEmailEvt','eDirEvt','eNotEvt'].forEach(x=>document.getElementById(x).value='');
+  selEmpE('ChillerSystem');
+  if(id){
+    const c=clientes.find(x=>x.id===id);
+    document.getElementById('tEventual').textContent='Editar Cliente Eventual';
+    document.getElementById('eventualId').value=c.id;
+    document.getElementById('eNomEvt').value=c.nombre||'';
+    document.getElementById('eContEvt').value=c.contacto||'';
+    document.getElementById('eTelEvt').value=c.telefono||'';
+    document.getElementById('eEmailEvt').value=c.email||'';
+    document.getElementById('eDirEvt').value=c.direccion||'';
+    document.getElementById('eNotEvt').value=c.notas||'';
+    selEmpE(c.empresa||'ChillerSystem');
+  }else{
+    document.getElementById('tEventual').textContent='Nuevo Cliente Eventual';
+  }
+  document.getElementById('mEventual').classList.add('open');
+}
+
+function selEmpE(v){
+  document.getElementById('eEmpresa').value=v;
+  document.getElementById('eOptCS').className='emp-opt'+(v==='ChillerSystem'?' sel-cs':'');
+  document.getElementById('eOptCV').className='emp-opt'+(v==='ChillerService'?' sel-cv':'');
+}
+
+async function guardarEventual(){
+  const id=document.getElementById('eventualId').value;
+  const nom=document.getElementById('eNomEvt').value.trim();
+  if(!nom){showToast('Nombre obligatorio',true);return;}
+  const data={nombre:nom,empresa:document.getElementById('eEmpresa').value,
+    tipo_cliente:'eventual',
+    contacto:document.getElementById('eContEvt').value.trim()||null,
+    telefono:document.getElementById('eTelEvt').value.trim()||null,
+    email:document.getElementById('eEmailEvt').value.trim()||null,
+    direccion:document.getElementById('eDirEvt').value.trim()||null,
+    notas:document.getElementById('eNotEvt').value.trim()||null};
+  try{
+    if(id) await api('clientes?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    else    await api('clientes',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Cliente guardado ✓','success');
+    cerrar('mEventual');await loadClientes();
+    renderEventuales(eventualesFiltrados());
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function elimEventual(id,nom){
+  if(!confirm('¿Eliminar "'+nom+'" y todos sus registros?'))return;
+  try{
+    await api('clientes?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Eliminado');
+    await Promise.all([loadClientes(),loadIntervenciones()]);
+    renderEventuales(eventualesFiltrados());
+  }catch(e){showToast('Error',true);}
+}
+
+async function convertirAbonado(id,nom){
+  if(!confirm('¿Convertir "'+nom+'" en cliente abonado? Pasará a la lista de Clientes.'))return;
+  try{
+    await api('clientes?id=eq.'+id,{method:'PATCH',body:JSON.stringify({tipo_cliente:'abonado'}),headers:{...H,'Prefer':'return=minimal'}});
+    showToast('⭐ Convertido a abonado ✓','success');
+    await loadClientes();
+    renderEventuales(eventualesFiltrados());
+  }catch(e){showToast('Error',true);}
+}
+
+function abrirTrabajoEvt(cliId){
+  ['trabajoEvtId','tTrabajoEquipo','tTrabajoTecnico','tTrabajoDesc','tTrabajoSol','tTrabajoRep','tTrabajoHoras'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('trabajoClienteEvtId').value=cliId;
+  document.getElementById('tTrabajoTipo').value='Correctivo';
+  document.getElementById('tTrabajoFecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('evtFotoPreview').innerHTML='';
+  evtFotosNuevas=[];
+  const c=clientes.find(x=>x.id===cliId);
+  document.getElementById('tTrabajoEvt').textContent='Registrar trabajo — '+(c?c.nombre:'');
+  document.getElementById('mTrabajoEvt').classList.add('open');
+}
+
+async function guardarTrabajoEvt(){
+  const cliId=document.getElementById('trabajoClienteEvtId').value;
+  const fecha=document.getElementById('tTrabajoFecha').value;
+  const tipo=document.getElementById('tTrabajoTipo').value;
+  const desc=document.getElementById('tTrabajoDesc').value.trim();
+  if(!fecha){showToast('Fecha obligatoria',true);return;}
+  if(!desc){showToast('Descripción obligatoria',true);return;}
+  showToast('Guardando...');
+  let fotosUrls=[];
+  if(evtFotosNuevas.length) fotosUrls=await subirFotos(evtFotosNuevas,'eventuales');
+  const equipo=document.getElementById('tTrabajoEquipo').value.trim();
+  const data={
+    cliente_id:cliId,
+    equipo_id:null,
+    tipo,fecha,
+    tecnico:document.getElementById('tTrabajoTecnico').value.trim()||null,
+    descripcion:(equipo?'['+equipo+'] ':'')+desc,
+    solucion:document.getElementById('tTrabajoSol').value.trim()||null,
+    repuestos:document.getElementById('tTrabajoRep').value.trim()||null,
+    horas_trabajo:parseFloat(document.getElementById('tTrabajoHoras').value)||null,
+    fotos:fotosUrls,
+    es_planilla:false,necesita_correctivo:false
+  };
+  try{
+    await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Trabajo guardado ✓','success');
+    cerrar('mTrabajoEvt');evtFotosNuevas=[];
+    await loadIntervenciones();
+    renderEventuales(eventualesFiltrados());
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
 function togglePass(id){
   const el=document.getElementById('pass-'+id);
   if(!el) return;
