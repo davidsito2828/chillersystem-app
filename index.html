@@ -373,7 +373,7 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Contraseña</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
       <tbody id="usersBody"></tbody>
     </table>
   </div>
@@ -1289,6 +1289,12 @@ function renderUsers(){
     return `<tr>
       <td class="td-name">${u.nombre}</td>
       <td class="td-mono">${u.usuario}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="td-mono" id="pass-${u.id}" style="filter:blur(4px);transition:filter 0.2s;">${u.password||'—'}</span>
+          <button onclick="togglePass('${u.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:13px;" title="Ver/ocultar">👁</button>
+        </div>
+      </td>
       <td><span class="badge ${rolBadge}">${rolLabel}</span></td>
       <td><span class="badge ${estadoBadge}">${estadoLabel}</span></td>
       <td style="display:flex;gap:4px;">
@@ -1556,6 +1562,11 @@ function showTab(id,btn){
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){const d=new Date(desde);d.setDate(d.getDate()+parseInt(dias));return d.toISOString().split('T')[0];}
 function fmtF(f){if(!f)return '—';const[y,m,d]=f.split('-');return d+'/'+m+'/'+y;}
+function togglePass(id){
+  const el=document.getElementById('pass-'+id);
+  if(!el) return;
+  el.style.filter=el.style.filter==='none'?'blur(4px)':'none';
+}
 let tt;
 function showToast(msg,type=''){
   const t=document.getElementById('toast');
