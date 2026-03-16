@@ -1412,13 +1412,60 @@ function setCorrectivo(v){
 function guardarServiceEq(){
   const eqId=document.getElementById('serviceEqId').value;
   const trabajo=document.getElementById('sTrabajoRealizado').value.trim();
-  if(!trabajo){showToast('Describí el trabajo realizado',true);return;}
+  // trabajo es opcional si es solo correctivo
   const necesita=document.getElementById('sNecesitaCorrectivo').value==='true';
   servicePlanilla[eqId]={trabajo,necesita_correctivo:necesita,desc_correctivo:document.getElementById('sDescCorrectivo').value.trim()||null,fotos_nuevas:serviceFotosNuevas,fotos:[]};
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
   showToast('Equipo confirmado ✓','success');
 }
+async function guardarSoloPreventivo(){
+  const firma=document.getElementById('firmaDigital').value.trim();
+  const tecnico=document.getElementById('firmaTecnico').value.trim();
+  const fecha=document.getElementById('firmaFecha').value;
+  if(!firma){showToast('Completá la firma digital para confirmar',true);return;}
+  if(!fecha){showToast('Ingresá la fecha del service',true);return;}
+  const eqs=equipos.filter(e=>e.cliente_id===serviceClienteActual);
+  if(!eqs.length){showToast('Sin equipos para registrar',true);return;}
+  showToast('Guardando preventivo...');
+  document.getElementById('btnGuardarPreventivo').disabled=true;
+  try{
+    for(const eq of eqs){
+      // Solo guardar si no tiene ya registro en servicePlanilla (que puede ser correctivo)
+      if(!servicePlanilla[eq.id]){
+        const frec=eq.frecuencia_dias||30;
+        await api('equipos?id=eq.'+eq.id,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
+      }
+    }
+    // Guardar una sola intervención general por el cliente
+    const cli=clientes.find(c=>c.id===serviceClienteActual);
+    const data={
+      equipo_id:eqs[0].id, tipo:'Preventivo', fecha,
+      tecnico:tecnico||firma,
+      descripcion:'Preventivo general — '+cli.nombre+' ('+eqs.length+' equipo(s) sin novedades)',
+      solucion:'Sin novedades — todo operativo',
+      firma:firma,
+      notas:document.getElementById('firmaObservaciones').value.trim()||null,
+      es_planilla:true, necesita_correctivo:false, fotos:[]
+    };
+    await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    // Si hay correctivos marcados en planilla, guardarlos también
+    for(const eqId of Object.keys(servicePlanilla)){
+      const p=servicePlanilla[eqId];
+      if(p.necesita_correctivo){
+        const d={equipo_id:eqId,tipo:'Correctivo',fecha,tecnico:tecnico||firma,
+          descripcion:p.trabajo,solucion:p.desc_correctivo||null,
+          firma:firma,fotos:[],es_planilla:true,necesita_correctivo:true};
+        await api('intervenciones',{method:'POST',body:JSON.stringify(d),headers:{...H,'Prefer':'return=minimal'}});
+      }
+    }
+    showToast('Preventivo guardado ✓','success');
+    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes()]);
+    calcAlertas(); volverListaService();
+  }catch(e){showToast('Error: '+e.message,true);}
+  finally{document.getElementById('btnGuardarPreventivo').disabled=false;}
+}
+
 async function guardarPlanilla(){
   const firma=document.getElementById('firmaDigital').value.trim();
   const tecnico=document.getElementById('firmaTecnico').value.trim();
