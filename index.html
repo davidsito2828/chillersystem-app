@@ -325,9 +325,9 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
     <table>
       <thead><tr>
         <th>Equipo</th><th>Cliente</th><th>Empresa</th><th>Tipo</th>
-        <th>Marca/Modelo</th><th>Estado</th><th>Próx. Preventivo</th><th>Acciones</th>
+        <th>Marca/Modelo</th><th>Capacidad</th><th>Estado</th><th>Próx. Preventivo</th><th>Acciones</th>
       </tr></thead>
-      <tbody id="eqBody"><tr><td colspan="8"><div class="loading"><span class="spinner"></span>Cargando...</div></td></tr></tbody>
+      <tbody id="eqBody"><tr><td colspan="9"><div class="loading"><span class="spinner"></span>Cargando...</div></td></tr></tbody>
     </table>
   </div>
 </div>
@@ -507,7 +507,8 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
           <option>Chiller absorción</option><option>Split / Multisplit</option><option>Torre de enfriamiento</option>
           <option>Fan Coil</option><option>Rooftop</option><option>VRV / VRF</option>
           <option>Piso techo</option><option>Baja silueta</option><option>Cassette</option>
-          <option>Condensadora</option><option>Compresor</option><option>Otro</option>
+          <option>Unidad separada</option><option>Condensadora</option><option>Compresor</option>
+          <option>Equipo Westrack / Alta precisión</option><option>Otro</option>
         </select>
       </div>
       <div class="form-group"><label class="form-label">Estado</label>
@@ -519,6 +520,17 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
       <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="eModelo"/></div>
       <div class="form-group"><label class="form-label">N° de serie</label><input class="form-input" id="eNserie"/></div>
       <div class="form-group"><label class="form-label">Ubicación</label><input class="form-input" id="eUbic" placeholder="Piso, sala..."/></div>
+      <div class="form-group"><label class="form-label">Capacidad</label><input class="form-input" id="eCapacidad" type="number" step="0.1" placeholder="Ej: 10"/></div>
+      <div class="form-group"><label class="form-label">Unidad de capacidad</label>
+        <select class="form-select" id="eUnidadCap">
+          <option value="">— Sin especificar —</option>
+          <option value="TR">TR (Toneladas de refrigeración)</option>
+          <option value="KW">KW (Kilowatts)</option>
+          <option value="BTU">BTU/h</option>
+          <option value="HP">HP (Caballos de fuerza)</option>
+          <option value="Kcal/h">Kcal/h</option>
+        </select>
+      </div>
       <div class="form-group"><label class="form-label">Frecuencia preventivo (días)</label><input class="form-input" id="eFrec" type="number" value="30" min="1"/></div>
       <div class="form-group"><label class="form-label">Último preventivo realizado</label><input class="form-input" id="eUltPrev" type="date"/></div>
       <div class="form-group full"><label class="form-label">Fotos del equipo</label>
@@ -924,7 +936,7 @@ function renderEq(lista){
   document.getElementById('eqCount').textContent=lista.length+' equipo(s)';
   const tb=document.getElementById('eqBody');
   const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
-  if(!lista.length){tb.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Sin equipos</div></div></td></tr>`;return;}
+  if(!lista.length){tb.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Sin equipos</div></div></td></tr>`;return;}
   tb.innerHTML=lista.map(e=>{
     const c=clientes.find(x=>x.id===e.cliente_id);
     const isCS=c&&c.empresa==='ChillerSystem';
@@ -934,6 +946,7 @@ function renderEq(lista){
       <td><span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span></td>
       <td class="td-dim">${e.tipo||'—'}</td>
       <td class="td-dim">${[e.marca,e.modelo].filter(Boolean).join('/')||'—'}</td>
+      <td class="td-mono">${e.capacidad?(e.capacidad+' '+(e.unidad_capacidad||'')):'—'}</td>
       <td><span class="badge ${badgeEst(e.estado)}">${e.estado||'Operativo'}</span></td>
       <td>${proxPrevHTML(e)}</td>
       <td style="display:flex;gap:4px;">
@@ -965,6 +978,8 @@ async function guardarEq(){
     modelo:document.getElementById('eModelo').value.trim()||null,
     numero_serie:document.getElementById('eNserie').value.trim()||null,
     ubicacion:document.getElementById('eUbic').value.trim()||null,
+    capacidad:parseFloat(document.getElementById('eCapacidad').value)||null,
+    unidad_capacidad:document.getElementById('eUnidadCap').value||null,
     frecuencia_dias:frec,ultimo_preventivo:ultP,proximo_preventivo:proxP,
     notas:document.getElementById('eNotas').value.trim()||null,
     fotos:[...existentes,...fotosUrls]};
@@ -983,7 +998,8 @@ async function elimEq(id,nom){
   catch(e){showToast('Error',true);}
 }
 function abrirModalEq(id=null,cliPre=null){
-  ['eqId','eNom','eMarca','eModelo','eNserie','eUbic','eNotas','eUltPrev'].forEach(x=>document.getElementById(x).value='');
+  ['eqId','eNom','eMarca','eModelo','eNserie','eUbic','eNotas','eUltPrev','eCapacidad'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('eUnidadCap').value='';
   document.getElementById('eTipo').value='';document.getElementById('eEst').value='Operativo';
   document.getElementById('eFrec').value='30';document.getElementById('eqFotoPreview').innerHTML='';
   eqFotosNuevas=[];
@@ -1003,6 +1019,8 @@ function abrirModalEq(id=null,cliPre=null){
     document.getElementById('eFrec').value=e.frecuencia_dias||30;
     document.getElementById('eUltPrev').value=e.ultimo_preventivo||'';
     document.getElementById('eNotas').value=e.notas||'';
+    document.getElementById('eCapacidad').value=e.capacidad||'';
+    document.getElementById('eUnidadCap').value=e.unidad_capacidad||'';
     if(e.fotos&&e.fotos.length){
       document.getElementById('eqFotoPreview').innerHTML=e.fotos.map(u=>`<div class="foto-preview"><img src="${u}" onclick="openLB('${u}')"/></div>`).join('');
     }
