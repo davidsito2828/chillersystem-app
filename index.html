@@ -1071,7 +1071,7 @@ function renderHistClientes(lista){
   document.getElementById('histCount').textContent=lista.length+' cliente(s)';
   document.getElementById('histClientesList').innerHTML=lista.map(c=>{
     const eqs=equipos.filter(e=>e.cliente_id===c.id);
-    const intervs=intervenciones.filter(i=>eqs.some(e=>e.id===i.equipo_id));
+    const intervs=intervenciones.filter(i=>eqs.some(e=>e.id===i.equipo_id)||i.cliente_id===c.id);
     const isCS=c.empresa==='ChillerSystem';
     const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
     const tieneCorrectivo=intervs.some(i=>i.necesita_correctivo);
@@ -1120,7 +1120,34 @@ function renderHistDetalle(){
   const eqsFiltrados2=filtroHE?eqs.filter(e=>e.id===filtroHE):eqs;
   if(!eqsFiltrados2.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Sin equipos</div></div>';return;}
   let total=0;
-  el.innerHTML=eqsFiltrados2.map(eq=>{
+  // Show general client records first
+  const generalRecords=intervenciones.filter(i=>i.cliente_id===histClienteActual&&!i.equipo_id&&(filtroHT?i.tipo===filtroHT:true));
+  let generalHTML='';
+  if(generalRecords.length){
+    const gRows=generalRecords.map(i=>{
+      const isAdminG=usuarioActual&&usuarioActual.rol==='admin';
+      const delBtn=isAdminG?('<button class="btn-danger" onclick="elimInterv(\'' +i.id+ '\')" style="padding:2px 7px;font-size:11px;">🗑</button>'):'';
+      return '<div class="interv-item" style="margin-bottom:6px;">'
+        +'<div class="interv-header">'
+        +'<span class="badge b-preventivo2">'+i.tipo+'</span>'
+        +'<span class="interv-fecha">'+fmtF(i.fecha)+'</span>'
+        +(i.tecnico?'<span class="interv-tecnico">· '+i.tecnico+'</span>':'')
+        +(i.firma?'<span style="font-size:10px;color:#34d399;">✍️ '+i.firma+'</span>':'')
+        +'<div style="margin-left:auto;">'+delBtn+'</div>'
+        +'</div>'
+        +(i.descripcion?'<div class="interv-desc">'+i.descripcion+'</div>':'')
+        +(i.solucion?'<div class="interv-sol">✓ '+i.solucion+'</div>':'')
+        +(i.notas?'<div class="interv-rep">📝 '+i.notas+'</div>':'')
+        +'</div>';
+    }).join('');
+    generalHTML='<div style="margin-bottom:16px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">'
+      +'<span style="font-weight:700;color:#a78bfa;font-size:13px;">📋 Registros generales del cliente</span>'
+      +'<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+generalRecords.length+' registro(s)</span>'
+      +'</div>'+gRows+'</div>';
+    total+=generalRecords.length;
+  }
+  el.innerHTML=generalHTML+eqsFiltrados2.map(eq=>{
     let intervs=intervenciones.filter(i=>i.equipo_id===eq.id);
     if(filtroHT) intervs=intervs.filter(i=>i.tipo===filtroHT);
     intervs.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
@@ -1452,10 +1479,11 @@ async function guardarSoloPreventivo(){
     // Guardar una sola intervención general por el cliente
     const cli=clientes.find(c=>c.id===serviceClienteActual);
     const data={
-      equipo_id:eqs[0].id, tipo:'Preventivo', fecha,
+      cliente_id:serviceClienteActual,
+      equipo_id:null, tipo:'Preventivo', fecha,
       tecnico:tecnico||firma,
-      descripcion:'Preventivo general — '+cli.nombre+' ('+eqs.length+' equipo(s) sin novedades)',
-      solucion:'Sin novedades — todo operativo',
+      descripcion:'✅ Preventivo — '+cli.nombre,
+      solucion:'Sin novedades — equipos operativos en su totalidad ('+eqs.length+' equipo(s))',
       firma:firma,
       notas:document.getElementById('firmaObservaciones').value.trim()||null,
       es_planilla:true, necesita_correctivo:false, fotos:[]
