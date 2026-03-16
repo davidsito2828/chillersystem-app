@@ -292,6 +292,7 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
   <button class="nav-btn hidden" id="tabUsers" onclick="showTab('usuarios',this)">👥 Usuarios</button>
   <button class="nav-btn" id="tabService" onclick="showTab('service',this)">🔧 Service</button>
   <button class="nav-btn" id="tabEventual" onclick="showTab('eventual',this)">🔖 Eventuales</button>
+  <button class="nav-btn admin-only" id="tabPpto" onclick="showTab('presupuestos',this)">💼 Presupuestos</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -569,6 +570,114 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
   </div>
 </div>
 
+
+<!-- ═══ PRESUPUESTOS ═══ -->
+<div id="tab-presupuestos" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div><div class="panel-title">💼 Presupuestos</div><div class="panel-count" id="pptoCount">—</div></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <select class="search-box" style="width:auto;" onchange="filtroPptoEstado=this.value;renderPresupuestos()">
+        <option value="">Todos</option>
+        <option value="borrador">🔴 Borradores</option>
+        <option value="aprobado">✅ Aprobados</option>
+        <option value="enviado">📤 Enviados</option>
+      </select>
+      <button class="btn-primary" onclick="abrirModalPpto()">＋ Nuevo presupuesto</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>N° Presupuesto</th><th>Empresa</th><th>Cliente</th><th>Referencia</th>
+        <th>Monto</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
+      </tr></thead>
+      <tbody id="pptoBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL PRESUPUESTO -->
+<div class="modal-overlay" id="mPpto">
+  <div class="modal" style="max-width:680px;">
+    <button class="modal-close" onclick="cerrar('mPpto')">✕</button>
+    <div class="modal-title" id="tPpto">Nuevo Presupuesto</div>
+    <input type="hidden" id="pptoId"/>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Empresa *</label>
+        <div class="emp-selector">
+          <button class="emp-opt sel-cs" id="pOptCS" onclick="selEmpP('ChillerSystem')">🔵 ChillerSystem S.R.L.</button>
+          <button class="emp-opt" id="pOptCV" onclick="selEmpP('ChillerService')">🟣 ChillerService S.A.</button>
+        </div>
+        <input type="hidden" id="pEmpresa" value="ChillerSystem"/>
+      </div>
+      <div class="form-group"><label class="form-label">N° Presupuesto *</label><input class="form-input" id="pNumero" placeholder="Ej: 42426SO/2026"/></div>
+      <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="pFecha" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Cliente — Seleccioná o escribí</label>
+        <select class="form-select" id="pClienteId" onchange="autocompletarCliente(this.value)">
+          <option value="">— Seleccioná un cliente —</option>
+        </select>
+      </div>
+      <div class="form-group full"><label class="form-label">Razón Social del destinatario *</label><input class="form-input" id="pClienteNombre" placeholder="Ej: SANTA OFELIA S.A.U"/></div>
+      <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="pClienteDireccion" placeholder="Dirección del cliente"/></div>
+      <div class="form-group"><label class="form-label">Atención (At.)</label><input class="form-input" id="pContacto" placeholder="Ej: Sr. Juan Pérez"/></div>
+      <div class="form-group full"><label class="form-label">Referencia (Ref.)</label><input class="form-input" id="pReferencia" placeholder="Descripción breve del trabajo"/></div>
+
+      <!-- SECCIONES DE TRABAJOS -->
+      <div class="form-group full">
+        <label class="form-label">Detalle de trabajos a realizar</label>
+        <div id="seccionesTrabajo"></div>
+        <button class="btn-add-eq" onclick="agregarSeccion()" style="margin-top:8px;">＋ Agregar sección de trabajos</button>
+      </div>
+
+      <!-- PRECIOS -->
+      <div class="form-group full">
+        <label class="form-label">Precios por sección</label>
+        <div id="preciosSecciones"></div>
+        <div style="margin-top:10px;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;color:#bfdbfe;">TOTAL:</span>
+          <span style="font-size:18px;font-weight:900;color:#34d399;font-family:'IBM Plex Mono',monospace;" id="pTotalDisplay">$0</span>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="pIncluyeIva" onchange="calcularTotal()"/>
+          <label for="pIncluyeIva" style="font-size:12px;color:var(--text-dim);">Incluye IVA (21%)</label>
+        </div>
+        <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">
+          Valor referencia dólar Venta BNA: USD 1.- = $<input type="text" id="pDolar" class="form-input" style="display:inline;width:80px;padding:3px 6px;font-size:11px;" placeholder="1435"/>
+        </div>
+      </div>
+
+      <div class="form-group"><label class="form-label">Forma de pago</label>
+        <textarea class="form-textarea" id="pFormaPago" style="min-height:60px;" placeholder="50% con la aceptación del presupuesto.&#10;50% con la terminación de los trabajos.&#10;8 (ocho) días fecha de factura."></textarea>
+      </div>
+      <div class="form-group"><label class="form-label">Plazo de entrega</label><input class="form-input" id="pPlazo" placeholder="A convenir desde aceptación"/></div>
+      <div class="form-group"><label class="form-label">Validez de la oferta</label><input class="form-input" id="pValidez" placeholder="20 (veinte) días"/></div>
+      <div class="form-group full"><label class="form-label">Consideraciones particulares</label>
+        <textarea class="form-textarea" id="pNotas" placeholder="Observaciones adicionales..."></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mPpto')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarPpto('borrador')" style="background:rgba(248,113,113,0.2);border:1px solid #f87171;color:#f87171;">💾 Guardar borrador</button>
+      <button class="btn-primary" onclick="previewPpto()">👁 Vista previa / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PREVIEW PDF -->
+<div class="modal-overlay" id="mPptoPdf">
+  <div class="modal" style="max-width:800px;padding:0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:700;color:#bfdbfe;">Vista previa del presupuesto</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-primary" onclick="imprimirPpto()">📥 Descargar PDF</button>
+        <button class="btn-secondary" onclick="cerrar('mPptoPdf')">✕ Cerrar</button>
+      </div>
+    </div>
+    <div id="pptoPdfContent" style="background:#fff;max-height:75vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
 </div><!-- /appScreen -->
 
 <!-- ══ MODAL CLIENTE ══ -->
@@ -775,7 +884,7 @@ async function iniciarApp(){
     document.getElementById('tabCli').classList.remove('active');
   }
   try{
-    await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones()]);
+    await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos()]);
     if(isAdmin) await loadUsuarios();
     setStatus(true); calcAlertas();
   }catch(e){setStatus(false);showToast('Error de conexión',true);}
@@ -1635,12 +1744,13 @@ function setFiltro(v,btn){
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
   if(id==='historial') renderHist();
   if(id==='eventual'){renderEventuales(eventualesFiltrados());}
+  if(id==='presupuestos'){loadPresupuestos();}
 }
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){const d=new Date(desde);d.setDate(d.getDate()+parseInt(dias));return d.toISOString().split('T')[0];}
@@ -1809,6 +1919,360 @@ async function guardarTrabajoEvt(){
     await loadIntervenciones();
     renderEventuales(eventualesFiltrados());
   }catch(e){showToast('Error: '+e.message,true);}
+}
+
+
+// ── PRESUPUESTOS ──
+let presupuestos=[];
+let filtroPptoEstado='';
+let seccionesActuales=[]; // [{titulo, items:[]}]
+let preciosActuales={}; // {idx: precio}
+
+async function loadPresupuestos(){
+  presupuestos=await api('presupuestos?select=*&order=created_at.desc');
+  renderPresupuestos();
+}
+
+function renderPresupuestos(){
+  const lista=filtroPptoEstado?presupuestos.filter(p=>p.estado===filtroPptoEstado):presupuestos;
+  document.getElementById('pptoCount').textContent=lista.length+' presupuesto(s)';
+  const tb=document.getElementById('pptoBody');
+  if(!lista.length){
+    tb.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">💼</div><div class="empty-title">Sin presupuestos</div></div></td></tr>';
+    return;
+  }
+  tb.innerHTML=lista.map(p=>{
+    const estadoStyle=p.estado==='borrador'
+      ?'color:#f87171;background:rgba(248,113,113,0.12);border-color:rgba(248,113,113,0.3)'
+      :p.estado==='aprobado'
+      ?'color:#34d399;background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.3)'
+      :'color:#60a5fa;background:rgba(59,130,246,0.12);border-color:rgba(59,130,246,0.3)';
+    const estadoLabel=p.estado==='borrador'?'🔴 Borrador':p.estado==='aprobado'?'✅ Aprobado':'📤 Enviado';
+    const isCS=p.empresa==='ChillerSystem';
+    const total=p.precio_total?'$'+Number(p.precio_total).toLocaleString('es-AR'):'—';
+    return `<tr>
+      <td class="td-mono">${p.numero}</td>
+      <td><span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span></td>
+      <td class="td-name">${p.cliente_nombre||'—'}</td>
+      <td class="td-dim" style="max-width:160px;">${p.referencia||'—'}</td>
+      <td class="td-mono" style="color:#34d399;">${total}</td>
+      <td><span class="badge" style="${estadoStyle}">${estadoLabel}</span></td>
+      <td class="td-dim">${p.created_at?fmtF(p.created_at.split('T')[0]):'—'}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap;">
+        <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
+        <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
+        ${p.estado==='borrador'?`<button class="btn-green" onclick="aprobarPpto('${p.id}')">✅ OK</button>`:''}
+        <button class="btn-danger" onclick="elimPpto('${p.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function selEmpP(v){
+  document.getElementById('pEmpresa').value=v;
+  document.getElementById('pOptCS').className='emp-opt'+(v==='ChillerSystem'?' sel-cs':'');
+  document.getElementById('pOptCV').className='emp-opt'+(v==='ChillerService'?' sel-cv':'');
+}
+
+function autocompletarCliente(cliId){
+  if(!cliId) return;
+  const c=clientes.find(x=>x.id===cliId);
+  if(!c) return;
+  document.getElementById('pClienteNombre').value=c.nombre||'';
+  document.getElementById('pClienteDireccion').value=c.direccion||'';
+  document.getElementById('pContacto').value=c.contacto||'';
+}
+
+function agregarSeccion(titulo='',items=[]){
+  const idx=seccionesActuales.length;
+  const label=String.fromCharCode(65+idx); // A, B, C...
+  seccionesActuales.push({titulo:titulo||label+')',items:items.length?items:['']});
+  renderSecciones();
+}
+
+function renderSecciones(){
+  const cont=document.getElementById('seccionesTrabajo');
+  const precsCont=document.getElementById('preciosSecciones');
+  cont.innerHTML=seccionesActuales.map((sec,si)=>`
+    <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input class="form-input" style="flex:1;" value="${sec.titulo}" oninput="seccionesActuales[${si}].titulo=this.value" placeholder="Título de la sección (ej: A)- Descripción de trabajos)"/>
+        ${seccionesActuales.length>1?`<button class="btn-danger" onclick="elimSeccion(${si})" style="padding:4px 8px;">✕</button>`:''}
+      </div>
+      <div id="items-sec-${si}">
+        ${sec.items.map((item,ii)=>`
+          <div style="display:flex;gap:6px;margin-bottom:5px;">
+            <span style="color:var(--text-dim);font-size:12px;padding-top:8px;">▶</span>
+            <input class="form-input" style="flex:1;" value="${item}" oninput="seccionesActuales[${si}].items[${ii}]=this.value" placeholder="Descripción del ítem de trabajo"/>
+            <button class="btn-danger" onclick="elimItem(${si},${ii})" style="padding:4px 8px;">✕</button>
+          </div>`).join('')}
+      </div>
+      <button class="btn-secondary" onclick="agregarItem(${si})" style="font-size:11px;padding:4px 10px;margin-top:4px;">＋ Agregar ítem</button>
+    </div>`).join('');
+
+  precsCont.innerHTML=seccionesActuales.map((sec,si)=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <span style="color:#bfdbfe;font-size:12px;font-weight:700;min-width:120px;">${sec.titulo||'Sección '+(si+1)}:</span>
+      <span style="color:var(--text-dim);font-size:13px;">$</span>
+      <input class="form-input" style="width:160px;" type="number" value="${preciosActuales[si]||''}" 
+        oninput="preciosActuales[${si}]=parseFloat(this.value)||0;calcularTotal()" placeholder="0"/>
+    </div>`).join('');
+  calcularTotal();
+}
+
+function agregarItem(si){
+  seccionesActuales[si].items.push('');
+  renderSecciones();
+}
+function elimItem(si,ii){
+  seccionesActuales[si].items.splice(ii,1);
+  if(!seccionesActuales[si].items.length) seccionesActuales[si].items=[''];
+  renderSecciones();
+}
+function elimSeccion(si){
+  seccionesActuales.splice(si,1);
+  delete preciosActuales[si];
+  // Reindex
+  const newPrecios={};
+  Object.keys(preciosActuales).forEach((k,i)=>newPrecios[i]=preciosActuales[k]);
+  preciosActuales=newPrecios;
+  renderSecciones();
+}
+function calcularTotal(){
+  const subtotal=Object.values(preciosActuales).reduce((a,b)=>a+(b||0),0);
+  const iva=document.getElementById('pIncluyeIva').checked?subtotal*0.21:0;
+  const total=subtotal+iva;
+  document.getElementById('pTotalDisplay').textContent='$'+total.toLocaleString('es-AR');
+  return total;
+}
+
+function abrirModalPpto(id=null){
+  seccionesActuales=[];preciosActuales={};
+  ['pptoId','pNumero','pClienteNombre','pClienteDireccion','pContacto','pReferencia','pFormaPago','pPlazo','pValidez','pNotas','pDolar'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('pFecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('pIncluyeIva').checked=false;
+  document.getElementById('pClienteId').innerHTML='<option value="">— Seleccioná un cliente —</option>'+clientes.filter(c=>c.tipo_cliente!=='eventual').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  selEmpP('ChillerSystem');
+  if(id){
+    const p=presupuestos.find(x=>x.id===id);
+    document.getElementById('tPpto').textContent='Editar Presupuesto';
+    document.getElementById('pptoId').value=p.id;
+    document.getElementById('pNumero').value=p.numero||'';
+    document.getElementById('pFecha').value=p.created_at?p.created_at.split('T')[0]:'';
+    document.getElementById('pClienteNombre').value=p.cliente_nombre||'';
+    document.getElementById('pClienteDireccion').value=p.cliente_direccion||'';
+    document.getElementById('pContacto').value=p.cliente_contacto||'';
+    document.getElementById('pReferencia').value=p.referencia||'';
+    document.getElementById('pFormaPago').value=p.forma_pago||'';
+    document.getElementById('pPlazo').value=p.plazo_entrega||'';
+    document.getElementById('pValidez').value=p.validez||'';
+    document.getElementById('pNotas').value=p.notas||'';
+    document.getElementById('pIncluyeIva').checked=p.incluye_iva||false;
+    selEmpP(p.empresa||'ChillerSystem');
+    // Load secciones
+    const items=p.items||[];
+    if(items.length){
+      items.forEach((sec,i)=>{
+        seccionesActuales.push({titulo:sec.titulo,items:sec.items||['']});
+        if(sec.precio) preciosActuales[i]=sec.precio;
+      });
+    }else{
+      agregarSeccion();
+    }
+  }else{
+    document.getElementById('tPpto').textContent='Nuevo Presupuesto';
+    agregarSeccion();
+  }
+  renderSecciones();
+  document.getElementById('mPpto').classList.add('open');
+}
+
+async function guardarPpto(estado){
+  const id=document.getElementById('pptoId').value;
+  const numero=document.getElementById('pNumero').value.trim();
+  const clienteNombre=document.getElementById('pClienteNombre').value.trim();
+  if(!numero){showToast('N° de presupuesto obligatorio',true);return;}
+  if(!clienteNombre){showToast('Nombre del cliente obligatorio',true);return;}
+  const total=calcularTotal();
+  const itemsData=seccionesActuales.map((sec,i)=>({titulo:sec.titulo,items:sec.items.filter(x=>x.trim()),precio:preciosActuales[i]||0}));
+  const data={
+    numero,empresa:document.getElementById('pEmpresa').value,
+    cliente_id:document.getElementById('pClienteId').value||null,
+    cliente_nombre:clienteNombre,
+    cliente_direccion:document.getElementById('pClienteDireccion').value.trim()||null,
+    cliente_contacto:document.getElementById('pContacto').value.trim()||null,
+    referencia:document.getElementById('pReferencia').value.trim()||null,
+    items:itemsData,
+    precio_total:total,
+    incluye_iva:document.getElementById('pIncluyeIva').checked,
+    forma_pago:document.getElementById('pFormaPago').value.trim()||null,
+    plazo_entrega:document.getElementById('pPlazo').value.trim()||null,
+    validez:document.getElementById('pValidez').value.trim()||null,
+    notas:document.getElementById('pNotas').value.trim()||null,
+    estado:id?(presupuestos.find(x=>x.id===id)||{}).estado||estado:estado,
+    creado_por:usuarioActual?usuarioActual.nombre:null,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    if(id) await api('presupuestos?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    else    await api('presupuestos',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Presupuesto guardado ✓','success');
+    cerrar('mPpto');await loadPresupuestos();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function aprobarPpto(id){
+  if(!confirm('¿Aprobar este presupuesto? Pasará a estado Aprobado.'))return;
+  try{
+    await api('presupuestos?id=eq.'+id,{method:'PATCH',
+      body:JSON.stringify({estado:'aprobado',aprobado_por:usuarioActual?usuarioActual.nombre:null,fecha_aprobacion:new Date().toISOString().split('T')[0]}),
+      headers:{...H,'Prefer':'return=minimal'}});
+    showToast('✅ Presupuesto aprobado','success');await loadPresupuestos();
+  }catch(e){showToast('Error',true);}
+}
+
+async function elimPpto(id){
+  if(!confirm('¿Eliminar este presupuesto?'))return;
+  try{await api('presupuestos?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Eliminado');await loadPresupuestos();}catch(e){showToast('Error',true);}
+}
+
+function previewPpto(){
+  // Build ppto object from form
+  const itemsData=seccionesActuales.map((sec,i)=>({titulo:sec.titulo,items:sec.items.filter(x=>x.trim()),precio:preciosActuales[i]||0}));
+  const p={
+    numero:document.getElementById('pNumero').value,
+    empresa:document.getElementById('pEmpresa').value,
+    cliente_nombre:document.getElementById('pClienteNombre').value,
+    cliente_direccion:document.getElementById('pClienteDireccion').value,
+    cliente_contacto:document.getElementById('pContacto').value,
+    referencia:document.getElementById('pReferencia').value,
+    items:itemsData,
+    precio_total:calcularTotal(),
+    incluye_iva:document.getElementById('pIncluyeIva').checked,
+    forma_pago:document.getElementById('pFormaPago').value,
+    plazo_entrega:document.getElementById('pPlazo').value,
+    validez:document.getElementById('pValidez').value,
+    notas:document.getElementById('pNotas').value,
+    dolar:document.getElementById('pDolar').value,
+    fecha:document.getElementById('pFecha').value
+  };
+  renderPptoPdf(p);
+  document.getElementById('mPptoPdf').classList.add('open');
+}
+
+function previewPptoById(id){
+  const p=presupuestos.find(x=>x.id===id);
+  if(!p)return;
+  renderPptoPdf(p);
+  document.getElementById('mPptoPdf').classList.add('open');
+}
+
+function renderPptoPdf(p){
+  const isCS=p.empresa==='ChillerSystem';
+  const empresa=isCS?{
+    nombre:'CHILLERSYSTEM ING. S.R.L.',
+    subtitulo:'Sistemas de Aire Acondicionado y Calefacción',
+    dir:'Sarmiento 4070 (1678) Caseros',tel:'4734-5999',
+    firmaCargo:'Gte. de Servicios y Proyectos',
+    firmaEmpresa:'CHILLERSYSTEM ING. S.R.L.',
+    logo:'https://www.chillersystem.com/assets/img/logo.webp'
+  }:{
+    nombre:'CHILLERSERVICE S.A.',
+    subtitulo:'Servicios e Instalaciones Termomecánicas',
+    dir:'Esmeralda 762 (1007) – 2°B – Cap.Fed.',tel:'5032-4033',
+    firmaCargo:'Apoderado.',
+    firmaEmpresa:'CHILLER SERVICE S.A.',
+    logo:'https://www.chillersystem.com/assets/img/logo.webp'
+  };
+  const fecha=p.fecha||p.created_at?new Date((p.fecha||p.created_at)).toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
+  const items=p.items||[];
+  const dolar=p.dolar||'';
+
+  const trabajosHTML=items.map((sec,si)=>`
+    <div style="margin-bottom:16px;">
+      <p style="font-weight:bold;text-decoration:underline;margin-bottom:8px;">${sec.titulo||String.fromCharCode(65+si)+')-  DESCRIPCIÓN DE TRABAJOS A REALIZAR:'}</p>
+      <ul style="list-style:none;padding:0;">
+        ${(sec.items||[]).map(item=>`<li style="padding:2px 0 2px 16px;">&#9658; ${item}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+
+  const preciosHTML=items.length===1
+    ?`<p style="text-align:center;font-size:15px;font-weight:bold;">$${Number(items[0].precio||p.precio_total||0).toLocaleString('es-AR')}.-</p>`
+    :items.map((sec,si)=>`<p style="text-align:center;font-size:15px;font-weight:bold;">${String.fromCharCode(65+si)}) $${Number(sec.precio||0).toLocaleString('es-AR')}.-</p>`).join('');
+
+  const html=`<div id="pptoImprimible" style="font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:720px;margin:0 auto;">
+    <!-- HEADER -->
+    <table width="100%" style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px;">
+      <tr>
+        <td width="120"><img src="${empresa.logo}" style="height:60px;object-fit:contain;" onerror="this.style.display='none'"/></td>
+        <td style="text-align:center;">
+          <div style="font-size:26px;font-weight:900;font-style:italic;">${empresa.nombre}</div>
+          <div style="font-size:14px;font-style:italic;">${empresa.subtitulo}</div>
+        </td>
+      </tr>
+    </table>
+    <div style="text-align:right;margin-bottom:20px;">Buenos Aires, ${fecha}.</div>
+    <table width="100%" style="margin-bottom:20px;">
+      <tr>
+        <td width="50%" style="vertical-align:top;">
+          <div><em>Señores</em></div>
+          <div><strong>${p.cliente_nombre||''}</strong></div>
+          ${p.cliente_direccion?`<div><em>${p.cliente_direccion}</em></div>`:''}
+        </td>
+        <td width="50%" style="vertical-align:top;text-align:right;">
+          ${p.cliente_contacto?`<div><strong>At.: ${p.cliente_contacto}</strong></div>`:''}
+          ${p.referencia?`<div><em>Ref.: ${p.referencia}</em></div>`:''}
+          <div><strong>Presupuesto N°${p.numero}</strong></div>
+        </td>
+      </tr>
+    </table>
+    <p style="margin-bottom:16px;">De nuestra mayor consideración:</p>
+    <p style="margin-bottom:20px;text-indent:30px;">Por intermedio de la presente, tenemos el agrado de dirigirnos a Uds., con el fin de hacerles llegar nuestro presupuesto por la realización de los trabajos de referencia:</p>
+    ${trabajosHTML}
+    <div style="margin:20px 0;">
+      <p style="font-weight:bold;text-decoration:underline;">1) PRECIOS:</p>
+      <p style="margin:8px 0;">El costo de los trabajos asciende a la suma de:</p>
+      ${preciosHTML}
+      <p style="text-align:center;font-weight:bold;margin-top:8px;">En ${p.incluye_iva?'estos valores se encuentra incluido':'este valor no se encuentra incluido'} el I.V.A.</p>
+      ${dolar?`<p style="margin-top:8px;">A) Valor referencia dólar Venta BNA siendo USD 1.- = $${dolar}.-</p>`:''}
+      <p style="margin-top:6px;">B) De generarse atrasos superiores a los 7 (siete) días en el pago del presente se efectuará Nota de Débito según valor de intereses por descubierto en Cta. Cte. BNA.</p>
+      <p style="font-style:italic;">(el valor se ajustará según la variación más significativa en la paridad de divisa al momento de contratación).</p>
+    </div>
+    +(p.forma_pago?'<div style="margin:16px 0;"><p><strong>2) FORMA DE PAGO:</strong> '+p.forma_pago.split('\n').join('<br/>')+'</p></div>':'')
+    +(p.plazo_entrega?'<div style="margin:12px 0;"><p><strong>3) PLAZO DE ENTREGA:</strong> '+p.plazo_entrega+'</p></div>':'')
+    +(p.validez?'<div style="margin:12px 0;"><p><strong>4) VALIDEZ DE LA OFERTA:</strong> '+p.validez+'</p></div>':'')
+    +(p.notas?'<div style="margin:16px 0;"><p style="font-weight:bold;text-decoration:underline;">CONSIDERACIONES PARTICULARES:</p><p style="margin-top:8px;">'+p.notas+'</p></div>':'')
+    <p style="margin:20px 0;">Sin otro particular, y a su disposición por cualquier duda o consulta que pudieran tener al respecto, aprovechamos la oportunidad para saludarlos muy cordialmente.</p>
+    <div style="text-align:right;margin-top:40px;">
+      <div style="display:inline-block;text-align:center;">
+        <div style="border-top:1px solid #000;padding-top:6px;min-width:200px;">
+          <div><strong>Ing. Norberto Garcia</strong></div>
+          <div>${empresa.firmaCargo}</div>
+          <div>${empresa.firmaEmpresa}</div>
+        </div>
+      </div>
+    </div>
+    <!-- FOOTER -->
+    <div style="border-top:1px solid #000;margin-top:30px;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;">
+      <span>Pto. N°${p.numero}</span>
+      <span>${empresa.dir} //TE.: ${empresa.tel}</span>
+    </div>
+  </div>`;
+
+  document.getElementById('pptoPdfContent').innerHTML=html;
+}
+
+function imprimirPpto(){
+  const contenido=document.getElementById('pptoImprimible');
+  if(!contenido)return;
+  const ventana=window.open('','_blank');
+  ventana.document.write('<html><head><title>Presupuesto</title><style>body{margin:0;padding:0;font-family:Arial,sans-serif;}@media print{body{-webkit-print-color-adjust:exact;}}</style></head><body>');
+  ventana.document.write(contenido.outerHTML);
+  ventana.document.write('</body></html>');
+  ventana.document.close();
+  ventana.focus();
+  setTimeout(()=>ventana.print(),500);
 }
 
 function togglePass(id){
