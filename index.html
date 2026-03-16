@@ -432,6 +432,18 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
             <input class="form-input" id="firmaDigital" placeholder="Escribí tu nombre completo para confirmar el service"/>
           </div>
         </div>
+        <!-- BOTONES GUARDAR -->
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+          <button id="btnGuardarPreventivo" onclick="guardarSoloPreventivo()" style="flex:1;padding:14px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">
+            ✅ Guardar preventivo — Sin novedades
+          </button>
+          <button id="btnGuardarPlanilla" onclick="guardarPlanilla()" style="flex:1;padding:14px;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">
+            💾 Guardar con correctivos registrados
+          </button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text-dim);text-align:center;">
+          Usá el botón verde si no hay novedades · Usá el azul si registraste algún correctivo arriba
+        </div>
       </div>
     </div>
   </div>
