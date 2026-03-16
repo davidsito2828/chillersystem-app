@@ -2201,65 +2201,56 @@ function renderPptoPdf(p){
     ?`<p style="text-align:center;font-size:15px;font-weight:bold;">$${Number(items[0].precio||p.precio_total||0).toLocaleString('es-AR')}.-</p>`
     :items.map((sec,si)=>`<p style="text-align:center;font-size:15px;font-weight:bold;">${String.fromCharCode(65+si)}) $${Number(sec.precio||0).toLocaleString('es-AR')}.-</p>`).join('');
 
-  const html=`<div id="pptoImprimible" style="font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:720px;margin:0 auto;">
-    <!-- HEADER -->
-    <table width="100%" style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px;">
-      <tr>
-        <td width="120"><img src="${empresa.logo}" style="height:60px;object-fit:contain;" onerror="this.style.display='none'"/></td>
-        <td style="text-align:center;">
-          <div style="font-size:26px;font-weight:900;font-style:italic;">${empresa.nombre}</div>
-          <div style="font-size:14px;font-style:italic;">${empresa.subtitulo}</div>
-        </td>
-      </tr>
-    </table>
-    <div style="text-align:right;margin-bottom:20px;">Buenos Aires, ${fecha}.</div>
-    <table width="100%" style="margin-bottom:20px;">
-      <tr>
-        <td width="50%" style="vertical-align:top;">
-          <div><em>Señores</em></div>
-          <div><strong>${p.cliente_nombre||''}</strong></div>
-          ${p.cliente_direccion?`<div><em>${p.cliente_direccion}</em></div>`:''}
-        </td>
-        <td width="50%" style="vertical-align:top;text-align:right;">
-          ${p.cliente_contacto?`<div><strong>At.: ${p.cliente_contacto}</strong></div>`:''}
-          ${p.referencia?`<div><em>Ref.: ${p.referencia}</em></div>`:''}
-          <div><strong>Presupuesto N°${p.numero}</strong></div>
-        </td>
-      </tr>
-    </table>
-    <p style="margin-bottom:16px;">De nuestra mayor consideración:</p>
-    <p style="margin-bottom:20px;text-indent:30px;">Por intermedio de la presente, tenemos el agrado de dirigirnos a Uds., con el fin de hacerles llegar nuestro presupuesto por la realización de los trabajos de referencia:</p>
-    ${trabajosHTML}
-    <div style="margin:20px 0;">
-      <p style="font-weight:bold;text-decoration:underline;">1) PRECIOS:</p>
-      <p style="margin:8px 0;">El costo de los trabajos asciende a la suma de:</p>
-      ${preciosHTML}
-      <p style="text-align:center;font-weight:bold;margin-top:8px;">En ${p.incluye_iva?'estos valores se encuentra incluido':'este valor no se encuentra incluido'} el I.V.A.</p>
-      ${dolar?`<p style="margin-top:8px;">A) Valor referencia dólar Venta BNA siendo USD 1.- = $${dolar}.-</p>`:''}
-      <p style="margin-top:6px;">B) De generarse atrasos superiores a los 7 (siete) días en el pago del presente se efectuará Nota de Débito según valor de intereses por descubierto en Cta. Cte. BNA.</p>
-      <p style="font-style:italic;">(el valor se ajustará según la variación más significativa en la paridad de divisa al momento de contratación).</p>
-    </div>
-    +(p.forma_pago?'<div style="margin:16px 0;"><p><strong>2) FORMA DE PAGO:</strong> '+p.forma_pago.split('\n').join('<br/>')+'</p></div>':'')
-    +(p.plazo_entrega?'<div style="margin:12px 0;"><p><strong>3) PLAZO DE ENTREGA:</strong> '+p.plazo_entrega+'</p></div>':'')
-    +(p.validez?'<div style="margin:12px 0;"><p><strong>4) VALIDEZ DE LA OFERTA:</strong> '+p.validez+'</p></div>':'')
-    +(p.notas?'<div style="margin:16px 0;"><p style="font-weight:bold;text-decoration:underline;">CONSIDERACIONES PARTICULARES:</p><p style="margin-top:8px;">'+p.notas+'</p></div>':'')
-    <p style="margin:20px 0;">Sin otro particular, y a su disposición por cualquier duda o consulta que pudieran tener al respecto, aprovechamos la oportunidad para saludarlos muy cordialmente.</p>
-    <div style="text-align:right;margin-top:40px;">
-      <div style="display:inline-block;text-align:center;">
-        <div style="border-top:1px solid #000;padding-top:6px;min-width:200px;">
-          <div><strong>Ing. Norberto Garcia</strong></div>
-          <div>${empresa.firmaCargo}</div>
-          <div>${empresa.firmaEmpresa}</div>
-        </div>
-      </div>
-    </div>
-    <!-- FOOTER -->
-    <div style="border-top:1px solid #000;margin-top:30px;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;">
-      <span>Pto. N°${p.numero}</span>
-      <span>${empresa.dir} //TE.: ${empresa.tel}</span>
-    </div>
-  </div>`;
-
+  let html='<div id="pptoImprimible" style="font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:720px;margin:0 auto;">';
+  // HEADER
+  html+='<table width="100%" style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px;"><tr>';
+  html+='<td width="120"><img src="'+empresa.logo+'" style="height:60px;object-fit:contain;" onerror="this.style.display=\'none\'"/></td>';
+  html+='<td style="text-align:center;"><div style="font-size:26px;font-weight:900;font-style:italic;">'+empresa.nombre+'</div>';
+  html+='<div style="font-size:14px;font-style:italic;">'+empresa.subtitulo+'</div></td></tr></table>';
+  html+='<div style="text-align:right;margin-bottom:20px;">Buenos Aires, '+fecha+'.</div>';
+  // DESTINATARIO
+  html+='<table width="100%" style="margin-bottom:20px;"><tr>';
+  html+='<td width="50%" style="vertical-align:top;"><div><em>Señores</em></div>';
+  html+='<div><strong>'+p.cliente_nombre+'</strong></div>';
+  if(p.cliente_direccion) html+='<div><em>'+p.cliente_direccion+'</em></div>';
+  html+='</td><td width="50%" style="vertical-align:top;text-align:right;">';
+  if(p.cliente_contacto) html+='<div><strong>At.: '+p.cliente_contacto+'</strong></div>';
+  if(p.referencia) html+='<div><em>Ref.: '+p.referencia+'</em></div>';
+  html+='<div><strong>Presupuesto N°'+p.numero+'</strong></div>';
+  html+='</td></tr></table>';
+  html+='<p style="margin-bottom:16px;">De nuestra mayor consideración:</p>';
+  html+='<p style="margin-bottom:20px;text-indent:30px;">Por intermedio de la presente, tenemos el agrado de dirigirnos a Uds., con el fin de hacerles llegar nuestro presupuesto por la realización de los trabajos de referencia:</p>';
+  // TRABAJOS
+  html+=trabajosHTML;
+  // PRECIOS
+  html+='<div style="margin:20px 0;">';
+  html+='<p style="font-weight:bold;text-decoration:underline;">1) PRECIOS:</p>';
+  html+='<p style="margin:8px 0;">El costo de los trabajos asciende a la suma de:</p>';
+  html+=preciosHTML;
+  html+='<p style="text-align:center;font-weight:bold;margin-top:8px;">En '+(p.incluye_iva?'estos valores se encuentra incluido':'este valor no se encuentra incluido')+' el I.V.A.</p>';
+  if(dolar) html+='<p style="margin-top:8px;">A) Valor referencia dólar Venta BNA siendo USD 1.- = $'+dolar+'.-</p>';
+  html+='<p style="margin-top:6px;">B) De generarse atrasos superiores a los 7 (siete) días en el pago del presente se efectuará Nota de Débito según valor de intereses por descubierto en Cta. Cte. BNA.</p>';
+  html+='<p style="font-style:italic;">(el valor se ajustará según la variación más significativa en la paridad de divisa al momento de contratación).</p>';
+  html+='</div>';
+  // FORMA DE PAGO
+  if(p.forma_pago) html+='<div style="margin:16px 0;"><p><strong>2) FORMA DE PAGO:</strong> '+p.forma_pago.split('\n').join('<br/>')+'</p></div>';
+  if(p.plazo_entrega) html+='<div style="margin:12px 0;"><p><strong>3) PLAZO DE ENTREGA:</strong> '+p.plazo_entrega+'</p></div>';
+  if(p.validez) html+='<div style="margin:12px 0;"><p><strong>4) VALIDEZ DE LA OFERTA:</strong> '+p.validez+'</p></div>';
+  if(p.notas) html+='<div style="margin:16px 0;"><p style="font-weight:bold;text-decoration:underline;">CONSIDERACIONES PARTICULARES:</p><p style="margin-top:8px;">'+p.notas+'</p></div>';
+  html+='<p style="margin:20px 0;">Sin otro particular, y a su disposición por cualquier duda o consulta que pudieran tener al respecto, aprovechamos la oportunidad para saludarlos muy cordialmente.</p>';
+  // FIRMA
+  html+='<div style="text-align:right;margin-top:40px;">';
+  html+='<div style="display:inline-block;text-align:center;">';
+  html+='<div style="border-top:1px solid #000;padding-top:6px;min-width:200px;">';
+  html+='<div><strong>Ing. Norberto Garcia</strong></div>';
+  html+='<div>'+empresa.firmaCargo+'</div>';
+  html+='<div>'+empresa.firmaEmpresa+'</div>';
+  html+='</div></div></div>';
+  // FOOTER
+  html+='<div style="border-top:1px solid #000;margin-top:30px;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;">';
+  html+='<span>Pto. N°'+p.numero+'</span>';
+  html+='<span>'+empresa.dir+' //TE.: '+empresa.tel+'</span></div>';
+  html+='</div>';
   document.getElementById('pptoPdfContent').innerHTML=html;
 }
 
