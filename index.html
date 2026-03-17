@@ -293,6 +293,7 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
   <button class="nav-btn" id="tabService" onclick="showTab('service',this)">🔧 Service</button>
   <button class="nav-btn" id="tabEventual" onclick="showTab('eventual',this)">🔖 Eventuales</button>
   <button class="nav-btn admin-only" id="tabPpto" onclick="showTab('presupuestos',this)">💼 Presupuestos</button>
+  <button class="nav-btn admin-only" id="tabInformes" onclick="showTab('informes',this)">📊 Informes</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -678,6 +679,129 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
   </div>
 </div>
 
+
+<!-- ═══ INFORMES ═══ -->
+<div id="tab-informes" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div><div class="panel-title">📊 Informes</div><div class="panel-count" id="informesCount">—</div></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <select class="search-box" style="width:auto;" onchange="filtroInformeTipo=this.value;renderInformes()">
+        <option value="">Todos</option>
+        <option value="tecnico">📋 Técnico</option>
+        <option value="gestion">📊 Gestión</option>
+      </select>
+      <select class="search-box" style="width:auto;" onchange="filtroInformeEstado=this.value;renderInformes()">
+        <option value="">Todos los estados</option>
+        <option value="borrador">🔴 Borrador</option>
+        <option value="aprobado">✅ Aprobado</option>
+      </select>
+      <button class="btn-primary" onclick="abrirModalInforme()">＋ Nuevo informe</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>N° Informe</th><th>Tipo</th><th>Empresa</th><th>Cliente</th>
+        <th>Período / Ref.</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
+      </tr></thead>
+      <tbody id="informesBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL INFORME -->
+<div class="modal-overlay" id="mInforme">
+  <div class="modal" style="max-width:700px;">
+    <button class="modal-close" onclick="cerrar('mInforme')">✕</button>
+    <div class="modal-title" id="tInforme">Nuevo Informe</div>
+    <input type="hidden" id="informeId"/>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Empresa *</label>
+        <div class="emp-selector">
+          <button class="emp-opt sel-cs" id="iOptCS" onclick="selEmpI('ChillerSystem')">🔵 ChillerSystem S.R.L.</button>
+          <button class="emp-opt" id="iOptCV" onclick="selEmpI('ChillerService')">🟣 ChillerService S.A.</button>
+        </div>
+        <input type="hidden" id="iEmpresa" value="ChillerSystem"/>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Tipo de informe *</label>
+        <div style="display:flex;gap:8px;">
+          <button class="emp-opt sel-cs" id="iTipoTec" onclick="selTipoInforme('tecnico')" style="flex:none;padding:8px 20px;">📋 Técnico</button>
+          <button class="emp-opt" id="iTipoGest" onclick="selTipoInforme('gestion')" style="flex:none;padding:8px 20px;">📊 Gestión mensual</button>
+        </div>
+        <input type="hidden" id="iTipo" value="tecnico"/>
+      </div>
+      <div class="form-group"><label class="form-label">N° Informe *</label><input class="form-input" id="iNumero" placeholder="Ej: IT-001/2026"/></div>
+      <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="iFechaInf" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Cliente *</label>
+        <select class="form-select" id="iClienteId" onchange="cargarDatosClienteInforme(this.value)">
+          <option value="">— Seleccioná un cliente —</option>
+        </select>
+      </div>
+      <div class="form-group full"><label class="form-label">Razón Social</label><input class="form-input" id="iClienteNombre"/></div>
+      <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="iClienteDireccion"/></div>
+      <div class="form-group"><label class="form-label">Atención (At.)</label><input class="form-input" id="iContacto" placeholder="Sr./Sra. ..."/></div>
+      <div class="form-group full"><label class="form-label">Referencia</label><input class="form-input" id="iReferencia" placeholder="Ej: Mantenimiento preventivo mensual"/></div>
+
+      <!-- PERIODO (para gestión) -->
+      <div class="form-group" id="iPeriodoDesdeCont"><label class="form-label">Período desde</label><input class="form-input" id="iPeriodoDesdeFecha" type="date"/></div>
+      <div class="form-group" id="iPeriodoHastaCont"><label class="form-label">Período hasta</label><input class="form-input" id="iPeriodoHastaFecha" type="date"/></div>
+
+      <!-- VINCULO PRESUPUESTO -->
+      <div class="form-group full">
+        <label class="form-label">Vincular con presupuesto (opcional)</label>
+        <select class="form-select" id="iPresupuestoId">
+          <option value="">— Sin vinculación —</option>
+        </select>
+      </div>
+
+      <!-- DESARROLLO -->
+      <div class="form-group full">
+        <label class="form-label">Desarrollo — Equipos e intervenciones</label>
+        <div id="iDesarrolloContainer" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">Seleccioná un cliente para ver las intervenciones disponibles</div>
+        </div>
+        <textarea class="form-textarea" id="iDesarrollo" placeholder="Desarrollo adicional, observaciones técnicas..." style="min-height:80px;"></textarea>
+      </div>
+
+      <!-- FOTOS -->
+      <div class="form-group full">
+        <label class="form-label">Fotos del informe</label>
+        <div id="iFotosContainer" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;">
+          <div style="font-size:11px;color:var(--text-dim);">Seleccioná un cliente para ver las fotos disponibles de sus intervenciones</div>
+        </div>
+        <div id="iFotosSeleccionadas" style="margin-top:8px;"></div>
+      </div>
+
+      <!-- CONCLUSION -->
+      <div class="form-group full">
+        <label class="form-label">Conclusión y recomendaciones</label>
+        <textarea class="form-textarea" id="iConclusion" placeholder="Conclusión del informe, recomendaciones para el cliente..." style="min-height:100px;"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mInforme')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarInforme('borrador')" style="background:rgba(248,113,113,0.2);border:1px solid #f87171;color:#f87171;">💾 Guardar borrador</button>
+      <button class="btn-primary" onclick="previewInforme()">👁 Vista previa / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PREVIEW INFORME PDF -->
+<div class="modal-overlay" id="mInformePdf">
+  <div class="modal" style="max-width:820px;padding:0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:700;color:#bfdbfe;">Vista previa del informe</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-primary" onclick="imprimirInforme()">📥 Descargar PDF</button>
+        <button class="btn-secondary" onclick="cerrar('mInformePdf')">✕ Cerrar</button>
+      </div>
+    </div>
+    <div id="informePdfContent" style="background:#fff;max-height:78vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
 </div><!-- /appScreen -->
 
 <!-- ══ MODAL CLIENTE ══ -->
@@ -884,7 +1008,7 @@ async function iniciarApp(){
     document.getElementById('tabCli').classList.remove('active');
   }
   try{
-    await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos()]);
+    await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos(),loadInformes()]);
     if(isAdmin) await loadUsuarios();
     setStatus(true); calcAlertas();
   }catch(e){setStatus(false);showToast('Error de conexión',true);}
@@ -1744,13 +1868,14 @@ function setFiltro(v,btn){
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
   if(id==='historial') renderHist();
   if(id==='eventual'){renderEventuales(eventualesFiltrados());}
   if(id==='presupuestos'){loadPresupuestos();}
+  if(id==='informes'){loadInformes();}
 }
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){const d=new Date(desde);d.setDate(d.getDate()+parseInt(dias));return d.toISOString().split('T')[0];}
@@ -2264,6 +2389,396 @@ function imprimirPpto(){
   ventana.document.close();
   ventana.focus();
   setTimeout(()=>ventana.print(),500);
+}
+
+
+// ── INFORMES ──
+let informes=[];
+let filtroInformeTipo='';
+let filtroInformeEstado='';
+let fotosInformeSeleccionadas=[]; // [{url, descripcion}]
+
+async function loadInformes(){
+  informes=await api('informes?select=*&order=created_at.desc');
+  renderInformes();
+}
+
+function renderInformes(){
+  let lista=informes;
+  if(filtroInformeTipo) lista=lista.filter(i=>i.tipo===filtroInformeTipo);
+  if(filtroInformeEstado) lista=lista.filter(i=>i.estado===filtroInformeEstado);
+  document.getElementById('informesCount').textContent=lista.length+' informe(s)';
+  const tb=document.getElementById('informesBody');
+  if(!lista.length){
+    tb.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">Sin informes</div></div></td></tr>';
+    return;
+  }
+  tb.innerHTML=lista.map(inf=>{
+    const isCS=inf.empresa==='ChillerSystem';
+    const esBorrador=inf.estado==='borrador';
+    const tipoLabel=inf.tipo==='tecnico'?'📋 Técnico':'📊 Gestión';
+    const estadoStyle=esBorrador
+      ?'color:#f87171;background:rgba(248,113,113,0.12);border-color:rgba(248,113,113,0.3)'
+      :'color:#34d399;background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.3)';
+    const periodo=inf.periodo_desde&&inf.periodo_hasta?fmtF(inf.periodo_desde)+' al '+fmtF(inf.periodo_hasta):inf.referencia||'—';
+    return '<tr>'
+      +'<td class="td-mono">'+inf.numero+'</td>'
+      +'<td><span class="badge '+(inf.tipo==='tecnico'?'b-preventivo2':'b-rev')+'">'+tipoLabel+'</span></td>'
+      +'<td><span class="badge '+(isCS?'emp-cs':'emp-cv')+'">'+(isCS?'🔵 CS':'🟣 CV')+'</span></td>'
+      +'<td class="td-name">'+(inf.cliente_nombre||'—')+'</td>'
+      +'<td class="td-dim" style="max-width:140px;">'+periodo+'</td>'
+      +'<td><span class="badge" style="'+estadoStyle+'">'+(esBorrador?'🔴 Borrador':'✅ Aprobado')+'</span></td>'
+      +'<td class="td-dim">'+(inf.created_at?fmtF(inf.created_at.split('T')[0]):'—')+'</td>'
+      +'<td style="display:flex;gap:4px;flex-wrap:wrap;">'
+        +'<button class="btn-edit" onclick="previewInformeById(\''+inf.id+'\')">👁</button>'
+        +'<button class="btn-edit" onclick="abrirModalInforme(\''+inf.id+'\')">✏️</button>'
+        +(esBorrador?'<button class="btn-green" onclick="aprobarInforme(\''+inf.id+'\')">✅ OK</button>':'')
+        +'<button class="btn-danger" onclick="elimInforme(\''+inf.id+'\')">🗑</button>'
+      +'</td></tr>';
+  }).join('');
+}
+
+function selEmpI(v){
+  document.getElementById('iEmpresa').value=v;
+  document.getElementById('iOptCS').className='emp-opt'+(v==='ChillerSystem'?' sel-cs':'');
+  document.getElementById('iOptCV').className='emp-opt'+(v==='ChillerService'?' sel-cv':'');
+}
+
+function selTipoInforme(v){
+  document.getElementById('iTipo').value=v;
+  document.getElementById('iTipoTec').className='emp-opt'+(v==='tecnico'?' sel-cs':'');
+  document.getElementById('iTipoGest').className='emp-opt'+(v==='gestion'?' sel-cs':'');
+  document.getElementById('iPeriodoDesdeCont').style.display=v==='gestion'?'flex':'none';
+  document.getElementById('iPeriodoHastaCont').style.display=v==='gestion'?'flex':'none';
+}
+
+function cargarDatosClienteInforme(cliId){
+  if(!cliId) return;
+  const c=clientes.find(x=>x.id===cliId);
+  if(!c) return;
+  document.getElementById('iClienteNombre').value=c.nombre||'';
+  document.getElementById('iClienteDireccion').value=c.direccion||'';
+  document.getElementById('iContacto').value=c.contacto||'';
+  // Load intervenciones for this client
+  cargarIntervencionesInforme(cliId);
+  // Load presupuestos for this client
+  const pptos=presupuestos.filter(p=>p.cliente_id===cliId||p.cliente_nombre===c.nombre);
+  document.getElementById('iPresupuestoId').innerHTML='<option value="">— Sin vinculación —</option>'
+    +pptos.map(p=>'<option value="'+p.id+'">'+p.numero+' — '+p.referencia+'</option>').join('');
+}
+
+function cargarIntervencionesInforme(cliId){
+  const eqs=equipos.filter(e=>e.cliente_id===cliId);
+  const intervs=intervenciones.filter(i=>eqs.some(e=>e.id===i.equipo_id)||i.cliente_id===cliId);
+  const container=document.getElementById('iDesarrolloContainer');
+  const fotosContainer=document.getElementById('iFotosContainer');
+  if(!intervs.length){
+    container.innerHTML='<div style="font-size:11px;color:var(--text-dim);">Sin intervenciones registradas para este cliente</div>';
+    fotosContainer.innerHTML='<div style="font-size:11px;color:var(--text-dim);">Sin fotos disponibles</div>';
+    return;
+  }
+  // Show interventions grouped by equipo
+  container.innerHTML='<div style="font-size:11px;color:var(--accent);margin-bottom:8px;font-weight:700;letter-spacing:1px;">INTERVENCIONES DISPONIBLES (se incluirán en el desarrollo)</div>'
+    +intervs.map(i=>{
+      const eq=equipos.find(e=>e.id===i.equipo_id);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+        +'<input type="checkbox" id="intv-'+i.id+'" checked style="accent-color:#3b82f6;"/>'
+        +'<label for="intv-'+i.id+'" style="font-size:12px;color:var(--text);">'
+        +'<span class="badge '+(i.tipo==='Correctivo'?'b-correctivo':'b-preventivo2')+'" style="margin-right:6px;">'+i.tipo+'</span>'
+        +fmtF(i.fecha)+' · '+(eq?eq.nombre:'General')+' · '+(i.descripcion?i.descripcion.substring(0,50)+'...':'Sin descripción')
+        +'</label></div>';
+    }).join('');
+
+  // Show available photos
+  const todasFotos=[];
+  intervs.forEach(i=>{
+    if(i.fotos&&i.fotos.length){
+      i.fotos.forEach(url=>{
+        todasFotos.push({url,interv:i,eq:equipos.find(e=>e.id===i.equipo_id)});
+      });
+    }
+  });
+  if(!todasFotos.length){
+    fotosContainer.innerHTML='<div style="font-size:11px;color:var(--text-dim);">Sin fotos disponibles en las intervenciones</div>';
+    return;
+  }
+  fotosContainer.innerHTML='<div style="font-size:11px;color:var(--accent);margin-bottom:8px;font-weight:700;letter-spacing:1px;">FOTOS DISPONIBLES — Seleccioná las que incluirás</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:10px;">'
+    +todasFotos.map((f,idx)=>'<div style="position:relative;width:90px;">'
+      +'<img src="'+f.url+'" style="width:90px;height:70px;object-fit:cover;border-radius:6px;border:2px solid rgba(255,255,255,0.1);cursor:pointer;" onclick="toggleFotoInforme('+idx+',this.src)" id="fotoInf-'+idx+'"/>'
+      +'<div style="font-size:9px;color:var(--text-dim);margin-top:3px;text-align:center;">'+(f.eq?f.eq.nombre:'General')+'</div>'
+      +'<input type="text" id="descFotoInf-'+idx+'" placeholder="Descripción..." style="width:90px;font-size:9px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text);border-radius:4px;padding:2px 4px;margin-top:2px;font-family:inherit;"/>'
+      +'</div>').join('')
+    +'</div>';
+  fotosInformeSeleccionadas=[];
+}
+
+function toggleFotoInforme(idx,url){
+  const img=document.getElementById('fotoInf-'+idx);
+  const realUrl=img?img.src:url;
+  const already=fotosInformeSeleccionadas.findIndex(f=>f.url===realUrl);
+  if(already>=0){
+    fotosInformeSeleccionadas.splice(already,1);
+    if(img) img.style.border='2px solid rgba(255,255,255,0.1)';
+  }else{
+    const desc=document.getElementById('descFotoInf-'+idx);
+    fotosInformeSeleccionadas.push({url:realUrl,descripcion:desc?desc.value:''});
+    if(img) img.style.border='2px solid #34d399';
+  }
+}
+
+function getFotosSeleccionadas(){
+  // Update descriptions before saving
+  const container=document.getElementById('iFotosContainer');
+  const imgs=container.querySelectorAll('img[id^="fotoInf-"]');
+  imgs.forEach((img,idx)=>{
+    const sel=fotosInformeSeleccionadas.findIndex(f=>f.url===img.src);
+    if(sel>=0){
+      const desc=document.getElementById('descFotoInf-'+idx);
+      if(desc) fotosInformeSeleccionadas[sel].descripcion=desc.value;
+    }
+  });
+  return fotosInformeSeleccionadas;
+}
+
+function abrirModalInforme(id=null){
+  fotosInformeSeleccionadas=[];
+  ['informeId','iNumero','iClienteNombre','iClienteDireccion','iContacto','iReferencia','iDesarrollo','iConclusion'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('iFechaInf').value=new Date().toISOString().split('T')[0];
+  document.getElementById('iPeriodoDesdeFecha').value='';
+  document.getElementById('iPeriodoHastaFecha').value='';
+  document.getElementById('iClienteId').innerHTML='<option value="">— Seleccioná un cliente —</option>'+clientes.filter(c=>c.tipo_cliente!=='eventual').map(c=>'<option value="'+c.id+'">'+c.nombre+'</option>').join('');
+  document.getElementById('iPresupuestoId').innerHTML='<option value="">— Sin vinculación —</option>';
+  document.getElementById('iDesarrolloContainer').innerHTML='<div style="font-size:11px;color:var(--text-dim);">Seleccioná un cliente para ver las intervenciones</div>';
+  document.getElementById('iFotosContainer').innerHTML='<div style="font-size:11px;color:var(--text-dim);">Seleccioná un cliente para ver las fotos disponibles</div>';
+  selEmpI('ChillerSystem');
+  selTipoInforme('tecnico');
+  if(id){
+    const inf=informes.find(x=>x.id===id);
+    document.getElementById('tInforme').textContent='Editar Informe';
+    document.getElementById('informeId').value=inf.id;
+    document.getElementById('iNumero').value=inf.numero||'';
+    document.getElementById('iFechaInf').value=inf.created_at?inf.created_at.split('T')[0]:'';
+    document.getElementById('iClienteNombre').value=inf.cliente_nombre||'';
+    document.getElementById('iClienteDireccion').value=inf.cliente_direccion||'';
+    document.getElementById('iContacto').value=inf.cliente_contacto||'';
+    document.getElementById('iReferencia').value=inf.referencia||'';
+    document.getElementById('iDesarrollo').value=inf.desarrollo||'';
+    document.getElementById('iConclusion').value=inf.conclusion||'';
+    document.getElementById('iPeriodoDesdeFecha').value=inf.periodo_desde||'';
+    document.getElementById('iPeriodoHastaFecha').value=inf.periodo_hasta||'';
+    selEmpI(inf.empresa||'ChillerSystem');
+    selTipoInforme(inf.tipo||'tecnico');
+    fotosInformeSeleccionadas=inf.fotos_seleccionadas||[];
+    if(inf.cliente_id){
+      document.getElementById('iClienteId').value=inf.cliente_id;
+      cargarDatosClienteInforme(inf.cliente_id);
+    }
+  }else{
+    document.getElementById('tInforme').textContent='Nuevo Informe';
+  }
+  document.getElementById('mInforme').classList.add('open');
+}
+
+async function guardarInforme(estado){
+  const id=document.getElementById('informeId').value;
+  const numero=document.getElementById('iNumero').value.trim();
+  const clienteNombre=document.getElementById('iClienteNombre').value.trim();
+  if(!numero){showToast('N° de informe obligatorio',true);return;}
+  if(!clienteNombre){showToast('Nombre del cliente obligatorio',true);return;}
+  const fotos=getFotosSeleccionadas();
+  const data={
+    numero,
+    tipo:document.getElementById('iTipo').value,
+    empresa:document.getElementById('iEmpresa').value,
+    cliente_id:document.getElementById('iClienteId').value||null,
+    cliente_nombre:clienteNombre,
+    cliente_direccion:document.getElementById('iClienteDireccion').value.trim()||null,
+    cliente_contacto:document.getElementById('iContacto').value.trim()||null,
+    referencia:document.getElementById('iReferencia').value.trim()||null,
+    periodo_desde:document.getElementById('iPeriodoDesdeFecha').value||null,
+    periodo_hasta:document.getElementById('iPeriodoHastaFecha').value||null,
+    presupuesto_id:document.getElementById('iPresupuestoId').value||null,
+    desarrollo:document.getElementById('iDesarrollo').value.trim()||null,
+    fotos_seleccionadas:fotos,
+    conclusion:document.getElementById('iConclusion').value.trim()||null,
+    estado:id?(informes.find(x=>x.id===id)||{}).estado||estado:estado,
+    creado_por:usuarioActual?usuarioActual.nombre:null
+  };
+  try{
+    if(id) await api('informes?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    else    await api('informes',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Informe guardado ✓','success');
+    cerrar('mInforme');await loadInformes();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function aprobarInforme(id){
+  if(!confirm('¿Aprobar este informe?'))return;
+  try{
+    await api('informes?id=eq.'+id,{method:'PATCH',
+      body:JSON.stringify({estado:'aprobado',aprobado_por:usuarioActual?usuarioActual.nombre:null}),
+      headers:{...H,'Prefer':'return=minimal'}});
+    showToast('✅ Informe aprobado','success');await loadInformes();
+  }catch(e){showToast('Error',true);}
+}
+
+async function elimInforme(id){
+  if(!confirm('¿Eliminar este informe?'))return;
+  try{await api('informes?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Eliminado');await loadInformes();}catch(e){showToast('Error',true);}
+}
+
+function previewInforme(){
+  const fotos=getFotosSeleccionadas();
+  const inf={
+    numero:document.getElementById('iNumero').value,
+    tipo:document.getElementById('iTipo').value,
+    empresa:document.getElementById('iEmpresa').value,
+    cliente_nombre:document.getElementById('iClienteNombre').value,
+    cliente_direccion:document.getElementById('iClienteDireccion').value,
+    cliente_contacto:document.getElementById('iContacto').value,
+    referencia:document.getElementById('iReferencia').value,
+    periodo_desde:document.getElementById('iPeriodoDesdeFecha').value,
+    periodo_hasta:document.getElementById('iPeriodoHastaFecha').value,
+    desarrollo:document.getElementById('iDesarrollo').value,
+    fotos_seleccionadas:fotos,
+    conclusion:document.getElementById('iConclusion').value,
+    fecha:document.getElementById('iFechaInf').value
+  };
+  renderInformePdf(inf);
+  document.getElementById('mInformePdf').classList.add('open');
+}
+
+function previewInformeById(id){
+  const inf=informes.find(x=>x.id===id);
+  if(!inf)return;
+  renderInformePdf(inf);
+  document.getElementById('mInformePdf').classList.add('open');
+}
+
+function renderInformePdf(inf){
+  const isCS=inf.empresa==='ChillerSystem';
+  const empresa=isCS?{
+    nombre:'CHILLERSYSTEM ING. S.R.L.',
+    subtitulo:'Sistemas de Aire Acondicionado y Calefacción',
+    dir:'Sarmiento 4070 (1678) Caseros',tel:'4734-5999',
+    firmaCargo:'Gte. de Servicios y Proyectos',
+    firmaEmpresa:'CHILLERSYSTEM ING. S.R.L.',
+    logo:'https://www.chillersystem.com/assets/img/logo.webp'
+  }:{
+    nombre:'CHILLERSERVICE S.A.',
+    subtitulo:'Servicios e Instalaciones Termomecánicas',
+    dir:'Esmeralda 762 (1007) – 2°B – Cap.Fed.',tel:'5032-4033',
+    firmaCargo:'Apoderado.',
+    firmaEmpresa:'CHILLER SERVICE S.A.',
+    logo:'https://www.chillersystem.com/assets/img/logo.webp'
+  };
+  const fecha=inf.fecha||inf.created_at?new Date((inf.fecha||inf.created_at)).toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
+  const fotos=inf.fotos_seleccionadas||[];
+  const tipoLabel=inf.tipo==='tecnico'?'INFORME TÉCNICO':'INFORME DE GESTIÓN';
+  const periodo=inf.periodo_desde&&inf.periodo_hasta?' — Período: '+fmtF(inf.periodo_desde)+' al '+fmtF(inf.periodo_hasta):'';
+
+  // BUILD INDICE
+  const secciones=[];
+  secciones.push({num:'1',titulo:'Introducción'});
+  secciones.push({num:'2',titulo:'Desarrollo'+(inf.tipo==='gestion'?' — Plan de mantenimiento':'')});
+  if(fotos.length) secciones.push({num:'3',titulo:'Registro fotográfico'});
+  secciones.push({num:fotos.length?'4':'3',titulo:'Conclusiones y recomendaciones'});
+
+  let html='<div id="informeImprimible" style="font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;">';
+  // HEADER
+  html+='<table width="100%" style="border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:20px;"><tr>';
+  html+='<td width="120"><img src="'+empresa.logo+'" style="height:60px;object-fit:contain;"/></td>';
+  html+='<td style="text-align:center;"><div style="font-size:24px;font-weight:900;font-style:italic;">'+empresa.nombre+'</div>';
+  html+='<div style="font-size:13px;font-style:italic;">'+empresa.subtitulo+'</div></td></tr></table>';
+  // TITULO
+  html+='<div style="text-align:center;margin:20px 0;padding:12px;background:#f5f5f5;border-radius:4px;">';
+  html+='<div style="font-size:18px;font-weight:900;text-transform:uppercase;">'+tipoLabel+'</div>';
+  html+='<div style="font-size:13px;margin-top:4px;">N° '+inf.numero+periodo+'</div></div>';
+  // DATOS
+  html+='<table width="100%" style="margin-bottom:16px;"><tr>';
+  html+='<td width="50%"><div><strong>Cliente:</strong> '+inf.cliente_nombre+'</div>';
+  if(inf.cliente_direccion) html+='<div>'+inf.cliente_direccion+'</div>';
+  if(inf.cliente_contacto) html+='<div><strong>At.:</strong> '+inf.cliente_contacto+'</div>';
+  html+='</td><td width="50%" style="text-align:right;">';
+  html+='<div>Buenos Aires, '+fecha+'</div>';
+  if(inf.referencia) html+='<div><strong>Ref.:</strong> '+inf.referencia+'</div>';
+  html+='</td></tr></table>';
+  html+='<hr style="margin:16px 0;"/>';
+  // INDICE
+  html+='<div style="margin:16px 0;page-break-after:avoid;">';
+  html+='<div style="font-size:14px;font-weight:bold;text-decoration:underline;margin-bottom:10px;">ÍNDICE</div>';
+  html+='<table width="100%">';
+  secciones.forEach(s=>{
+    html+='<tr><td style="padding:4px 0;">'+s.num+'. '+s.titulo+'</td><td style="text-align:right;border-bottom:1px dotted #999;">..................</td></tr>';
+  });
+  html+='</table></div><hr style="margin:16px 0;"/>';
+  // INTRODUCCION
+  html+='<div style="margin:16px 0;">';
+  html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">1. INTRODUCCIÓN</div>';
+  html+='<p>Por intermedio del presente informe, '+empresa.nombre+' hace entrega del registro de trabajos realizados correspondiente a '+inf.cliente_nombre+'. Los trabajos se llevaron a cabo en el marco del plan de mantenimiento '+(inf.tipo==='gestion'?'preventivo y correctivo del período '+fmtF(inf.periodo_desde||'')+' al '+fmtF(inf.periodo_hasta||''):'preventivo y correctivo programado')+'.</p>';
+  html+='</div><hr style="margin:16px 0;"/>';
+  // DESARROLLO
+  html+='<div style="margin:16px 0;">';
+  html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">2. DESARROLLO</div>';
+  if(inf.desarrollo) html+='<p style="white-space:pre-wrap;">'+inf.desarrollo+'</p>';
+  else html+='<p style="color:#666;font-style:italic;">Ver registro de intervenciones adjunto.</p>';
+  html+='</div>';
+  // FOTOS
+  if(fotos.length){
+    html+='<hr style="margin:16px 0;"/>';
+    html+='<div style="margin:16px 0;">';
+    html+='<div style="font-size:14px;font-weight:bold;margin-bottom:12px;">3. REGISTRO FOTOGRÁFICO</div>';
+    // 2 fotos por fila
+    for(let i=0;i<fotos.length;i+=2){
+      html+='<table width="100%" style="margin-bottom:16px;"><tr>';
+      for(let j=i;j<Math.min(i+2,fotos.length);j++){
+        html+='<td width="50%" style="padding:0 8px;text-align:center;">';
+        html+='<img src="'+fotos[j].url+'" style="max-width:100%;max-height:220px;object-fit:contain;border:1px solid #ddd;border-radius:4px;"/>';
+        if(fotos[j].descripcion) html+='<div style="font-size:11px;margin-top:5px;font-style:italic;color:#555;">'+fotos[j].descripcion+'</div>';
+        html+='</td>';
+      }
+      if(fotos.length%2!==0&&i===fotos.length-1) html+='<td width="50%"></td>';
+      html+='</tr></table>';
+    }
+    html+='</div>';
+  }
+  // CONCLUSION
+  html+='<hr style="margin:16px 0;"/>';
+  html+='<div style="margin:16px 0;">';
+  const numConc=fotos.length?'4':'3';
+  html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">'+numConc+'. CONCLUSIONES Y RECOMENDACIONES</div>';
+  if(inf.conclusion) html+='<p style="white-space:pre-wrap;">'+inf.conclusion+'</p>';
+  else html+='<p style="color:#666;font-style:italic;">Sin observaciones adicionales.</p>';
+  html+='</div>';
+  // FIRMA
+  html+='<div style="text-align:right;margin-top:50px;">';
+  html+='<div style="display:inline-block;text-align:center;">';
+  html+='<div style="border-top:1px solid #000;padding-top:6px;min-width:200px;">';
+  html+='<div><strong>Ing. Norberto Garcia</strong></div>';
+  html+='<div>'+empresa.firmaCargo+'</div>';
+  html+='<div>'+empresa.firmaEmpresa+'</div>';
+  html+='</div></div></div>';
+  // FOOTER
+  html+='<div style="border-top:1px solid #000;margin-top:30px;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;">';
+  html+='<span>Informe N°'+inf.numero+'</span>';
+  html+='<span>'+empresa.dir+' //TE.: '+empresa.tel+'</span></div>';
+  html+='</div>';
+
+  document.getElementById('informePdfContent').innerHTML=html;
+}
+
+function imprimirInforme(){
+  const contenido=document.getElementById('informeImprimible');
+  if(!contenido)return;
+  const ventana=window.open('',"_blank");
+  ventana.document.write('<html><head><title>Informe</title><style>body{margin:0;padding:0;font-family:Arial,sans-serif;}@media print{body{-webkit-print-color-adjust:exact;}img{max-width:100% !important;}}</style></head><body>');
+  ventana.document.write(contenido.outerHTML);
+  ventana.document.write('</body></html>');
+  ventana.document.close();
+  ventana.focus();
+  setTimeout(()=>ventana.print(),600);
 }
 
 function togglePass(id){
