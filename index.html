@@ -4,6 +4,12 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ChillerSystem · Gestión Integral</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#060f20"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="ChillerSystem"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -214,12 +220,53 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
 .toast.error{background:linear-gradient(135deg,#dc2626,#ef4444);}
 .toast.success{background:linear-gradient(135deg,#059669,#10b981);}
 
-@media(max-width:600px){
-  .header,.empresa-filter,.nav,.panel,.alertas-banner{padding-left:12px;padding-right:12px;}
-  .panel{margin-left:12px;margin-right:12px;}
-  .alertas-banner{margin-left:12px;margin-right:12px;}
+@media(max-width:700px){
+  .header,.empresa-filter,.nav,.panel,.alertas-banner{padding-left:10px;padding-right:10px;}
+  .panel{margin-left:8px;margin-right:8px;border-radius:0 8px 8px 8px;}
+  .alertas-banner{margin-left:8px;margin-right:8px;}
   .form-grid{grid-template-columns:1fr;}
   .search-box{width:100%;}
+  .panel-header{flex-direction:column;align-items:flex-start;}
+  .stats-bar{gap:6px;}
+  .stat-mini{flex:1 1 70px;padding:6px 8px;}
+  .stat-mini-num{font-size:16px;}
+  /* TABLAS RESPONSIVE */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:600px;}
+  /* MODALES */
+  .modal{padding:16px;margin:8px;}
+  .modal-overlay{padding:8px;}
+  /* NAV */
+  .nav{gap:2px;flex-wrap:wrap;}
+  .nav-btn{padding:6px 10px;font-size:11px;border-radius:6px 6px 0 0;}
+  /* HEADER */
+  .header{padding:10px 12px;}
+  .header-title{font-size:13px;}
+  .logo-wrap img{height:30px;}
+  /* EMPRESA PILLS */
+  .empresa-filter{gap:5px;padding:10px 10px 0;}
+  .empresa-pill{padding:5px 10px;font-size:11px;}
+  /* CLIENTE CARDS */
+  .cliente-row{flex-wrap:wrap;gap:6px;}
+  .equipos-expand{padding:0 10px 10px 10px;}
+  /* BOTONES ACCION */
+  .panel-header div{flex-wrap:wrap;gap:5px;}
+  /* ALERTA ITEMS */
+  .alerta-item{flex-wrap:wrap;gap:6px;}
+  /* FORM ACTIONS */
+  .form-actions{flex-wrap:wrap;}
+  .form-actions button{flex:1;}
+  /* USER INFO */
+  .user-info{flex-wrap:wrap;gap:5px;}
+  .user-badge{font-size:10px;padding:3px 8px;}
+  /* SERVICE */
+  .equipo-header{flex-wrap:wrap;gap:6px;}
+}
+@media(max-width:400px){
+  .nav-btn{font-size:10px;padding:5px 7px;}
+  .stat-mini-num{font-size:14px;}
+  .header-title{font-size:12px;}
+  table{min-width:500px;}
 }
 </style>
 </head>
@@ -265,6 +312,9 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
     </div>
   </div>
   <div class="user-info">
+    <button id="installBtn" onclick="instalarApp()" style="display:none;align-items:center;gap:5px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">
+      📱 Instalar app
+    </button>
     <div id="sDot" style="width:7px;height:7px;border-radius:50%;background:#fbbf24;"></div>
     <div class="user-badge"><span id="userNombre">—</span> · <span id="userRolBadge" class="rol-admin">—</span></div>
     <button class="btn-logout" onclick="doLogout()">Salir</button>
@@ -2781,6 +2831,16 @@ function imprimirInforme(){
   setTimeout(()=>ventana.print(),600);
 }
 
+function instalarApp(){
+  if(window.deferredPrompt){
+    window.deferredPrompt.prompt();
+    window.deferredPrompt.userChoice.then(choice=>{
+      if(choice.outcome==='accepted') showToast('App instalada ✓','success');
+      window.deferredPrompt=null;
+      document.getElementById('installBtn').style.display='none';
+    });
+  }
+}
 function togglePass(id){
   const el=document.getElementById('pass-'+id);
   if(!el) return;
@@ -2795,6 +2855,29 @@ function showToast(msg,type=''){
 }
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(()=>console.log('SW registrado'))
+      .catch(e=>console.log('SW error:',e));
+  });
+}
+// PWA Install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  // Show install button if not installed
+  const btn=document.getElementById('installBtn');
+  if(btn) btn.style.display='flex';
+});
+window.addEventListener('appinstalled',()=>{
+  const btn=document.getElementById('installBtn');
+  if(btn) btn.style.display='none';
+  deferredPrompt=null;
+});
 </script>
 </body>
 </html>
