@@ -508,46 +508,76 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
     <button class="modal-close" onclick="cerrar('mServiceEq')">✕</button>
     <div class="modal-title" id="tServiceEq">Registrar service</div>
     <input type="hidden" id="serviceEqId"/>
-    <div class="form-grid">
-      <div class="form-group full">
-        <label class="form-label">Tipo de registro *</label>
-        <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
-          <button class="emp-opt" id="sTipoPreventivo" onclick="setServiceTipo('Preventivo')" style="flex:none;padding:8px 20px;">✅ Preventivo</button>
-          <button class="emp-opt" id="sTipoCorrectivo" onclick="setServiceTipo('Correctivo')" style="flex:none;padding:8px 20px;">🔴 Correctivo</button>
-        </div>
-        <input type="hidden" id="sTipo" value="Preventivo"/>
-      </div>
-      <div class="form-group full">
-        <label class="form-label">Trabajo realizado *</label>
-        <textarea class="form-textarea" id="sTrabajoRealizado" placeholder="Describí en detalle qué se realizó en este equipo..." style="min-height:80px;"></textarea>
-      </div>
-      <div class="form-group full" id="sLecturasGroup">
-        <label class="form-label">Lecturas operativas</label>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="form-group"><label class="form-label">T° agua entrada</label><input class="form-input" id="sTempEntrada" type="number" step="0.1" placeholder="°C"/></div>
-          <div class="form-group"><label class="form-label">T° agua salida</label><input class="form-input" id="sTempSalida" type="number" step="0.1" placeholder="°C"/></div>
-          <div class="form-group"><label class="form-label">T° condensación</label><input class="form-input" id="sTempCondensacion" type="number" step="0.1" placeholder="°C"/></div>
-          <div class="form-group"><label class="form-label">Presión alta (bar)</label><input class="form-input" id="sPresAlta" type="number" step="0.1" placeholder="bar"/></div>
-          <div class="form-group"><label class="form-label">Presión baja (bar)</label><input class="form-input" id="sPresBaja" type="number" step="0.1" placeholder="bar"/></div>
-          <div class="form-group"><label class="form-label">Corriente compresor (A)</label><input class="form-input" id="sCorrienteComp" type="number" step="0.1" placeholder="A"/></div>
-        </div>
-      </div>
-      <div class="form-group full" id="sCorrectivoDet" style="display:none;">
-        <label class="form-label">Descripción del correctivo necesario</label>
-        <textarea class="form-textarea" id="sDescCorrectivo" placeholder="¿Qué falla? ¿Qué se necesita para resolverlo?"></textarea>
-      </div>
-      <div class="form-group full">
-        <label class="form-label">Fotos del equipo / trabajo</label>
-        <div class="foto-upload-area" onclick="document.getElementById('fotoServiceInput').click()">
-          <input type="file" id="fotoServiceInput" accept="image/*" multiple onchange="previewFotos(this,'serviceFotoPreview','serviceFotosNuevas')"/>
-          <div style="color:var(--text-dim);font-size:13px;">📷 Subir fotos</div>
-        </div>
-        <div class="foto-preview-grid" id="serviceFotoPreview"></div>
+    <input type="hidden" id="sTipo" value=""/>
+
+    <!-- PASO 1: SELECTOR DE TIPO (siempre visible arriba) -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:10px;">¿Qué tipo de trabajo es?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <button id="sTipoPreventivo" onclick="setServiceTipo('Preventivo')"
+          style="padding:18px 12px;border-radius:10px;border:2px solid rgba(52,211,153,0.35);background:rgba(52,211,153,0.08);color:#34d399;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.2s;text-align:center;line-height:1.4;">
+          ✅<br/><span style="font-size:13px;">Preventivo</span>
+        </button>
+        <button id="sTipoCorrectivo" onclick="setServiceTipo('Correctivo')"
+          style="padding:18px 12px;border-radius:10px;border:2px solid rgba(248,113,113,0.35);background:rgba(248,113,113,0.08);color:#f87171;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;transition:all 0.2s;text-align:center;line-height:1.4;">
+          🔴<br/><span style="font-size:13px;">Correctivo</span>
+        </button>
       </div>
     </div>
-    <div class="form-actions">
+
+    <!-- PASO 2: FORMULARIO (según tipo seleccionado) -->
+    <div id="sFormulario" style="display:none;">
+      <div style="height:1px;background:rgba(255,255,255,0.08);margin-bottom:14px;"></div>
+      <div class="form-grid">
+
+        <!-- PREVENTIVO: trabajo realizado -->
+        <div class="form-group full" id="sTrabajoGroup">
+          <label class="form-label" id="sTrabajoLabel">Trabajo realizado *</label>
+          <textarea class="form-textarea" id="sTrabajoRealizado" placeholder="Describí en detalle qué se realizó en este equipo..." style="min-height:80px;"></textarea>
+        </div>
+
+        <!-- CORRECTIVO: descripción del problema + qué se necesita -->
+        <div class="form-group full" id="sCorrectivoDet" style="display:none;">
+          <label class="form-label">Descripción del problema detectado *</label>
+          <textarea class="form-textarea" id="sDescCorrectivo" placeholder="¿Qué falla? ¿Cuáles son los síntomas?" style="min-height:70px;"></textarea>
+        </div>
+        <div class="form-group full" id="sNecesitaGroup" style="display:none;">
+          <label class="form-label">¿Qué se necesita para resolverlo?</label>
+          <textarea class="form-textarea" id="sNecesitaResolucion" placeholder="Repuestos, trabajos adicionales, personal especializado..." style="min-height:60px;"></textarea>
+        </div>
+
+        <!-- LECTURAS OPERATIVAS (ambos tipos) -->
+        <div class="form-group full" id="sLecturasGroup">
+          <label class="form-label">Lecturas operativas</label>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group"><label class="form-label">T° agua entrada</label><input class="form-input" id="sTempEntrada" type="number" step="0.1" placeholder="°C"/></div>
+            <div class="form-group"><label class="form-label">T° agua salida</label><input class="form-input" id="sTempSalida" type="number" step="0.1" placeholder="°C"/></div>
+            <div class="form-group"><label class="form-label">T° condensación</label><input class="form-input" id="sTempCondensacion" type="number" step="0.1" placeholder="°C"/></div>
+            <div class="form-group"><label class="form-label">Presión alta (bar)</label><input class="form-input" id="sPresAlta" type="number" step="0.1" placeholder="bar"/></div>
+            <div class="form-group"><label class="form-label">Presión baja (bar)</label><input class="form-input" id="sPresBaja" type="number" step="0.1" placeholder="bar"/></div>
+            <div class="form-group"><label class="form-label">Corriente compresor (A)</label><input class="form-input" id="sCorrienteComp" type="number" step="0.1" placeholder="A"/></div>
+          </div>
+        </div>
+
+        <!-- FOTOS -->
+        <div class="form-group full">
+          <label class="form-label">Fotos del equipo / trabajo</label>
+          <div class="foto-upload-area" onclick="document.getElementById('fotoServiceInput').click()">
+            <input type="file" id="fotoServiceInput" accept="image/*" multiple onchange="previewFotos(this,'serviceFotoPreview','serviceFotosNuevas')"/>
+            <div style="color:var(--text-dim);font-size:13px;">📷 Subir fotos</div>
+          </div>
+          <div class="foto-preview-grid" id="serviceFotoPreview"></div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="cerrar('mServiceEq')">Cancelar</button>
+        <button class="btn-primary" id="sBtnConfirmar" onclick="guardarServiceEq()">✓ Confirmar equipo</button>
+      </div>
+    </div>
+
+    <!-- Botón cancelar visible siempre antes de elegir tipo -->
+    <div id="sCancelarSinTipo" style="margin-top:8px;text-align:center;">
       <button class="btn-secondary" onclick="cerrar('mServiceEq')">Cancelar</button>
-      <button class="btn-primary" onclick="guardarServiceEq()">✓ Confirmar equipo</button>
     </div>
   </div>
 </div>
@@ -1510,6 +1540,71 @@ function abrirHistCliente(cliId){
   renderHistDetalle();
 }
 
+function renderIntervItem(i){
+  const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
+  const esCorrectivo=i.tipo==='Correctivo'||i.necesita_correctivo;
+  // Buscar resolución vinculada
+  const resolucion=i.resuelto_por_id?intervenciones.find(x=>x.id===i.resuelto_por_id):null;
+  const tieneResolucion=!!resolucion||i.correctivo_resuelto;
+
+  let html='<div class="interv-item" style="margin-bottom:'+(esCorrectivo?'10px':'6px')+';'+(esCorrectivo?'border-left:3px solid '+(tieneResolucion?'#34d399':'#f87171')+';padding-left:10px;':'')+'">';
+
+  // ENCABEZADO
+  html+='<div class="interv-header">';
+  if(esCorrectivo){
+    html+='<span class="badge b-correctivo">🔴 Correctivo</span>';
+  }else{
+    html+='<span class="badge b-preventivo2">'+i.tipo+'</span>';
+  }
+  html+='<span class="interv-fecha">'+fmtF(i.fecha)+'</span>';
+  if(i.tecnico) html+='<span class="interv-tecnico">'+i.tecnico+'</span>';
+  if(i.firma) html+='<span style="font-size:10px;color:#34d399;">✍️ '+i.firma+'</span>';
+  html+='<div style="margin-left:auto;display:flex;gap:4px;">';
+  if(!esCorrectivo) html+='<button class="btn-edit" onclick="abrirModalInterv(\''+i.id+'\')" style="padding:2px 7px;font-size:11px;">✏️</button>';
+  if(isAdmin) html+='<button class="btn-danger" onclick="elimInterv(\''+i.id+'\')" style="padding:2px 7px;font-size:11px;">🗑</button>';
+  html+='</div></div>'; // /interv-header
+
+  // DESCRIPCIÓN
+  if(i.descripcion) html+='<div class="interv-desc">'+i.descripcion+'</div>';
+  if(i.solucion) html+='<div class="interv-sol">✓ '+i.solucion+'</div>';
+  if(i.repuestos) html+='<div class="interv-rep">🔩 '+i.repuestos+'</div>';
+  if(i.notas) html+='<div class="interv-rep">📝 '+i.notas+'</div>';
+  if(i.fotos&&i.fotos.length) html+=fotosHTML(i.fotos);
+
+  // CADENA CORRECTIVO
+  if(esCorrectivo){
+    html+='<div style="margin-top:10px;padding:8px 10px;border-radius:7px;background:rgba(0,0,0,0.2);">';
+    // Línea detección
+    html+='<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">';
+    html+='<span style="color:#f87171;font-size:13px;flex-shrink:0;">🔴</span>';
+    html+='<div><span style="color:#f87171;font-weight:700;font-size:12px;">Detectado el '+fmtF(i.fecha)+'</span>';
+    if(i.tecnico) html+=' <span style="color:var(--text-dim);font-size:11px;">por '+i.tecnico+'</span>';
+    if(i.descripcion) html+='<div style="color:var(--text-dim);font-size:11px;margin-top:2px;">'+i.descripcion+'</div>';
+    html+='</div></div>';
+
+    if(tieneResolucion&&resolucion){
+      // Resolución encontrada
+      html+='<div style="display:flex;align-items:flex-start;gap:8px;">';
+      html+='<span style="color:#34d399;font-size:13px;flex-shrink:0;">✅</span>';
+      html+='<div><span style="color:#34d399;font-weight:700;font-size:12px;">Resuelto el '+fmtF(resolucion.fecha)+'</span>';
+      if(resolucion.tecnico) html+=' <span style="color:var(--text-dim);font-size:11px;">por '+resolucion.tecnico+'</span>';
+      if(resolucion.descripcion||resolucion.solucion) html+='<div style="color:#a7f3d0;font-size:11px;margin-top:2px;">'+(resolucion.solucion||resolucion.descripcion)+'</div>';
+      if(resolucion.fotos&&resolucion.fotos.length) html+=fotosHTML(resolucion.fotos);
+      html+='</div></div>';
+    }else if(!tieneResolucion){
+      // Sin resolución — mostrar botón
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">';
+      html+='<span style="color:var(--text-dim);font-size:11px;font-style:italic;">Sin resolución registrada</span>';
+      html+='<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:linear-gradient(135deg,#059669,#10b981);margin-left:auto;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">✅ Realizar correctivo</button>';
+      html+='</div>';
+    }
+    html+='</div>'; // /cadena
+  }
+
+  html+='</div>'; // /interv-item
+  return html;
+}
+
 function renderHistDetalle(){
   const c=clientes.find(x=>x.id===histClienteActual);
   const eqs=equipos.filter(e=>e.cliente_id===histClienteActual);
@@ -1523,26 +1618,7 @@ function renderHistDetalle(){
   const generalRecords=intervenciones.filter(i=>i.cliente_id===histClienteActual&&!i.equipo_id&&(filtroHT?i.tipo===filtroHT:true)).filter(i=>!resolutionIds.has(i.id));
   let generalHTML='';
   if(generalRecords.length){
-    const gRows=generalRecords.map(i=>{
-      const isAdminG=usuarioActual&&usuarioActual.rol==='admin';
-      const delBtn=isAdminG?('<button class="btn-danger" onclick="elimInterv(\'' +i.id+ '\')" style="padding:2px 7px;font-size:11px;">🗑</button>'):'';
-      return '<div class="interv-item" style="margin-bottom:6px;">'
-        +'<div class="interv-header">'
-        +'<span class="badge b-preventivo2">'+i.tipo+'</span>'
-        +'<span class="interv-fecha">'+fmtF(i.fecha)+'</span>'
-        +(i.tecnico?'<span class="interv-tecnico">· '+i.tecnico+'</span>':'')
-        +(i.firma?'<span style="font-size:10px;color:#34d399;">✍️ '+i.firma+'</span>':'')
-        +'<div style="margin-left:auto;">'+delBtn+'</div>'
-        +'</div>'
-        +(i.descripcion?'<div class="interv-desc">'+i.descripcion+'</div>':'')
-        +(i.solucion?'<div class="interv-sol">✓ '+i.solucion+'</div>':'')
-        +((i.necesita_correctivo&&!i.correctivo_resuelto)?'<div class="interv-sol" style="color:#f87171;">🔴 Correctivo pendiente</div>':'')
-        +((i.necesita_correctivo&&i.correctivo_resuelto)?'<div class="interv-sol" style="color:#34d399;">✅ Correctivo resuelto</div>':'')
-        +((i.necesita_correctivo&&!i.correctivo_resuelto)?'<button class="btn-secondary" style="margin-top:8px;padding:4px 9px;font-size:11px;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">Realizar correctivo</button>':'')
-        +((function(){const res=i.resuelto_por_id?intervenciones.find(x=>x.id===i.resuelto_por_id):null;return res?'<div class="interv-rep" style="margin-top:8px;">🔄 Detección → Resolución: '+(res.tecnico?res.tecnico+' · ':'')+fmtF(res.fecha)+(res.descripcion?'<br/>'+res.descripcion:'')+'</div>':''})())
-        +(i.notas?'<div class="interv-rep">📝 '+i.notas+'</div>':'')
-        +'</div>';
-    }).join('');
+    const gRows=generalRecords.map(i=>renderIntervItem(i)).join('');
     generalHTML='<div style="margin-bottom:16px;">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">'
       +'<span style="font-weight:700;color:#a78bfa;font-size:13px;">📋 Registros generales del cliente</span>'
@@ -1566,28 +1642,7 @@ function renderHistDetalle(){
         <span style="font-size:11px;color:var(--text-dim);margin-left:auto;">${intervs.length} registro(s)</span>
         <button class="btn-green" onclick="abrirModalInterv(null,'${eq.id}')" style="padding:3px 9px;font-size:11px;">＋</button>
       </div>
-      ${intervs.map(i=>`
-        <div class="interv-item" style="margin-bottom:6px;">
-          <div class="interv-header">
-            <span class="badge ${i.tipo==='Correctivo'?'b-correctivo':'b-preventivo2'}">${i.tipo}</span>
-            ${i.necesita_correctivo?'<span class="badge" style="color:#f87171;background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.3);">🔴 Correctivo</span>':''}
-            <span class="interv-fecha">${fmtF(i.fecha)}</span>
-            ${i.tecnico?`<span class="interv-tecnico">· ${i.tecnico}</span>`:''}
-            ${i.firma?`<span style="font-size:10px;color:#34d399;">✍️ ${i.firma}</span>`:''}
-            <div style="margin-left:auto;display:flex;gap:4px;">
-              <button class="btn-edit" onclick="abrirModalInterv('${i.id}')" style="padding:2px 7px;font-size:11px;">✏️</button>
-              ${usuarioActual&&usuarioActual.rol==='admin'?`<button class="btn-danger" onclick="elimInterv('${i.id}')" style="padding:2px 7px;font-size:11px;">🗑</button>`:''}
-            </div>
-          </div>
-          ${i.descripcion?`<div class="interv-desc">${i.descripcion}</div>`:''}
-          ${i.solucion?`<div class="interv-sol">✓ ${i.solucion}</div>`:''}
-          ${i.necesita_correctivo&&!i.correctivo_resuelto?`<div class="interv-sol" style="color:#f87171;">🔴 Correctivo pendiente</div>`:''}
-          ${i.necesita_correctivo&&i.correctivo_resuelto?`<div class="interv-sol" style="color:#34d399;">✅ Correctivo resuelto</div>`:''}
-          ${i.necesita_correctivo&&!i.correctivo_resuelto?`<button class="btn-secondary" style="margin-top:8px;padding:4px 9px;font-size:11px;" onclick="abrirResolverCorrectivo('${i.id}')">Realizar correctivo</button>`:''}
-          ${(() => { const res=i.resuelto_por_id?intervenciones.find(x=>x.id===i.resuelto_por_id):null; return res?`<div class="interv-rep" style="margin-top:8px;">🔄 Detección → Resolución: ${res.tecnico?res.tecnico+' · ':''}${fmtF(res.fecha)}${res.descripcion?'<br/>'+res.descripcion:''}</div>`:''})()}
-          ${i.repuestos?`<div class="interv-rep">🔩 ${i.repuestos}</div>`:''}
-          ${fotosHTML(i.fotos)}
-        </div>`).join('')}
+      ${intervs.map(i=>renderIntervItem(i)).join('')}
     </div>`;
   }).join('');
   document.getElementById('histCount').textContent=c.nombre+' · '+total+' registro(s)';
@@ -1852,8 +1907,10 @@ function abrirServiceEq(eqId){
   const eq=equipos.find(e=>e.id===eqId);
   document.getElementById('tServiceEq').textContent='Service: '+eq.nombre;
   document.getElementById('serviceEqId').value=eqId;
+  document.getElementById('sTipo').value='';
   document.getElementById('sTrabajoRealizado').value='';
   document.getElementById('sDescCorrectivo').value='';
+  document.getElementById('sNecesitaResolucion').value='';
   document.getElementById('sTempEntrada').value='';
   document.getElementById('sTempSalida').value='';
   document.getElementById('sTempCondensacion').value='';
@@ -1862,11 +1919,18 @@ function abrirServiceEq(eqId){
   document.getElementById('sCorrienteComp').value='';
   document.getElementById('serviceFotoPreview').innerHTML='';
   serviceFotosNuevas=[];
-  setServiceTipo('Preventivo');
+  // Resetear selector visual
+  const btnPrev=document.getElementById('sTipoPreventivo');
+  const btnCorr=document.getElementById('sTipoCorrectivo');
+  btnPrev.style.background='rgba(52,211,153,0.08)';btnPrev.style.borderColor='rgba(52,211,153,0.35)';btnPrev.style.transform='scale(1)';
+  btnCorr.style.background='rgba(248,113,113,0.08)';btnCorr.style.borderColor='rgba(248,113,113,0.35)';btnCorr.style.transform='scale(1)';
+  document.getElementById('sFormulario').style.display='none';
+  document.getElementById('sCancelarSinTipo').style.display='block';
   const p=servicePlanilla[eqId];
   if(p){
     document.getElementById('sTrabajoRealizado').value=p.trabajo||'';
     document.getElementById('sDescCorrectivo').value=p.desc_correctivo||'';
+    document.getElementById('sNecesitaResolucion').value=p.necesita_resolucion||'';
     document.getElementById('sTempEntrada').value=p.lecturas_operativas?.temperatura_entrada||'';
     document.getElementById('sTempSalida').value=p.lecturas_operativas?.temperatura_salida||'';
     document.getElementById('sTempCondensacion').value=p.lecturas_operativas?.temperatura_condensacion||'';
@@ -1879,15 +1943,38 @@ function abrirServiceEq(eqId){
 }
 function setServiceTipo(tipo){
   document.getElementById('sTipo').value=tipo;
-  document.getElementById('sTipoPreventivo').className='emp-opt'+(tipo==='Preventivo'?' sel-cs':'');
-  document.getElementById('sTipoCorrectivo').className='emp-opt'+(tipo==='Correctivo'?' sel-cv':'');
-  document.getElementById('sCorrectivoDet').style.display=tipo==='Correctivo'?'block':'none';
+  const esPrev=tipo==='Preventivo';
+  // Resaltar botón seleccionado
+  const btnPrev=document.getElementById('sTipoPreventivo');
+  const btnCorr=document.getElementById('sTipoCorrectivo');
+  if(esPrev){
+    btnPrev.style.background='rgba(52,211,153,0.25)';btnPrev.style.borderColor='#34d399';btnPrev.style.transform='scale(1.03)';
+    btnCorr.style.background='rgba(248,113,113,0.08)';btnCorr.style.borderColor='rgba(248,113,113,0.35)';btnCorr.style.transform='scale(1)';
+  }else{
+    btnCorr.style.background='rgba(248,113,113,0.25)';btnCorr.style.borderColor='#f87171';btnCorr.style.transform='scale(1.03)';
+    btnPrev.style.background='rgba(52,211,153,0.08)';btnPrev.style.borderColor='rgba(52,211,153,0.35)';btnPrev.style.transform='scale(1)';
+  }
+  // Mostrar formulario
+  document.getElementById('sFormulario').style.display='block';
+  document.getElementById('sCancelarSinTipo').style.display='none';
+  // Campos según tipo
+  document.getElementById('sTrabajoGroup').style.display=esPrev?'':'none';
+  document.getElementById('sTrabajoLabel').textContent=esPrev?'Trabajo realizado *':'Observaciones generales';
+  document.getElementById('sCorrectivoDet').style.display=esPrev?'none':'';
+  document.getElementById('sNecesitaGroup').style.display=esPrev?'none':'';
+  // Botón confirmar
+  const btn=document.getElementById('sBtnConfirmar');
+  btn.style.background=esPrev?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)';
+  btn.textContent=esPrev?'✅ Confirmar preventivo':'🔴 Registrar correctivo';
 }
 function guardarServiceEq(){
   const eqId=document.getElementById('serviceEqId').value;
   const tipo=document.getElementById('sTipo').value;
+  if(!tipo){showToast('Elegí el tipo de trabajo: Preventivo o Correctivo',true);return;}
   const trabajo=document.getElementById('sTrabajoRealizado').value.trim();
   const descCorrectivo=document.getElementById('sDescCorrectivo').value.trim()||null;
+  const necesitaResolucion=document.getElementById('sNecesitaResolucion').value.trim()||null;
+  if(tipo==='Correctivo'&&!descCorrectivo){showToast('Describí el problema detectado',true);return;}
   const lecturas={
     temperatura_entrada:parseFloat(document.getElementById('sTempEntrada').value)||null,
     temperatura_salida:parseFloat(document.getElementById('sTempSalida').value)||null,
@@ -1900,7 +1987,8 @@ function guardarServiceEq(){
     tipo,
     trabajo:trabajo||null,
     necesita_correctivo:tipo==='Correctivo',
-    desc_correctivo:tipo==='Correctivo'?descCorrectivo:descCorrectivo||null,
+    desc_correctivo:tipo==='Correctivo'?descCorrectivo:null,
+    necesita_resolucion:tipo==='Correctivo'?necesitaResolucion:null,
     lecturas_operativas:lecturas,
     fotos_nuevas:serviceFotosNuevas,
     fotos:[]
@@ -1971,8 +2059,11 @@ async function guardarPlanilla(){
       const p=servicePlanilla[eqId];
       let fotosUrls=[];
       if(p.fotos_nuevas&&p.fotos_nuevas.length) fotosUrls=await subirFotos(p.fotos_nuevas,'service');
+      const descCorr=p.tipo==='Correctivo'
+        ?([p.desc_correctivo,p.necesita_resolucion?'Necesita: '+p.necesita_resolucion:null].filter(Boolean).join(' — '))
+        :p.trabajo;
       const data={equipo_id:eqId,tipo:p.tipo||'Preventivo',fecha,tecnico:tecnico||firma,
-        descripcion:p.tipo==='Correctivo'?(p.desc_correctivo||p.trabajo):p.trabajo,
+        descripcion:descCorr||p.trabajo||null,
         solucion:p.tipo==='Correctivo'?null:p.trabajo,
         notas:document.getElementById('firmaObservaciones').value.trim()||null,
         fotos:fotosUrls,
