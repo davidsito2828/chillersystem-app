@@ -1,5 +1,4 @@
--- Supabase migration for correctivo and operational readings support
-ALTER TABLE intervenciones
+
   ADD COLUMN IF NOT EXISTS lecturas_operativas jsonb,
   ADD COLUMN IF NOT EXISTS correctivo_resuelto boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS resuelto_por_id uuid;

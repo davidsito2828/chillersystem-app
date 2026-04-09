@@ -391,7 +391,6 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
     <div><div class="panel-title">📋 Historial Técnico</div><div class="panel-count" id="histCount">Seleccioná un cliente</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <input class="search-box" type="text" placeholder="🔍 Buscar cliente..." oninput="filtrarHistClientes(this.value)"/>
-      <button class="btn-primary" onclick="abrirModalInterv()">＋ Nueva intervención</button>
     </div>
   </div>
   <!-- LISTA CLIENTES HISTORIAL -->
@@ -546,16 +545,16 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
           <textarea class="form-textarea" id="sNecesitaResolucion" placeholder="Repuestos, trabajos adicionales, personal especializado..." style="min-height:60px;"></textarea>
         </div>
 
-        <!-- LECTURAS OPERATIVAS (ambos tipos) -->
+        <!-- LECTURAS OPERATIVAS (todos opcionales) -->
         <div class="form-group full" id="sLecturasGroup">
-          <label class="form-label">Lecturas operativas</label>
+          <label class="form-label">Lecturas operativas <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;">(todas opcionales)</span></label>
           <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="form-group"><label class="form-label">T° agua entrada</label><input class="form-input" id="sTempEntrada" type="number" step="0.1" placeholder="°C"/></div>
-            <div class="form-group"><label class="form-label">T° agua salida</label><input class="form-input" id="sTempSalida" type="number" step="0.1" placeholder="°C"/></div>
-            <div class="form-group"><label class="form-label">T° condensación</label><input class="form-input" id="sTempCondensacion" type="number" step="0.1" placeholder="°C"/></div>
+            <div class="form-group"><label class="form-label">T° inyección (°C)</label><input class="form-input" id="sTempInyeccion" type="number" step="0.1" placeholder="°C"/></div>
+            <div class="form-group"><label class="form-label">T° retorno (°C)</label><input class="form-input" id="sTempRetorno" type="number" step="0.1" placeholder="°C"/></div>
             <div class="form-group"><label class="form-label">Presión alta (bar)</label><input class="form-input" id="sPresAlta" type="number" step="0.1" placeholder="bar"/></div>
             <div class="form-group"><label class="form-label">Presión baja (bar)</label><input class="form-input" id="sPresBaja" type="number" step="0.1" placeholder="bar"/></div>
             <div class="form-group"><label class="form-label">Corriente compresor (A)</label><input class="form-input" id="sCorrienteComp" type="number" step="0.1" placeholder="A"/></div>
+            <div class="form-group"><label class="form-label">Observación carga de gas</label><input class="form-input" id="sCargaGas" placeholder="Normal, bajo, cargado..."/></div>
           </div>
         </div>
 
@@ -1541,67 +1540,69 @@ function abrirHistCliente(cliId){
 }
 
 function renderIntervItem(i){
-  const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
   const esCorrectivo=i.tipo==='Correctivo'||i.necesita_correctivo;
-  // Buscar resolución vinculada
   const resolucion=i.resuelto_por_id?intervenciones.find(x=>x.id===i.resuelto_por_id):null;
   const tieneResolucion=!!resolucion||i.correctivo_resuelto;
+  const lec=i.lecturas_operativas||{};
+  const lecHtml=(function(){
+    const filas=[
+      lec.temperatura_inyeccion!=null?'<span>💉 Iny: <b>'+lec.temperatura_inyeccion+'°C</b></span>':'',
+      lec.temperatura_retorno!=null?'<span>🔄 Ret: <b>'+lec.temperatura_retorno+'°C</b></span>':'',
+      lec.presion_alta!=null?'<span>↑ P.alta: <b>'+lec.presion_alta+' bar</b></span>':'',
+      lec.presion_baja!=null?'<span>↓ P.baja: <b>'+lec.presion_baja+' bar</b></span>':'',
+      lec.corriente_compresor!=null?'<span>⚡ Corr: <b>'+lec.corriente_compresor+' A</b></span>':'',
+      lec.carga_gas?'<span>🔵 Gas: '+lec.carga_gas+'</span>':'',
+      // compatibilidad con campos viejos
+      lec.temperatura_entrada!=null&&lec.temperatura_inyeccion==null?'<span>💧 Ent: <b>'+lec.temperatura_entrada+'°C</b></span>':'',
+      lec.temperatura_salida!=null&&lec.temperatura_retorno==null?'<span>💧 Sal: <b>'+lec.temperatura_salida+'°C</b></span>':'',
+      lec.temperatura_condensacion!=null?'<span>🌡 Cond: <b>'+lec.temperatura_condensacion+'°C</b></span>':''
+    ].filter(Boolean);
+    if(!filas.length) return '';
+    return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:11px;color:var(--accent3);">'+filas.join('')+'</div>';
+  })();
 
   let html='<div class="interv-item" style="margin-bottom:'+(esCorrectivo?'10px':'6px')+';'+(esCorrectivo?'border-left:3px solid '+(tieneResolucion?'#34d399':'#f87171')+';padding-left:10px;':'')+'">';
 
-  // ENCABEZADO
+  // ENCABEZADO — solo lectura, sin botones
   html+='<div class="interv-header">';
-  if(esCorrectivo){
-    html+='<span class="badge b-correctivo">🔴 Correctivo</span>';
-  }else{
-    html+='<span class="badge b-preventivo2">'+i.tipo+'</span>';
-  }
+  html+=esCorrectivo?'<span class="badge b-correctivo">🔴 Correctivo</span>':'<span class="badge b-preventivo2">'+i.tipo+'</span>';
   html+='<span class="interv-fecha">'+fmtF(i.fecha)+'</span>';
   if(i.tecnico) html+='<span class="interv-tecnico">'+i.tecnico+'</span>';
   if(i.firma) html+='<span style="font-size:10px;color:#34d399;">✍️ '+i.firma+'</span>';
-  html+='<div style="margin-left:auto;display:flex;gap:4px;">';
-  if(!esCorrectivo) html+='<button class="btn-edit" onclick="abrirModalInterv(\''+i.id+'\')" style="padding:2px 7px;font-size:11px;">✏️</button>';
-  if(isAdmin) html+='<button class="btn-danger" onclick="elimInterv(\''+i.id+'\')" style="padding:2px 7px;font-size:11px;">🗑</button>';
-  html+='</div></div>'; // /interv-header
+  html+='</div>';
 
-  // DESCRIPCIÓN
+  // CONTENIDO
   if(i.descripcion) html+='<div class="interv-desc">'+i.descripcion+'</div>';
   if(i.solucion) html+='<div class="interv-sol">✓ '+i.solucion+'</div>';
   if(i.repuestos) html+='<div class="interv-rep">🔩 '+i.repuestos+'</div>';
   if(i.notas) html+='<div class="interv-rep">📝 '+i.notas+'</div>';
+  html+=lecHtml;
   if(i.fotos&&i.fotos.length) html+=fotosHTML(i.fotos);
 
-  // CADENA CORRECTIVO
+  // CADENA CORRECTIVO — solo lectura
   if(esCorrectivo){
     html+='<div style="margin-top:10px;padding:8px 10px;border-radius:7px;background:rgba(0,0,0,0.2);">';
-    // Línea detección
     html+='<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">';
     html+='<span style="color:#f87171;font-size:13px;flex-shrink:0;">🔴</span>';
     html+='<div><span style="color:#f87171;font-weight:700;font-size:12px;">Detectado el '+fmtF(i.fecha)+'</span>';
     if(i.tecnico) html+=' <span style="color:var(--text-dim);font-size:11px;">por '+i.tecnico+'</span>';
     if(i.descripcion) html+='<div style="color:var(--text-dim);font-size:11px;margin-top:2px;">'+i.descripcion+'</div>';
     html+='</div></div>';
-
     if(tieneResolucion&&resolucion){
-      // Resolución encontrada
       html+='<div style="display:flex;align-items:flex-start;gap:8px;">';
       html+='<span style="color:#34d399;font-size:13px;flex-shrink:0;">✅</span>';
       html+='<div><span style="color:#34d399;font-weight:700;font-size:12px;">Resuelto el '+fmtF(resolucion.fecha)+'</span>';
       if(resolucion.tecnico) html+=' <span style="color:var(--text-dim);font-size:11px;">por '+resolucion.tecnico+'</span>';
-      if(resolucion.descripcion||resolucion.solucion) html+='<div style="color:#a7f3d0;font-size:11px;margin-top:2px;">'+(resolucion.solucion||resolucion.descripcion)+'</div>';
+      if(resolucion.solucion||resolucion.descripcion) html+='<div style="color:#a7f3d0;font-size:11px;margin-top:2px;">'+(resolucion.solucion||resolucion.descripcion)+'</div>';
       if(resolucion.fotos&&resolucion.fotos.length) html+=fotosHTML(resolucion.fotos);
       html+='</div></div>';
     }else if(!tieneResolucion){
-      // Sin resolución — mostrar botón
-      html+='<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">';
-      html+='<span style="color:var(--text-dim);font-size:11px;font-style:italic;">Sin resolución registrada</span>';
-      html+='<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:linear-gradient(135deg,#059669,#10b981);margin-left:auto;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">✅ Realizar correctivo</button>';
-      html+='</div>';
+      html+='<div style="margin-top:4px;"><span style="color:#f87171;font-size:11px;font-style:italic;">🔴 Pendiente de resolución</span></div>';
     }
-    html+='</div>'; // /cadena
+    html+='</div>';
   }
 
-  html+='</div>'; // /interv-item
+  html+='</div>';
   return html;
 }
 
@@ -1640,7 +1641,6 @@ function renderHistDetalle(){
         <span class="badge ${badgeEst(eq.estado)}">${eq.estado||'Operativo'}</span>
         ${eq.capacidad?`<span style="font-size:11px;color:var(--text-dim);">${eq.capacidad} ${eq.unidad_capacidad||''}</span>`:''}
         <span style="font-size:11px;color:var(--text-dim);margin-left:auto;">${intervs.length} registro(s)</span>
-        <button class="btn-green" onclick="abrirModalInterv(null,'${eq.id}')" style="padding:3px 9px;font-size:11px;">＋</button>
       </div>
       ${intervs.map(i=>renderIntervItem(i)).join('')}
     </div>`;
@@ -1911,12 +1911,12 @@ function abrirServiceEq(eqId){
   document.getElementById('sTrabajoRealizado').value='';
   document.getElementById('sDescCorrectivo').value='';
   document.getElementById('sNecesitaResolucion').value='';
-  document.getElementById('sTempEntrada').value='';
-  document.getElementById('sTempSalida').value='';
-  document.getElementById('sTempCondensacion').value='';
+  document.getElementById('sTempInyeccion').value='';
+  document.getElementById('sTempRetorno').value='';
   document.getElementById('sPresAlta').value='';
   document.getElementById('sPresBaja').value='';
   document.getElementById('sCorrienteComp').value='';
+  document.getElementById('sCargaGas').value='';
   document.getElementById('serviceFotoPreview').innerHTML='';
   serviceFotosNuevas=[];
   // Resetear selector visual
@@ -1931,12 +1931,12 @@ function abrirServiceEq(eqId){
     document.getElementById('sTrabajoRealizado').value=p.trabajo||'';
     document.getElementById('sDescCorrectivo').value=p.desc_correctivo||'';
     document.getElementById('sNecesitaResolucion').value=p.necesita_resolucion||'';
-    document.getElementById('sTempEntrada').value=p.lecturas_operativas?.temperatura_entrada||'';
-    document.getElementById('sTempSalida').value=p.lecturas_operativas?.temperatura_salida||'';
-    document.getElementById('sTempCondensacion').value=p.lecturas_operativas?.temperatura_condensacion||'';
+    document.getElementById('sTempInyeccion').value=p.lecturas_operativas?.temperatura_inyeccion||'';
+    document.getElementById('sTempRetorno').value=p.lecturas_operativas?.temperatura_retorno||'';
     document.getElementById('sPresAlta').value=p.lecturas_operativas?.presion_alta||'';
     document.getElementById('sPresBaja').value=p.lecturas_operativas?.presion_baja||'';
     document.getElementById('sCorrienteComp').value=p.lecturas_operativas?.corriente_compresor||'';
+    document.getElementById('sCargaGas').value=p.lecturas_operativas?.carga_gas||'';
     setServiceTipo(p.tipo||'Preventivo');
   }
   document.getElementById('mServiceEq').classList.add('open');
@@ -1976,12 +1976,12 @@ function guardarServiceEq(){
   const necesitaResolucion=document.getElementById('sNecesitaResolucion').value.trim()||null;
   if(tipo==='Correctivo'&&!descCorrectivo){showToast('Describí el problema detectado',true);return;}
   const lecturas={
-    temperatura_entrada:parseFloat(document.getElementById('sTempEntrada').value)||null,
-    temperatura_salida:parseFloat(document.getElementById('sTempSalida').value)||null,
-    temperatura_condensacion:parseFloat(document.getElementById('sTempCondensacion').value)||null,
+    temperatura_inyeccion:parseFloat(document.getElementById('sTempInyeccion').value)||null,
+    temperatura_retorno:parseFloat(document.getElementById('sTempRetorno').value)||null,
     presion_alta:parseFloat(document.getElementById('sPresAlta').value)||null,
     presion_baja:parseFloat(document.getElementById('sPresBaja').value)||null,
-    corriente_compresor:parseFloat(document.getElementById('sCorrienteComp').value)||null
+    corriente_compresor:parseFloat(document.getElementById('sCorrienteComp').value)||null,
+    carga_gas:document.getElementById('sCargaGas').value.trim()||null
   };
   servicePlanilla[eqId]={
     tipo,
