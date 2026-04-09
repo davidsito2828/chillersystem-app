@@ -510,16 +510,27 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
     <input type="hidden" id="serviceEqId"/>
     <div class="form-grid">
       <div class="form-group full">
+        <label class="form-label">Tipo de registro *</label>
+        <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+          <button class="emp-opt" id="sTipoPreventivo" onclick="setServiceTipo('Preventivo')" style="flex:none;padding:8px 20px;">✅ Preventivo</button>
+          <button class="emp-opt" id="sTipoCorrectivo" onclick="setServiceTipo('Correctivo')" style="flex:none;padding:8px 20px;">🔴 Correctivo</button>
+        </div>
+        <input type="hidden" id="sTipo" value="Preventivo"/>
+      </div>
+      <div class="form-group full">
         <label class="form-label">Trabajo realizado *</label>
         <textarea class="form-textarea" id="sTrabajoRealizado" placeholder="Describí en detalle qué se realizó en este equipo..." style="min-height:80px;"></textarea>
       </div>
-      <div class="form-group full">
-        <label class="form-label">¿Necesita correctivo?</label>
-        <div style="display:flex;gap:10px;margin-top:4px;">
-          <button class="emp-opt" id="sNoCorrectivo" onclick="setCorrectivo(false)" style="flex:none;padding:8px 20px;">✅ No necesita</button>
-          <button class="emp-opt" id="sSiCorrectivo" onclick="setCorrectivo(true)" style="flex:none;padding:8px 20px;">🔴 Sí necesita correctivo</button>
+      <div class="form-group full" id="sLecturasGroup">
+        <label class="form-label">Lecturas operativas</label>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group"><label class="form-label">T° agua entrada</label><input class="form-input" id="sTempEntrada" type="number" step="0.1" placeholder="°C"/></div>
+          <div class="form-group"><label class="form-label">T° agua salida</label><input class="form-input" id="sTempSalida" type="number" step="0.1" placeholder="°C"/></div>
+          <div class="form-group"><label class="form-label">T° condensación</label><input class="form-input" id="sTempCondensacion" type="number" step="0.1" placeholder="°C"/></div>
+          <div class="form-group"><label class="form-label">Presión alta (bar)</label><input class="form-input" id="sPresAlta" type="number" step="0.1" placeholder="bar"/></div>
+          <div class="form-group"><label class="form-label">Presión baja (bar)</label><input class="form-input" id="sPresBaja" type="number" step="0.1" placeholder="bar"/></div>
+          <div class="form-group"><label class="form-label">Corriente compresor (A)</label><input class="form-input" id="sCorrienteComp" type="number" step="0.1" placeholder="A"/></div>
         </div>
-        <input type="hidden" id="sNecesitaCorrectivo" value="false"/>
       </div>
       <div class="form-group full" id="sCorrectivoDet" style="display:none;">
         <label class="form-label">Descripción del correctivo necesario</label>
@@ -538,6 +549,22 @@ tbody tr:hover{background:rgba(59,130,246,0.04);}
       <button class="btn-secondary" onclick="cerrar('mServiceEq')">Cancelar</button>
       <button class="btn-primary" onclick="guardarServiceEq()">✓ Confirmar equipo</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="mCorrectivoRes">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" onclick="cerrar('mCorrectivoRes')">✕</button>
+    <div class="modal-title">Resolver correctivo</div>
+    <input type="hidden" id="resCorrectivoId"/>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Fecha de resolución *</label><input class="form-input" id="resFecha" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Técnico que resolvió</label><input class="form-input" id="resTecnico" placeholder="Nombre completo"/></div>
+      <div class="form-group full"><label class="form-label">Descripción de la reparación</label><textarea class="form-textarea" id="resDesc" placeholder="Qué se hizo para resolver el correctivo..."></textarea></div>
+    </div>
+    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mCorrectivoRes')">Cancelar</button><button class="btn-primary" onclick="guardarResolucionCorrectivo()">💾 Guardar resolución</button></div>
+  </div>
+</div>
   </div>
 </div>
 
@@ -1486,7 +1513,8 @@ function renderHistDetalle(){
   if(!eqsFiltrados2.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Sin equipos</div></div>';return;}
   let total=0;
   // Show general client records first
-  const generalRecords=intervenciones.filter(i=>i.cliente_id===histClienteActual&&!i.equipo_id&&(filtroHT?i.tipo===filtroHT:true));
+  const resolutionIds=new Set(intervenciones.filter(i=>i.resuelto_por_id).map(i=>i.resuelto_por_id));
+  const generalRecords=intervenciones.filter(i=>i.cliente_id===histClienteActual&&!i.equipo_id&&(filtroHT?i.tipo===filtroHT:true)).filter(i=>!resolutionIds.has(i.id));
   let generalHTML='';
   if(generalRecords.length){
     const gRows=generalRecords.map(i=>{
@@ -1502,6 +1530,10 @@ function renderHistDetalle(){
         +'</div>'
         +(i.descripcion?'<div class="interv-desc">'+i.descripcion+'</div>':'')
         +(i.solucion?'<div class="interv-sol">✓ '+i.solucion+'</div>':'')
+        +((i.necesita_correctivo&&!i.correctivo_resuelto)?'<div class="interv-sol" style="color:#f87171;">🔴 Correctivo pendiente</div>':'')
+        +((i.necesita_correctivo&&i.correctivo_resuelto)?'<div class="interv-sol" style="color:#34d399;">✅ Correctivo resuelto</div>':'')
+        +((i.necesita_correctivo&&!i.correctivo_resuelto)?'<button class="btn-secondary" style="margin-top:8px;padding:4px 9px;font-size:11px;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">Realizar correctivo</button>':'')
+        +((function(){const res=i.resuelto_por_id?intervenciones.find(x=>x.id===i.resuelto_por_id):null;return res?'<div class="interv-rep" style="margin-top:8px;">🔄 Detección → Resolución: '+(res.tecnico?res.tecnico+' · ':'')+fmtF(res.fecha)+(res.descripcion?'<br/>'+res.descripcion:'')+'</div>':''})())
         +(i.notas?'<div class="interv-rep">📝 '+i.notas+'</div>':'')
         +'</div>';
     }).join('');
@@ -1514,6 +1546,8 @@ function renderHistDetalle(){
   }
   el.innerHTML=generalHTML+eqsFiltrados2.map(eq=>{
     let intervs=intervenciones.filter(i=>i.equipo_id===eq.id);
+    const resolutionIds=new Set(intervenciones.filter(x=>x.resuelto_por_id).map(x=>x.resuelto_por_id));
+    intervs=intervs.filter(i=>!resolutionIds.has(i.id));
     if(filtroHT) intervs=intervs.filter(i=>i.tipo===filtroHT);
     intervs.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
     total+=intervs.length;
@@ -1541,6 +1575,10 @@ function renderHistDetalle(){
           </div>
           ${i.descripcion?`<div class="interv-desc">${i.descripcion}</div>`:''}
           ${i.solucion?`<div class="interv-sol">✓ ${i.solucion}</div>`:''}
+          ${i.necesita_correctivo&&!i.correctivo_resuelto?`<div class="interv-sol" style="color:#f87171;">🔴 Correctivo pendiente</div>`:''}
+          ${i.necesita_correctivo&&i.correctivo_resuelto?`<div class="interv-sol" style="color:#34d399;">✅ Correctivo resuelto</div>`:''}
+          ${i.necesita_correctivo&&!i.correctivo_resuelto?`<button class="btn-secondary" style="margin-top:8px;padding:4px 9px;font-size:11px;" onclick="abrirResolverCorrectivo('${i.id}')">Realizar correctivo</button>`:''}
+          ${(() => { const res=i.resuelto_por_id?intervenciones.find(x=>x.id===i.resuelto_por_id):null; return res?`<div class="interv-rep" style="margin-top:8px;">🔄 Detección → Resolución: ${res.tecnico?res.tecnico+' · ':''}${fmtF(res.fecha)}${res.descripcion?'<br/>'+res.descripcion:''}</div>`:''})()}
           ${i.repuestos?`<div class="interv-rep">🔩 ${i.repuestos}</div>`:''}
           ${fotosHTML(i.fotos)}
         </div>`).join('')}
@@ -1716,14 +1754,14 @@ function mostrarTabService(){
   calcCorrectivosAlert();
 }
 function calcCorrectivosAlert(){
-  const correctivos=intervenciones.filter(i=>i.necesita_correctivo&&i.es_planilla);
+  const correctivos=intervenciones.filter(i=>i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto);
   const banner=document.getElementById('correctivosBanner');
   if(correctivos.length){
     banner.style.display='block';
     document.getElementById('correctivosList').innerHTML=correctivos.slice(0,5).map(i=>{
       const eq=equipos.find(e=>e.id===i.equipo_id);
       const cli=eq?clientes.find(c=>c.id===eq.cliente_id):null;
-      return '<div class="alerta-item"><span style="color:#f87171;font-weight:700;">🔴</span><span style="font-weight:700;color:#e0f2fe;">'+(eq?eq.nombre:'—')+'</span><span style="color:var(--text-dim);">'+(cli?'· '+cli.nombre:'')+'</span><span style="color:#f87171;font-size:11px;">'+(i.descripcion||'')+'</span><span style="color:var(--text-dim);font-size:11px;margin-left:auto;">'+fmtF(i.fecha)+'</span></div>';
+      return '<div class="alerta-item"><span style="color:#f87171;font-weight:700;">🔴</span><span style="font-weight:700;color:#e0f2fe;">'+(eq?eq.nombre:'—')+'</span><span style="color:var(--text-dim);font-size:11px;">'+(cli?'· '+cli.nombre:'')+'</span><span style="color:#f87171;font-size:11px;">'+(i.descripcion||i.desc_correctivo||'Correctivo pendiente')+'</span><button class="btn-primary" style="padding:4px 9px;font-size:11px;margin-left:auto;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">Realizar correctivo</button></div>';
     }).join('');
   }else{banner.style.display='none';}
 }
@@ -1737,7 +1775,7 @@ function renderServiceClientes(lista){
     const eqs=equipos.filter(e=>e.cliente_id===c.id);
     const isCS=c.empresa==='ChillerSystem';
     const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-    const tieneCorrectivo=eqs.some(eq=>intervenciones.some(i=>i.equipo_id===eq.id&&i.necesita_correctivo&&i.es_planilla));
+    const tieneCorrectivo=eqs.some(eq=>intervenciones.some(i=>i.equipo_id===eq.id&&i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto));
     return `<div class="cliente-card">
       <div class="cliente-row" onclick="abrirServiceCliente('${c.id}')">
         <div class="cliente-avatar ${isCS?'av-cs':'av-cv'}">${ini}</div>
@@ -1764,7 +1802,7 @@ function abrirServiceCliente(cliId){
   document.getElementById('serviceClientesList').style.display='none';
   document.getElementById('serviceDetalle').style.display='block';
   document.getElementById('serviceCount').textContent='Planilla de service — '+c.nombre;
-  const tieneCorrectivo=eqs.some(eq=>intervenciones.some(i=>i.equipo_id===eq.id&&i.necesita_correctivo&&i.es_planilla));
+  const tieneCorrectivo=eqs.some(eq=>intervenciones.some(i=>i.equipo_id===eq.id&&i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto));
   document.getElementById('serviceClienteAlerta').innerHTML=tieneCorrectivo?'<span style="color:#f87171;font-weight:700;font-size:12px;">🔴 Correctivo pendiente</span>':'';
   renderServiceEquipos(eqs);
 }
@@ -1774,20 +1812,24 @@ function renderServiceEquipos(eqs){
   el.innerHTML=eqs.map(eq=>{
     const planilla=servicePlanilla[eq.id];
     const ultCorrectivo=intervenciones.filter(i=>i.equipo_id===eq.id&&i.necesita_correctivo&&i.es_planilla).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))[0];
-    return `<div class="equipo-item ${ultCorrectivo?'alarm-vencido':''}" style="margin-bottom:10px;">
+    const pendiente=ultCorrectivo&&!ultCorrectivo.correctivo_resuelto;
+    const resuelto=ultCorrectivo&&ultCorrectivo.correctivo_resuelto;
+    return `<div class="equipo-item ${pendiente?'alarm-vencido':''}" style="margin-bottom:10px;">
       <div class="equipo-header">
         <div style="flex:1;">
           <div class="equipo-nombre">⚙️ ${eq.nombre}</div>
           <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'Sin detalles'}${eq.ubicacion?' · '+eq.ubicacion:''}</div>
-          ${ultCorrectivo?`<div style="margin-top:4px;"><span class="badge b-correctivo">🔴 ${ultCorrectivo.solucion||ultCorrectivo.descripcion||'Correctivo pendiente'}</span></div>`:''}
+          ${pendiente?`<div style="margin-top:4px;"><span class="badge b-correctivo">🔴 Correctivo pendiente</span></div>`:''}
+          ${resuelto?`<div style="margin-top:4px;"><span class="badge b-preventivo2">✅ Correctivo resuelto</span></div>`:''}
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           ${planilla?'<span class="badge b-preventivo2">✓ Listo</span>':''}
           <button class="btn-primary" style="padding:6px 14px;" onclick="abrirServiceEq('${eq.id}')">${planilla?'✏️ Editar':'📋 Registrar'}</button>
         </div>
       </div>
+      ${ultCorrectivo&&!ultCorrectivo.correctivo_resuelto?`<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span style="color:#f87171;font-size:12px;">🔴 ${ultCorrectivo.descripcion||ultCorrectivo.desc_correctivo||'Correctivo pendiente'}</span><button class="btn-secondary" style="padding:4px 9px;font-size:11px;" onclick="abrirResolverCorrectivo('${ultCorrectivo.id}')">Realizar correctivo</button></div>`:''}
       ${planilla?`<div style="margin-top:8px;padding:8px;background:rgba(52,211,153,0.06);border-radius:6px;font-size:12px;">
-        <div style="color:#a7f3d0;">✓ ${planilla.trabajo}</div>
+        <div style="color:#a7f3d0;">✓ ${planilla.trabajo||'Servicio registrado'}</div>
         ${planilla.necesita_correctivo?`<div style="color:#f87171;margin-top:4px;">🔴 Correctivo: ${planilla.desc_correctivo||'Pendiente'}</div>`:''}
       </div>`:''}
     </div>`;
@@ -1806,25 +1848,57 @@ function abrirServiceEq(eqId){
   document.getElementById('serviceEqId').value=eqId;
   document.getElementById('sTrabajoRealizado').value='';
   document.getElementById('sDescCorrectivo').value='';
+  document.getElementById('sTempEntrada').value='';
+  document.getElementById('sTempSalida').value='';
+  document.getElementById('sTempCondensacion').value='';
+  document.getElementById('sPresAlta').value='';
+  document.getElementById('sPresBaja').value='';
+  document.getElementById('sCorrienteComp').value='';
   document.getElementById('serviceFotoPreview').innerHTML='';
   serviceFotosNuevas=[];
-  setCorrectivo(false);
+  setServiceTipo('Preventivo');
   const p=servicePlanilla[eqId];
-  if(p){document.getElementById('sTrabajoRealizado').value=p.trabajo||'';document.getElementById('sDescCorrectivo').value=p.desc_correctivo||'';setCorrectivo(p.necesita_correctivo||false);}
+  if(p){
+    document.getElementById('sTrabajoRealizado').value=p.trabajo||'';
+    document.getElementById('sDescCorrectivo').value=p.desc_correctivo||'';
+    document.getElementById('sTempEntrada').value=p.lecturas_operativas?.temperatura_entrada||'';
+    document.getElementById('sTempSalida').value=p.lecturas_operativas?.temperatura_salida||'';
+    document.getElementById('sTempCondensacion').value=p.lecturas_operativas?.temperatura_condensacion||'';
+    document.getElementById('sPresAlta').value=p.lecturas_operativas?.presion_alta||'';
+    document.getElementById('sPresBaja').value=p.lecturas_operativas?.presion_baja||'';
+    document.getElementById('sCorrienteComp').value=p.lecturas_operativas?.corriente_compresor||'';
+    setServiceTipo(p.tipo||'Preventivo');
+  }
   document.getElementById('mServiceEq').classList.add('open');
 }
-function setCorrectivo(v){
-  document.getElementById('sNecesitaCorrectivo').value=String(v);
-  document.getElementById('sNoCorrectivo').className='emp-opt'+(v===false?' sel-cs':'');
-  document.getElementById('sSiCorrectivo').className='emp-opt'+(v===true?' sel-cv':'');
-  document.getElementById('sCorrectivoDet').style.display=v?'block':'none';
+function setServiceTipo(tipo){
+  document.getElementById('sTipo').value=tipo;
+  document.getElementById('sTipoPreventivo').className='emp-opt'+(tipo==='Preventivo'?' sel-cs':'');
+  document.getElementById('sTipoCorrectivo').className='emp-opt'+(tipo==='Correctivo'?' sel-cv':'');
+  document.getElementById('sCorrectivoDet').style.display=tipo==='Correctivo'?'block':'none';
 }
 function guardarServiceEq(){
   const eqId=document.getElementById('serviceEqId').value;
+  const tipo=document.getElementById('sTipo').value;
   const trabajo=document.getElementById('sTrabajoRealizado').value.trim();
-  // trabajo es opcional si es solo correctivo
-  const necesita=document.getElementById('sNecesitaCorrectivo').value==='true';
-  servicePlanilla[eqId]={trabajo,necesita_correctivo:necesita,desc_correctivo:document.getElementById('sDescCorrectivo').value.trim()||null,fotos_nuevas:serviceFotosNuevas,fotos:[]};
+  const descCorrectivo=document.getElementById('sDescCorrectivo').value.trim()||null;
+  const lecturas={
+    temperatura_entrada:parseFloat(document.getElementById('sTempEntrada').value)||null,
+    temperatura_salida:parseFloat(document.getElementById('sTempSalida').value)||null,
+    temperatura_condensacion:parseFloat(document.getElementById('sTempCondensacion').value)||null,
+    presion_alta:parseFloat(document.getElementById('sPresAlta').value)||null,
+    presion_baja:parseFloat(document.getElementById('sPresBaja').value)||null,
+    corriente_compresor:parseFloat(document.getElementById('sCorrienteComp').value)||null
+  };
+  servicePlanilla[eqId]={
+    tipo,
+    trabajo:trabajo||null,
+    necesita_correctivo:tipo==='Correctivo',
+    desc_correctivo:tipo==='Correctivo'?descCorrectivo:descCorrectivo||null,
+    lecturas_operativas:lecturas,
+    fotos_nuevas:serviceFotosNuevas,
+    fotos:[]
+  };
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
   showToast('Equipo confirmado ✓','success');
@@ -1891,12 +1965,17 @@ async function guardarPlanilla(){
       const p=servicePlanilla[eqId];
       let fotosUrls=[];
       if(p.fotos_nuevas&&p.fotos_nuevas.length) fotosUrls=await subirFotos(p.fotos_nuevas,'service');
-      const data={equipo_id:eqId,tipo:'Preventivo',fecha,tecnico:tecnico||firma,
-        descripcion:p.trabajo,solucion:p.necesita_correctivo?p.desc_correctivo:p.trabajo,
+      const data={equipo_id:eqId,tipo:p.tipo||'Preventivo',fecha,tecnico:tecnico||firma,
+        descripcion:p.tipo==='Correctivo'?(p.desc_correctivo||p.trabajo):p.trabajo,
+        solucion:p.tipo==='Correctivo'?null:p.trabajo,
         notas:document.getElementById('firmaObservaciones').value.trim()||null,
-        fotos:fotosUrls,necesita_correctivo:p.necesita_correctivo,firma:firma,es_planilla:true};
+        fotos:fotosUrls,
+        necesita_correctivo:p.tipo==='Correctivo',
+        correctivo_resuelto:p.tipo==='Correctivo'?false:null,
+        lecturas_operativas:p.lecturas_operativas||null,
+        firma:firma,es_planilla:true};
       await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
-      if(!p.necesita_correctivo){
+      if(p.tipo!=='Correctivo'){
         const eq=equipos.find(e=>e.id===eqId);
         const frec=eq?eq.frecuencia_dias||30:30;
         await api('equipos?id=eq.'+eqId,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
@@ -1907,6 +1986,51 @@ async function guardarPlanilla(){
     calcAlertas();volverListaService();
   }catch(e){showToast('Error: '+e.message,true);}
   finally{document.getElementById('btnGuardarPlanilla').disabled=false;}
+}
+
+function abrirResolverCorrectivo(id){
+  const i=intervenciones.find(x=>x.id===id);
+  if(!i){showToast('Correctivo no encontrado',true);return;}
+  document.getElementById('resCorrectivoId').value=id;
+  document.getElementById('resFecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('resTecnico').value=usuarioActual?usuarioActual.nombre:'';
+  document.getElementById('resDesc').value='';
+  document.getElementById('mCorrectivoRes').classList.add('open');
+}
+
+async function guardarResolucionCorrectivo(){
+  const id=document.getElementById('resCorrectivoId').value;
+  const fecha=document.getElementById('resFecha').value;
+  const tecnico=document.getElementById('resTecnico').value.trim();
+  const descripcion=document.getElementById('resDesc').value.trim();
+  if(!fecha||!tecnico||!descripcion){showToast('Completá todos los campos de resolución',true);return;}
+  showToast('Guardando resolución...');
+  try{
+    const resolveData={
+      equipo_id:(intervenciones.find(x=>x.id===id)||{}).equipo_id||null,
+      tipo:'Correctivo',
+      fecha,
+      tecnico,
+      descripcion:'Resolución de correctivo: '+descripcion,
+      solucion:descripcion,
+      notas:null,
+      fotos:[],
+      necesita_correctivo:false,
+      correctivo_resuelto:true,
+      lecturas_operativas:null,
+      firma:null,
+      es_planilla:false
+    };
+    const res=await api('intervenciones',{method:'POST',body:JSON.stringify(resolveData),headers:{...H,'Prefer':'return=representation'}});
+    const resId=(res&&res[0]&&res[0].id)||(res&&res.id)||null;
+    if(resId){
+      await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify({correctivo_resuelto:true,resuelto_por_id:resId}),headers:{...H,'Prefer':'return=minimal'}});
+    }
+    showToast('Correctivo resuelto ✓','success');
+    cerrar('mCorrectivoRes');
+    await loadIntervenciones();
+    calcAlertas();
+  }catch(e){showToast('Error: '+e.message,true);}
 }
 
 function setFiltro(v,btn){
