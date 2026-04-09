@@ -1037,10 +1037,16 @@ let filtroEmp='todas',filtroHE='',filtroHT='';
 let usuarioActual=null;
 let eqFotosNuevas=[],intervFotosNuevas=[];
 
-async function api(path,opts={}){
-  const r=await fetch(SURL+'/rest/v1/'+path,{headers:H,...opts});
-  if(!r.ok){const e=await r.json();throw new Error(e.message||'Error');}
-  return r.status===204?null:r.json();
+async function api(path, opts={}) {
+  const r = await fetch(SURL+'/rest/v1/'+path, {headers:H, ...opts});
+  if (!r.ok) {
+    const e = await r.json().catch(()=>({message:'Error'}));
+    throw new Error(e.message||'Error');
+  }
+  if (r.status === 204 || r.headers.get('content-length')==='0') return null;
+  const text = await r.text();
+  if (!text) return null;
+  return JSON.parse(text);
 }
 
 // ── LOGIN ──
