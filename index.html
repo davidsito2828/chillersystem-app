@@ -30,8 +30,8 @@
   --text-inv:#ffffff;
   /* Acento */
   --accent:#2563eb;
-  --accent2:#3b82f6;
-  --accent3:#60a5fa;
+  --accent2:#1d4ed8;
+  --accent3:#60a5fa; /* solo para fondos oscuros (header) */
   /* Estados */
   --green:#059669;
   --green-bg:#ecfdf5;
@@ -231,7 +231,7 @@ body{
   letter-spacing:-1px;
 }
 .stat-mini-lbl{
-  font-size:10px;color:var(--text-muted);
+  font-size:10px;color:var(--text-dim);
   margin-top:4px;text-transform:uppercase;letter-spacing:1px;font-weight:600;
 }
 
@@ -370,7 +370,7 @@ body{
 /* ── HISTORIAL ── */
 .historial-wrap{margin-top:10px;border-top:1px solid var(--border);padding-top:10px;}
 .historial-title{
-  font-size:10px;letter-spacing:1.5px;color:var(--text-muted);
+  font-size:10px;letter-spacing:1.5px;color:var(--text-dim);
   text-transform:uppercase;font-weight:700;margin-bottom:7px;
 }
 .interv-item{
@@ -378,7 +378,7 @@ body{
   border-radius:var(--r);padding:10px 12px;margin-bottom:6px;font-size:12px;
 }
 .interv-header{display:flex;align-items:center;gap:7px;margin-bottom:4px;flex-wrap:wrap;}
-.interv-fecha{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);font-variant-numeric:tabular-nums;}
+.interv-fecha{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;}
 .interv-tecnico{color:var(--accent);font-weight:600;font-size:11px;}
 .interv-desc{color:var(--text-dim);line-height:1.55;margin-top:2px;}
 .interv-sol{color:var(--green);font-size:11px;margin-top:3px;font-weight:600;}
@@ -391,7 +391,7 @@ thead tr{border-bottom:2px solid var(--border);}
 th{
   text-align:left;padding:10px 14px;
   font-size:10px;letter-spacing:1.5px;
-  color:var(--text-muted);text-transform:uppercase;font-weight:700;
+  color:#4b5563;text-transform:uppercase;font-weight:700;
   white-space:nowrap;background:var(--bg3);
 }
 td{
@@ -442,7 +442,7 @@ tbody tr:hover{background:#f8faff;}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px;}
 .form-group{display:flex;flex-direction:column;gap:5px;}
 .form-group.full{grid-column:1/-1;}
-.form-label{font-size:10px;letter-spacing:1.5px;color:var(--text-muted);text-transform:uppercase;font-weight:700;}
+.form-label{font-size:10px;letter-spacing:1.5px;color:#4b5563;text-transform:uppercase;font-weight:700;}
 .form-input,.form-select,.form-textarea{
   background:var(--bg2);border:1px solid var(--border);
   color:var(--text);border-radius:var(--r);
@@ -493,10 +493,10 @@ tbody tr:hover{background:#f8faff;}
 #lightbox .close-lb:hover{color:#fff;}
 
 /* ── EMPTY / LOADING ── */
-.empty-state{text-align:center;padding:48px 20px;color:var(--text-muted);}
+.empty-state{text-align:center;padding:48px 20px;color:var(--text-dim);}
 .empty-icon{font-size:36px;margin-bottom:10px;opacity:0.4;}
 .empty-title{font-size:14px;font-weight:700;color:var(--text-dim);margin-bottom:4px;}
-.loading{text-align:center;padding:32px;color:var(--text-muted);font-size:12px;}
+.loading{text-align:center;padding:32px;color:var(--text-dim);font-size:12px;}
 .spinner{
   display:inline-block;width:15px;height:15px;
   border:2px solid #dbeafe;border-top-color:var(--accent);
@@ -606,7 +606,7 @@ tbody tr:hover{background:#f8faff;}
       📱 Instalar
     </button>
     <div id="sDot" style="width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div>
-    <div class="user-badge"><span id="userNombre" style="color:var(--text);">—</span> <span style="color:var(--border);margin:0 2px;">|</span> <span id="userRolBadge" class="rol-admin">—</span></div>
+    <div class="user-badge"><span id="userNombre" style="color:rgba(255,255,255,0.9);">—</span> <span style="color:rgba(255,255,255,0.3);margin:0 2px;">|</span> <span id="userRolBadge" class="rol-admin">—</span></div>
     <button class="btn-logout" onclick="doLogout()">Salir</button>
   </div>
 </div>
@@ -639,9 +639,9 @@ tbody tr:hover{background:#f8faff;}
 <!-- ═══ CLIENTES ═══ -->
 <div id="tab-clientes" class="panel">
   <div class="stats-bar">
-    <div class="stat-mini" style="border-left-color:var(--accent2);"><div class="stat-mini-num" style="color:var(--accent2);" id="stTotal">0</div><div class="stat-mini-lbl">Clientes</div></div>
-    <div class="stat-mini" style="border-left-color:var(--accent);"><div class="stat-mini-num" style="color:var(--accent);" id="stCS">0</div><div class="stat-mini-lbl">ChillerSystem</div></div>
-    <div class="stat-mini" style="border-left-color:#8b5cf6;"><div class="stat-mini-num" style="color:#8b5cf6;" id="stCV">0</div><div class="stat-mini-lbl">ChillerService</div></div>
+    <div class="stat-mini" style="border-left-color:var(--accent);"><div class="stat-mini-num" style="color:var(--accent);" id="stTotal">0</div><div class="stat-mini-lbl">Clientes</div></div>
+    <div class="stat-mini" style="border-left-color:#1d4ed8;"><div class="stat-mini-num" style="color:#1d4ed8;" id="stCS">0</div><div class="stat-mini-lbl">ChillerSystem</div></div>
+    <div class="stat-mini" style="border-left-color:#6d28d9;"><div class="stat-mini-num" style="color:#6d28d9;" id="stCV">0</div><div class="stat-mini-lbl">ChillerService</div></div>
     <div class="stat-mini" style="border-left-color:var(--green);"><div class="stat-mini-num" style="color:var(--green);" id="stEq">0</div><div class="stat-mini-lbl">Equipos</div></div>
     <div class="stat-mini" style="border-left-color:var(--red);"><div class="stat-mini-num" style="color:var(--red);" id="stAlarm">0</div><div class="stat-mini-lbl">Alertas</div></div>
   </div>
@@ -784,7 +784,7 @@ tbody tr:hover{background:#f8faff;}
             💾 Guardar con correctivos
           </button>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);text-align:center;">
+        <div style="margin-top:8px;font-size:11px;color:var(--text-dim);text-align:center;">
           Verde: sin novedades · Azul: con correctivos registrados
         </div>
       </div>
@@ -817,7 +817,7 @@ tbody tr:hover{background:#f8faff;}
 
     <!-- PASO 2: FORMULARIO (según tipo seleccionado) -->
     <div id="sFormulario" style="display:none;">
-      <div style="height:1px;background:rgba(255,255,255,0.08);margin-bottom:14px;"></div>
+      <div style="height:1px;background:var(--border);margin-bottom:14px;"></div>
       <div class="form-grid">
 
         <!-- PREVENTIVO: trabajo realizado -->
@@ -1032,9 +1032,9 @@ tbody tr:hover{background:#f8faff;}
       <div class="form-group full">
         <label class="form-label">Precios por sección</label>
         <div id="preciosSecciones"></div>
-        <div style="margin-top:10px;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-weight:700;color:#bfdbfe;">TOTAL:</span>
-          <span style="font-size:18px;font-weight:900;color:#34d399;font-family:'IBM Plex Mono',monospace;" id="pTotalDisplay">$0</span>
+        <div style="margin-top:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;color:var(--text);">TOTAL:</span>
+          <span style="font-size:18px;font-weight:900;color:var(--green);font-family:'IBM Plex Mono',monospace;" id="pTotalDisplay">$0</span>
         </div>
         <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
           <input type="checkbox" id="pIncluyeIva" onchange="calcularTotal()"/>
@@ -1056,7 +1056,7 @@ tbody tr:hover{background:#f8faff;}
     </div>
     <div class="form-actions">
       <button class="btn-secondary" onclick="cerrar('mPpto')">Cancelar</button>
-      <button class="btn-primary" onclick="guardarPpto('borrador')" style="background:rgba(248,113,113,0.2);border:1px solid #f87171;color:#f87171;">💾 Guardar borrador</button>
+      <button class="btn-primary" onclick="guardarPpto('borrador')" style="background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);">💾 Guardar borrador</button>
       <button class="btn-primary" onclick="previewPpto()">👁 Vista previa / PDF</button>
     </div>
   </div>
@@ -1156,7 +1156,7 @@ tbody tr:hover{background:#f8faff;}
       <!-- DESARROLLO -->
       <div class="form-group full">
         <label class="form-label">Desarrollo — Equipos e intervenciones</label>
-        <div id="iDesarrolloContainer" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
+        <div id="iDesarrolloContainer" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
           <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">Seleccioná un cliente para ver las intervenciones disponibles</div>
         </div>
         <textarea class="form-textarea" id="iDesarrollo" placeholder="Desarrollo adicional, observaciones técnicas..." style="min-height:80px;"></textarea>
@@ -1165,7 +1165,7 @@ tbody tr:hover{background:#f8faff;}
       <!-- FOTOS -->
       <div class="form-group full">
         <label class="form-label">Fotos del informe</label>
-        <div id="iFotosContainer" style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div id="iFotosContainer" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;">
           <div style="font-size:11px;color:var(--text-dim);">Seleccioná un cliente para ver las fotos disponibles de sus intervenciones</div>
         </div>
         <div id="iFotosSeleccionadas" style="margin-top:8px;"></div>
@@ -1179,7 +1179,7 @@ tbody tr:hover{background:#f8faff;}
     </div>
     <div class="form-actions">
       <button class="btn-secondary" onclick="cerrar('mInforme')">Cancelar</button>
-      <button class="btn-primary" onclick="guardarInforme('borrador')" style="background:rgba(248,113,113,0.2);border:1px solid #f87171;color:#f87171;">💾 Guardar borrador</button>
+      <button class="btn-primary" onclick="guardarInforme('borrador')" style="background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);">💾 Guardar borrador</button>
       <button class="btn-primary" onclick="previewInforme()">👁 Vista previa / PDF</button>
     </div>
   </div>
@@ -1441,7 +1441,7 @@ function calcAlertas(){
     document.getElementById('alertasLista').innerHTML=alertas.map(a=>`
       <div class="alerta-item">
         <span style="color:${a.tipo==='vencido'?'var(--red)':'var(--yellow)'}">${a.tipo==='vencido'?'🔴 VENCIDO':'🟡 En '+a.dias+'d'}</span>
-        <span style="font-weight:700;color:#e0f2fe;">${a.eq.nombre}</span>
+        <span style="font-weight:700;color:var(--text);">${a.eq.nombre}</span>
         <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
         <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;" onclick="abrirModalInterv(null,'${a.eq.id}');document.getElementById('iTipo').value='Preventivo'">✓ Registrar</button>
       </div>`).join('');
@@ -1849,7 +1849,7 @@ function renderIntervItem(i){
       lec.temperatura_condensacion!=null?'<span>🌡 Cond: <b>'+lec.temperatura_condensacion+'°C</b></span>':''
     ].filter(Boolean);
     if(!filas.length) return '';
-    return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:11px;color:var(--accent3);">'+filas.join('')+'</div>';
+    return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:11px;color:var(--accent);">'+filas.join('')+'</div>';
   })();
 
   let html='<div class="interv-item" style="margin-bottom:'+(esCorrectivo?'10px':'6px')+';'+(esCorrectivo?'border-left:3px solid '+(tieneResolucion?'var(--green)':'var(--red)')+';padding-left:10px;':'')+'">';
@@ -1912,8 +1912,8 @@ function renderHistDetalle(){
   if(generalRecords.length){
     const gRows=generalRecords.map(i=>renderIntervItem(i)).join('');
     generalHTML='<div style="margin-bottom:16px;">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">'
-      +'<span style="font-weight:700;color:#a78bfa;font-size:13px;">📋 Registros generales del cliente</span>'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">'
+      +'<span style="font-weight:700;color:#6d28d9;font-size:13px;">📋 Registros generales del cliente</span>'
       +'<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+generalRecords.length+' registro(s)</span>'
       +'</div>'+gRows+'</div>';
     total+=generalRecords.length;
@@ -1927,8 +1927,8 @@ function renderHistDetalle(){
     total+=intervs.length;
     if(!intervs.length) return '';
     return `<div style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">
-        <span style="font-weight:700;color:#bfdbfe;font-size:13px;">⚙️ ${eq.nombre}</span>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+        <span style="font-weight:700;color:var(--text);font-size:13px;">⚙️ ${eq.nombre}</span>
         <span class="badge ${badgeEst(eq.estado)}">${eq.estado||'Operativo'}</span>
         ${eq.capacidad?`<span style="font-size:11px;color:var(--text-dim);">${eq.capacidad} ${eq.unidad_capacidad||''}</span>`:''}
         <span style="font-size:11px;color:var(--text-dim);margin-left:auto;">${intervs.length} registro(s)</span>
@@ -2113,7 +2113,7 @@ function calcCorrectivosAlert(){
     document.getElementById('correctivosList').innerHTML=correctivos.slice(0,5).map(i=>{
       const eq=equipos.find(e=>e.id===i.equipo_id);
       const cli=eq?clientes.find(c=>c.id===eq.cliente_id):null;
-      return '<div class="alerta-item"><span style="color:#f87171;font-weight:700;">🔴</span><span style="font-weight:700;color:#e0f2fe;">'+(eq?eq.nombre:'—')+'</span><span style="color:var(--text-dim);font-size:11px;">'+(cli?'· '+cli.nombre:'')+'</span><span style="color:#f87171;font-size:11px;">'+(i.descripcion||i.desc_correctivo||'Correctivo pendiente')+'</span><button class="btn-primary" style="padding:4px 9px;font-size:11px;margin-left:auto;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">Realizar correctivo</button></div>';
+      return '<div class="alerta-item"><span style="color:var(--red);font-weight:700;">🔴</span><span style="font-weight:700;color:var(--text);">'+(eq?eq.nombre:'—')+'</span><span style="color:var(--text-dim);font-size:11px;">'+(cli?'· '+cli.nombre:'')+'</span><span style="color:var(--red);font-size:11px;">'+(i.descripcion||i.desc_correctivo||'Correctivo pendiente')+'</span><button class="btn-primary" style="padding:4px 9px;font-size:11px;margin-left:auto;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">Realizar correctivo</button></div>';
     }).join('');
   }else{banner.style.display='none';}
 }
@@ -2132,7 +2132,7 @@ function renderServiceClientes(lista){
       <div class="cliente-row" onclick="abrirServiceCliente('${c.id}')">
         <div class="cliente-avatar ${isCS?'av-cs':'av-cv'}">${ini}</div>
         <div class="cliente-info">
-          <div class="cliente-nombre">${c.nombre} ${tieneCorrectivo?'<span style="color:#f87171;">🔴 Correctivo pendiente</span>':''}</div>
+          <div class="cliente-nombre">${c.nombre} ${tieneCorrectivo?'<span style="color:var(--red);">🔴 Correctivo pendiente</span>':''}</div>
           <div class="cliente-meta">${c.direccion||c.telefono||'Sin datos'} · ${eqs.length} equipo(s)</div>
         </div>
         <span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span>
@@ -2155,7 +2155,7 @@ function abrirServiceCliente(cliId){
   document.getElementById('serviceDetalle').style.display='block';
   document.getElementById('serviceCount').textContent='Planilla de service — '+c.nombre;
   const tieneCorrectivo=eqs.some(eq=>intervenciones.some(i=>i.equipo_id===eq.id&&i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto));
-  document.getElementById('serviceClienteAlerta').innerHTML=tieneCorrectivo?'<span style="color:#f87171;font-weight:700;font-size:12px;">🔴 Correctivo pendiente</span>':'';
+  document.getElementById('serviceClienteAlerta').innerHTML=tieneCorrectivo?'<span style="color:var(--red);font-weight:700;font-size:12px;">🔴 Correctivo pendiente</span>':'';
   renderServiceEquipos(eqs);
 }
 function renderServiceEquipos(eqs){
@@ -2179,10 +2179,10 @@ function renderServiceEquipos(eqs){
           <button class="btn-primary" style="padding:6px 14px;" onclick="abrirServiceEq('${eq.id}')">${planilla?'✏️ Editar':'📋 Registrar'}</button>
         </div>
       </div>
-      ${ultCorrectivo&&!ultCorrectivo.correctivo_resuelto?`<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span style="color:#f87171;font-size:12px;">🔴 ${ultCorrectivo.descripcion||ultCorrectivo.desc_correctivo||'Correctivo pendiente'}</span><button class="btn-secondary" style="padding:4px 9px;font-size:11px;" onclick="abrirResolverCorrectivo('${ultCorrectivo.id}')">Realizar correctivo</button></div>`:''}
-      ${planilla?`<div style="margin-top:8px;padding:8px;background:rgba(52,211,153,0.06);border-radius:6px;font-size:12px;">
-        <div style="color:#a7f3d0;">✓ ${planilla.trabajo||'Servicio registrado'}</div>
-        ${planilla.necesita_correctivo?`<div style="color:#f87171;margin-top:4px;">🔴 Correctivo: ${planilla.desc_correctivo||'Pendiente'}</div>`:''}
+      ${ultCorrectivo&&!ultCorrectivo.correctivo_resuelto?`<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span style="color:var(--red);font-size:12px;">🔴 ${ultCorrectivo.descripcion||ultCorrectivo.desc_correctivo||'Correctivo pendiente'}</span><button class="btn-secondary" style="padding:4px 9px;font-size:11px;" onclick="abrirResolverCorrectivo('${ultCorrectivo.id}')">Realizar correctivo</button></div>`:''}
+      ${planilla?`<div style="margin-top:8px;padding:8px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:6px;font-size:12px;">
+        <div style="color:var(--green);">✓ ${planilla.trabajo||'Servicio registrado'}</div>
+        ${planilla.necesita_correctivo?`<div style="color:var(--red);margin-top:4px;">🔴 Correctivo: ${planilla.desc_correctivo||'Pendiente'}</div>`:''}
       </div>`:''}
     </div>`;
   }).join('');
@@ -2479,7 +2479,7 @@ function renderEventuales(lista){
             <button class="btn-danger" onclick="elimEventual('${c.id}','${c.nombre.replace(/'/g,"")}')">🗑</button>
           </div>
         </div>
-        ${trabajos.length?`<div style="margin-top:10px;border-top:1px solid rgba(255,255,255,0.06);padding-top:10px;">
+        ${trabajos.length?`<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
           ${trabajos.slice(0,3).map(t=>`
             <div class="interv-item" style="margin-bottom:5px;">
               <div class="interv-header">
@@ -2630,10 +2630,10 @@ function renderPresupuestos(){
   }
   tb.innerHTML=lista.map(p=>{
     const estadoStyle=p.estado==='borrador'
-      ?'color:#f87171;background:rgba(248,113,113,0.12);border-color:rgba(248,113,113,0.3)'
+      ?'color:var(--red);background:var(--red-bg);border-color:var(--red-border)'
       :p.estado==='aprobado'
-      ?'color:#34d399;background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.3)'
-      :'color:#60a5fa;background:rgba(59,130,246,0.12);border-color:rgba(59,130,246,0.3)';
+      ?'color:var(--green);background:var(--green-bg);border-color:var(--green-border)'
+      :'color:var(--accent);background:#eff6ff;border-color:#bfdbfe';
     const estadoLabel=p.estado==='borrador'?'🔴 Borrador':p.estado==='aprobado'?'✅ Aprobado':'📤 Enviado';
     const isCS=p.empresa==='ChillerSystem';
     const total=p.precio_total?'$'+Number(p.precio_total).toLocaleString('es-AR'):'—';
@@ -2642,7 +2642,7 @@ function renderPresupuestos(){
       <td><span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span></td>
       <td class="td-name">${p.cliente_nombre||'—'}</td>
       <td class="td-dim" style="max-width:160px;">${p.referencia||'—'}</td>
-      <td class="td-mono" style="color:#34d399;">${total}</td>
+      <td class="td-mono" style="color:var(--green);">${total}</td>
       <td><span class="badge" style="${estadoStyle}">${estadoLabel}</span></td>
       <td class="td-dim">${p.created_at?fmtF(p.created_at.split('T')[0]):'—'}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
@@ -2681,7 +2681,7 @@ function renderSecciones(){
   const cont=document.getElementById('seccionesTrabajo');
   const precsCont=document.getElementById('preciosSecciones');
   cont.innerHTML=seccionesActuales.map((sec,si)=>`
-    <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
         <input class="form-input" style="flex:1;" value="${sec.titulo}" oninput="seccionesActuales[${si}].titulo=this.value" placeholder="Título de la sección (ej: A)- Descripción de trabajos)"/>
         ${seccionesActuales.length>1?`<button class="btn-danger" onclick="elimSeccion(${si})" style="padding:4px 8px;">✕</button>`:''}
@@ -2980,8 +2980,8 @@ function renderInformes(){
     const esBorrador=inf.estado==='borrador';
     const tipoLabel=inf.tipo==='tecnico'?'📋 Técnico':'📊 Gestión';
     const estadoStyle=esBorrador
-      ?'color:#f87171;background:rgba(248,113,113,0.12);border-color:rgba(248,113,113,0.3)'
-      :'color:#34d399;background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.3)';
+      ?'color:var(--red);background:var(--red-bg);border-color:var(--red-border)'
+      :'color:var(--green);background:var(--green-bg);border-color:var(--green-border)';
     const periodo=inf.periodo_desde&&inf.periodo_hasta?fmtF(inf.periodo_desde)+' al '+fmtF(inf.periodo_hasta):inf.referencia||'—';
     return '<tr>'
       +'<td class="td-mono">'+inf.numero+'</td>'
@@ -3043,7 +3043,7 @@ function cargarIntervencionesInforme(cliId){
   container.innerHTML='<div style="font-size:11px;color:var(--accent);margin-bottom:8px;font-weight:700;letter-spacing:1px;">INTERVENCIONES DISPONIBLES (se incluirán en el desarrollo)</div>'
     +intervs.map(i=>{
       const eq=equipos.find(e=>e.id===i.equipo_id);
-      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border-dim);">'
         +'<input type="checkbox" id="intv-'+i.id+'" checked style="accent-color:#3b82f6;"/>'
         +'<label for="intv-'+i.id+'" style="font-size:12px;color:var(--text);">'
         +'<span class="badge '+(i.tipo==='Correctivo'?'b-correctivo':'b-preventivo2')+'" style="margin-right:6px;">'+i.tipo+'</span>'
@@ -3067,9 +3067,9 @@ function cargarIntervencionesInforme(cliId){
   fotosContainer.innerHTML='<div style="font-size:11px;color:var(--accent);margin-bottom:8px;font-weight:700;letter-spacing:1px;">FOTOS DISPONIBLES — Seleccioná las que incluirás</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:10px;">'
     +todasFotos.map((f,idx)=>'<div style="position:relative;width:90px;">'
-      +'<img src="'+f.url+'" style="width:90px;height:70px;object-fit:cover;border-radius:6px;border:2px solid rgba(255,255,255,0.1);cursor:pointer;" onclick="toggleFotoInforme('+idx+',this.src)" id="fotoInf-'+idx+'"/>'
+      +'<img src="'+f.url+'" style="width:90px;height:70px;object-fit:cover;border-radius:6px;border:2px solid var(--border);cursor:pointer;" onclick="toggleFotoInforme('+idx+',this.src)" id="fotoInf-'+idx+'"/>'
       +'<div style="font-size:9px;color:var(--text-dim);margin-top:3px;text-align:center;">'+(f.eq?f.eq.nombre:'General')+'</div>'
-      +'<input type="text" id="descFotoInf-'+idx+'" placeholder="Descripción..." style="width:90px;font-size:9px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);color:var(--text);border-radius:4px;padding:2px 4px;margin-top:2px;font-family:inherit;"/>'
+      +'<input type="text" id="descFotoInf-'+idx+'" placeholder="Descripción..." style="width:90px;font-size:9px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 4px;margin-top:2px;font-family:inherit;"/>'
       +'</div>').join('')
     +'</div>';
   fotosInformeSeleccionadas=[];
@@ -3081,7 +3081,7 @@ function toggleFotoInforme(idx,url){
   const already=fotosInformeSeleccionadas.findIndex(f=>f.url===realUrl);
   if(already>=0){
     fotosInformeSeleccionadas.splice(already,1);
-    if(img) img.style.border='2px solid rgba(255,255,255,0.1)';
+    if(img) img.style.border='2px solid var(--border)';
   }else{
     const desc=document.getElementById('descFotoInf-'+idx);
     fotosInformeSeleccionadas.push({url:realUrl,descripcion:desc?desc.value:''});
