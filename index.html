@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="ChillerSystem"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
    CHILLERSYSTEM — CORPORATE LIGHT UI
@@ -1430,35 +1431,36 @@ let usuarioActual=null;
 let eqFotosNuevas=[],intervFotosNuevas=[];
 let tareasConfig=[];    // configuración de tareas desde Supabase
 let tareasRealizadas=[]; // historial de tareas realizadas por equipo
+let dismissedAlertas=new Set(); // alertas descartadas temporalmente
 
 // ══════════════════════════════════════════
 //  MOTOR DE MANTENIMIENTO
 // ══════════════════════════════════════════
 const MATRIZ_MANTENIMIENTO={
   'Split / Multisplit':{
-    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas de refrigerante','Verificar correcto drenaje de condensados'],
-    trimestral:['Revisión de borneras eléctricas','Limpieza profunda unidad interior','Verificar consumo eléctrico real vs nominal','Control de presiones'],
-    estacional:['Limpieza química serpentina condensadora','Revisión modo frío/calor','Seteo y verificación de termostatos','Control de gas refrigerante']
+    mensual:['Control de amperaje compresor y ventiladores','Limpieza y desinfección filtros unidad interior','Control visual de fugas de refrigerante','Verificar correcto drenaje de condensados','Medir tensión de alimentación (V)','Control temperatura de inyección y retorno','Verificar presión de succión y descarga','Verificar vibración y ruidos anormales'],
+    trimestral:['Revisión de borneras eléctricas y reapriete','Limpieza profunda bandeja con desinfectante','Verificar consumo eléctrico real vs nominal','Control de presiones alta y baja','Estado de paletas y deflectores','Verificar temperatura de descarga del compresor','Verificar estado y capacidad de capacitores de arranque','Revisión estado de contactores y relés'],
+    estacional:['Limpieza química serpentina condensadora','Revisión modo frío/calor','Seteo y verificación de termostatos','Verificar carga de gas refrigerante','Calibración de sensores de temperatura']
   },
   'Piso techo':{
-    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas de refrigerante','Verificar drenaje de condensados'],
-    trimestral:['Verificar sujeciones y estructura de soporte','Control de vibración y ruidos','Estado de paletas y deflectores','Revisión de borneras eléctricas'],
-    estacional:['Limpieza química serpentina','Revisión modo frío/calor','Seteo de termostatos','Control de gas refrigerante']
+    mensual:['Control de amperaje compresor y ventiladores','Limpieza y desinfección filtros','Control visual de fugas de refrigerante','Verificar drenaje de condensados','Medir tensión de alimentación (V)','Control temperatura de inyección y retorno','Verificar presión de succión y descarga','Verificar vibración y ruidos anormales'],
+    trimestral:['Verificar sujeciones y estructura de soporte','Control de vibración y ruidos','Estado de paletas y deflectores','Revisión de borneras eléctricas y reapriete','Verificar temperatura de descarga del compresor','Verificar capacitores de arranque','Revisión contactores y relés'],
+    estacional:['Limpieza química serpentina','Revisión modo frío/calor','Seteo de termostatos','Verificar carga de gas refrigerante']
   },
   'Baja silueta':{
-    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas','Verificar drenaje'],
-    trimestral:['Revisión de borneras eléctricas','Limpieza profunda interior','Verificar consumo eléctrico'],
-    estacional:['Limpieza química serpentina','Revisión modo frío/calor','Seteo de termostatos']
+    mensual:['Control de amperaje compresor y ventiladores','Limpieza y desinfección filtros','Control visual de fugas','Verificar drenaje','Medir tensión de alimentación (V)','Verificar presión de succión y descarga'],
+    trimestral:['Revisión de borneras eléctricas y reapriete','Limpieza profunda bandeja con desinfectante','Verificar consumo eléctrico','Verificar temperatura de descarga del compresor','Estado de paletas y deflectores','Verificar capacitores de arranque'],
+    estacional:['Limpieza química serpentina','Revisión modo frío/calor','Seteo de termostatos','Verificar carga de gas refrigerante']
   },
   'Cassette':{
-    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas','Verificar drenaje y bomba de condensados'],
-    trimestral:['Revisión de borneras eléctricas','Limpieza profunda unidad interior','Control de presiones','Verificar consumo eléctrico'],
-    estacional:['Limpieza química serpentina condensadora','Revisión modo frío/calor','Seteo de termostatos','Control de gas refrigerante']
+    mensual:['Control de amperaje compresor y ventiladores','Limpieza y desinfección filtros','Control visual de fugas','Verificar drenaje y bomba de condensados','Medir tensión de alimentación (V)','Verificar presión de succión y descarga','Verificar vibración y ruidos anormales'],
+    trimestral:['Revisión de borneras eléctricas y reapriete','Limpieza profunda bandeja con desinfectante','Control de presiones','Verificar consumo eléctrico','Verificar temperatura de descarga del compresor','Estado de paletas y deflectores','Verificar capacitores de arranque','Revisión contactores y relés'],
+    estacional:['Limpieza química serpentina condensadora','Revisión modo frío/calor','Seteo de termostatos','Verificar carga de gas refrigerante']
   },
   'Rooftop':{
-    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas de refrigerante','Verificar caudal de aire'],
-    trimestral:['Tensión y estado de correas','Estado de poleas','Verificar presión alta y baja','Engrase de rodamientos','Revisión de borneras eléctricas'],
-    estacional:['Limpieza química serpentinas evaporadora y condensadora','Revisión economizadores','Revisión modo frío/calor','Seteo de termostatos']
+    mensual:['Control de amperaje compresor y ventiladores','Limpieza de filtros de aire','Control visual de fugas de refrigerante','Verificar caudal de aire','Control temperatura inyección y retorno','Verificar presión alta y baja'],
+    trimestral:['Tensión y estado de correas de transmisión','Estado y desgaste de poleas','Alineación de poleas','Engrase de rodamientos de ventiladores','Revisión de borneras eléctricas y reapriete','Verificar vibración de rodamientos','Revisión dampers y actuadores (si aplica)','Verificar presión diferencial filtros de aire','Revisión free-cooling (si aplica)','Revisión estado de contactores y protecciones'],
+    estacional:['Limpieza química serpentinas evaporadora y condensadora','Revisión economizadores','Revisión modo frío/calor','Seteo de termostatos','Verificar temperatura de descarga del compresor']
   },
   'VRV / VRF':{
     mensual:['Control de amperaje unidades interiores','Limpieza de filtros','Control visual de fugas en ramificaciones'],
@@ -1471,19 +1473,19 @@ const MATRIZ_MANTENIMIENTO={
     estacional:['Limpieza química serpentina','Revisión válvulas de cierre','Verificar aislación térmica de tuberías']
   },
   'Chiller centrífugo':{
-    mensual:['Control de amperaje compresor','Verificar presión alta/baja','Control visual fugas de refrigerante','Verificar caudal y temperatura agua'],
-    trimestral:['Limpieza intercambiadores','Verificar bomba de circulación','Control de concentración de glicol','Verificar sensores de flujo','Engrase de rodamientos'],
-    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración de sensores de temperatura y presión','Análisis de agua del circuito']
+    mensual:['Control de amperaje compresor','Verificar presión alta/baja','Control visual fugas de refrigerante','Verificar caudal y temperatura agua','Verificar temperatura de descarga del compresor','Verificar vibración del compresor','Control nivel y estado de aceite lubricante','Verificar resistencia calefactora cárter activa','Verificar mirilla de líquido (sin burbujas)'],
+    trimestral:['Limpieza filtros de agua evaporador','Verificar bomba de circulación hidráulica','Control de concentración de glicol','Verificar sensores de flujo','Engrase de rodamientos','Reapriete de conexiones eléctricas y borneras','Revisión contactores y relés térmicos','Verificar diferencial presión filtro de aceite','Verificar presostato diferencial de aceite'],
+    estacional:['Limpieza química intercambiadores/condensador','Revisión válvulas de seguridad','Calibración de sensores de temperatura y presión','Análisis de agua del circuito hidráulico','Verificar válvula de expansión electrónica','Control de humedad en el circuito de refrigerante','Verificar aislación eléctrica del motor compresor','Verificar bypass de arranque suave','Control temperatura de aceite (rango operativo)','Purga de incondensables del circuito']
   },
   'Chiller tornillo':{
-    mensual:['Control de amperaje','Verificar presiones alta/baja','Control visual de fugas','Verificar nivel de aceite'],
-    trimestral:['Análisis de aceite lubricante','Limpieza intercambiadores','Verificar bomba de circulación','Control de concentración de glicol'],
-    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración de sensores','Verificar sistema de control']
+    mensual:['Control de amperaje compresor','Verificar presiones alta/baja','Control visual de fugas','Verificar nivel de aceite lubricante','Verificar temperatura de descarga del compresor','Verificar vibración del compresor','Verificar mirilla de líquido (sin burbujas)','Control temperatura de aceite'],
+    trimestral:['Análisis de aceite lubricante (acidez/viscosidad)','Limpieza filtros de agua intercambiadores','Verificar bomba de circulación','Control de concentración de glicol','Verificar diferencial presión filtro de aceite','Reapriete de conexiones eléctricas y borneras','Revisión contactores y relés'],
+    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración de sensores de temperatura y presión','Verificar válvula de expansión electrónica','Control de humedad en el circuito','Verificar aislación eléctrica del motor','Purga de incondensables']
   },
   'Chiller reciprocante':{
-    mensual:['Control de amperaje compresor','Verificar presiones','Control visual de fugas','Verificar nivel de aceite'],
-    trimestral:['Análisis de aceite','Limpieza intercambiadores','Verificar bomba y válvulas','Control de glicol'],
-    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración sensores']
+    mensual:['Control de amperaje compresor','Verificar presiones alta/baja','Control visual de fugas','Verificar nivel de aceite','Verificar temperatura de descarga del compresor','Verificar vibración del compresor'],
+    trimestral:['Análisis de aceite lubricante','Limpieza intercambiadores','Verificar bomba y válvulas','Control de glicol','Verificar diferencial presión filtro de aceite','Verificar presostato diferencial de aceite','Reapriete de conexiones eléctricas'],
+    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración sensores','Control de humedad en el circuito','Verificar aislación eléctrica del motor','Purga de incondensables']
   },
   'Chiller absorción':{
     mensual:['Control visual de fugas de solución','Verificar presión del generador','Verificar caudal agua torre','Control temperatura solución'],
@@ -1501,6 +1503,11 @@ const _TAREAS_GENERICAS={
   trimestral:['Revisión de borneras eléctricas','Verificar consumo eléctrico','Control de conexiones'],
   estacional:['Limpieza profunda','Verificar modos de operación','Seteo de parámetros de control']
 };
+
+function dismissAlerta(key){
+  dismissedAlertas.add(key);
+  calcAlertas();
+}
 
 function calcularFrecuenciaRecomendada(tipo){
   // Todos retornan 30 días (mensual) salvo que se especifique
@@ -1758,7 +1765,13 @@ function calcAlertas(){
     document.getElementById({secCritico:'listaCritico',secUrgente:'listaUrgente',secAviso:'listaAviso'}[id]).innerHTML=html;
   }
 
-  seccion('secCritico',criticos,criticos.map(a=>{
+  // Filtrar descartadas
+  const criticosFilt=criticos.filter(a=>!dismissedAlertas.has('c-'+a.eq.id+(a.motivo==='fs'?'-fs':'')));
+  const urgentesFilt=urgentes.filter(a=>!dismissedAlertas.has('u-'+a.eq.id));
+  const avisosFilt=avisos.filter(a=>!dismissedAlertas.has('a-'+a.i.id));
+
+  seccion('secCritico',criticosFilt,criticosFilt.map(a=>{
+    const key='c-'+a.eq.id+(a.motivo==='fs'?'-fs':'');
     const label=a.motivo==='fs'
       ?'🔴 Fuera de servicio'
       :`🔴 Vencido hace ${a.diasHab}dh`;
@@ -1768,10 +1781,12 @@ function calcAlertas(){
       <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
       <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--red);border-color:var(--red);"
         onclick="abrirModalInterv(null,'${a.eq.id}');document.getElementById('iTipo').value='Preventivo'">✓ Registrar preventivo</button>
+      <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
     </div>`;
   }).join(''));
 
-  seccion('secUrgente',urgentes,urgentes.map(a=>{
+  seccion('secUrgente',urgentesFilt,urgentesFilt.map(a=>{
+    const key='u-'+a.eq.id;
     const label=a.motivo==='vencido_reciente'
       ?`🟡 Vencido hace ${a.diasHab}dh`
       :`🟡 Vence en ${a.diasHab}dh`;
@@ -1781,16 +1796,19 @@ function calcAlertas(){
       <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
       <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--yellow);border-color:var(--yellow);"
         onclick="abrirModalInterv(null,'${a.eq.id}');document.getElementById('iTipo').value='Preventivo'">✓ Registrar preventivo</button>
+      <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
     </div>`;
   }).join(''));
 
-  seccion('secAviso',avisos,avisos.map(a=>{
+  seccion('secAviso',avisosFilt,avisosFilt.map(a=>{
+    const key='a-'+a.i.id;
     return `<div class="alerta-item">
       <span style="color:var(--accent);font-weight:700;">🔵 Hace ${a.diasHab}dh sin resolver</span>
       <span style="font-weight:700;color:var(--text);">${a.eq?a.eq.nombre:'Sin equipo'}</span>
       <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
       <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;"
         onclick="abrirResolverCorrectivo('${a.i.id}')">Ver correctivo</button>
+      <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
     </div>`;
   }).join(''));
 }
@@ -2473,14 +2491,14 @@ function mostrarTabService(){
   calcCorrectivosAlert();
 }
 function calcCorrectivosAlert(){
-  const correctivos=intervenciones.filter(i=>i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto);
+  const correctivos=intervenciones.filter(i=>i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto&&!dismissedAlertas.has('corr-'+i.id));
   const banner=document.getElementById('correctivosBanner');
   if(correctivos.length){
     banner.style.display='block';
     document.getElementById('correctivosList').innerHTML=correctivos.slice(0,5).map(i=>{
       const eq=equipos.find(e=>e.id===i.equipo_id);
       const cli=eq?clientes.find(c=>c.id===eq.cliente_id):null;
-      return '<div class="alerta-item"><span style="color:var(--red);font-weight:700;">🔴</span><span style="font-weight:700;color:var(--text);">'+(eq?eq.nombre:'—')+'</span><span style="color:var(--text-dim);font-size:11px;">'+(cli?'· '+cli.nombre:'')+'</span><span style="color:var(--red);font-size:11px;">'+(i.descripcion||i.desc_correctivo||'Correctivo pendiente')+'</span><button class="btn-primary" style="padding:4px 9px;font-size:11px;margin-left:auto;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">Realizar correctivo</button></div>';
+      return '<div class="alerta-item"><span style="color:var(--red);font-weight:700;">🔴</span><span style="font-weight:700;color:var(--text);">'+(eq?eq.nombre:'—')+'</span><span style="color:var(--text-dim);font-size:11px;">'+(cli?'· '+cli.nombre:'')+'</span><span style="color:var(--red);font-size:11px;">'+(i.descripcion||i.desc_correctivo||'Correctivo pendiente')+'</span><button class="btn-primary" style="padding:4px 9px;font-size:11px;margin-left:auto;" onclick="abrirResolverCorrectivo(\''+i.id+'\')">Realizar correctivo</button><button onclick="dismissedAlertas.add(\'corr-'+i.id+'\');calcCorrectivosAlert()" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button></div>';
     }).join('');
   }else{banner.style.display='none';}
 }
@@ -3558,18 +3576,20 @@ function renderPptoPdf(p){
   html+='<span>'+empresa.dir+' //TE.: '+empresa.tel+'</span></div>';
   html+='</div>';
   document.getElementById('pptoPdfContent').innerHTML=html;
+  window._currentPptoNumero=p.numero;
 }
 
 function imprimirPpto(){
   const contenido=document.getElementById('pptoImprimible');
   if(!contenido)return;
-  const ventana=window.open('','_blank');
-  ventana.document.write('<html><head><title>Presupuesto</title><style>body{margin:0;padding:0;font-family:Arial,sans-serif;}@media print{body{-webkit-print-color-adjust:exact;}}</style></head><body>');
-  ventana.document.write(contenido.outerHTML);
-  ventana.document.write('</body></html>');
-  ventana.document.close();
-  ventana.focus();
-  setTimeout(()=>ventana.print(),500);
+  const numero=window._currentPptoNumero||'X';
+  html2pdf().set({
+    margin:10,
+    filename:'Presupuesto-'+numero+'.pdf',
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2,useCORS:true},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).from(contenido).save();
 }
 
 
@@ -3839,15 +3859,7 @@ function previewInformeById(id){
 }
 
 function renderInformePdf(inf){
-  const isCS=inf.empresa==='ChillerSystem';
-  const empresa=isCS?{
-    nombre:'CHILLERSYSTEM ING. S.R.L.',
-    subtitulo:'Sistemas de Aire Acondicionado y Calefacción',
-    dir:'Sarmiento 4070 (1678) Caseros',tel:'4734-5999',
-    firmaCargo:'Gte. de Servicios y Proyectos',
-    firmaEmpresa:'CHILLERSYSTEM ING. S.R.L.',
-    logo:'https://www.chillersystem.com/assets/img/logo.webp'
-  }:{
+  const empresa={
     nombre:'CHILLERSERVICE S.A.',
     subtitulo:'Servicios e Instalaciones Termomecánicas',
     dir:'Esmeralda 762 (1007) – 2°B – Cap.Fed.',tel:'5032-4033',
@@ -3855,6 +3867,7 @@ function renderInformePdf(inf){
     firmaEmpresa:'CHILLER SERVICE S.A.',
     logo:'https://www.chillersystem.com/assets/img/logo.webp'
   };
+  window._currentInformeNumero=inf.numero;
   const fecha=inf.fecha||inf.created_at?new Date((inf.fecha||inf.created_at)).toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
   const fotos=inf.fotos_seleccionadas||[];
   const tipoLabel=inf.tipo==='tecnico'?'INFORME TÉCNICO':'INFORME DE GESTIÓN';
@@ -3953,13 +3966,14 @@ function renderInformePdf(inf){
 function imprimirInforme(){
   const contenido=document.getElementById('informeImprimible');
   if(!contenido)return;
-  const ventana=window.open('',"_blank");
-  ventana.document.write('<html><head><title>Informe</title><style>body{margin:0;padding:0;font-family:Arial,sans-serif;}@media print{body{-webkit-print-color-adjust:exact;}img{max-width:100% !important;}}</style></head><body>');
-  ventana.document.write(contenido.outerHTML);
-  ventana.document.write('</body></html>');
-  ventana.document.close();
-  ventana.focus();
-  setTimeout(()=>ventana.print(),600);
+  const numero=window._currentInformeNumero||'X';
+  html2pdf().set({
+    margin:10,
+    filename:'Informe-'+numero+'.pdf',
+    image:{type:'jpeg',quality:0.98},
+    html2canvas:{scale:2,useCORS:true},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).from(contenido).save();
 }
 
 function instalarApp(){
