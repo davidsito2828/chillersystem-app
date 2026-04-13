@@ -843,6 +843,14 @@ tbody tr:hover{background:#f8faff;}
       </div>
     </div>
 
+    <!-- TAREAS RECOMENDADAS (visible solo en Preventivo) -->
+    <div id="sTareasWrap" style="display:none;margin-bottom:4px;">
+      <div style="height:1px;background:var(--border);margin-bottom:12px;"></div>
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:8px;">📋 Tareas recomendadas para hoy</div>
+      <div id="sTareasList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;"></div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">Las tareas marcadas se incluirán en "Trabajo realizado".</div>
+    </div>
+
     <!-- PASO 2: FORMULARIO (según tipo seleccionado) -->
     <div id="sFormulario" style="display:none;">
       <div style="height:1px;background:var(--border);margin-bottom:14px;"></div>
@@ -1265,7 +1273,7 @@ tbody tr:hover{background:#f8faff;}
       <div class="form-group full"><label class="form-label">Nombre del equipo *</label><input class="form-input" id="eNom" placeholder="Ej: Chiller York #1"/></div>
       <div class="form-group full"><label class="form-label">Cliente *</label><select class="form-select" id="eCliId"><option value="">— Seleccioná un cliente —</option></select></div>
       <div class="form-group"><label class="form-label">Tipo</label>
-        <select class="form-select" id="eTipo">
+        <select class="form-select" id="eTipo" onchange="(function(v){const f=document.getElementById('eFrec');if(!f.value||f.value==='30')f.value=calcularFrecuenciaRecomendada(v);})(this.value)">
           <option value="">— Seleccionar —</option>
           <option>Chiller centrífugo</option><option>Chiller tornillo</option><option>Chiller reciprocante</option>
           <option>Chiller absorción</option><option>Split / Multisplit</option><option>Torre de enfriamiento</option>
@@ -1384,6 +1392,131 @@ let serviceClienteActual=null;
 let filtroEmp='todas',filtroHE='',filtroHT='';
 let usuarioActual=null;
 let eqFotosNuevas=[],intervFotosNuevas=[];
+
+// ══════════════════════════════════════════
+//  MOTOR DE MANTENIMIENTO
+// ══════════════════════════════════════════
+const MATRIZ_MANTENIMIENTO={
+  'Split / Multisplit':{
+    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas de refrigerante','Verificar correcto drenaje de condensados'],
+    trimestral:['Revisión de borneras eléctricas','Limpieza profunda unidad interior','Verificar consumo eléctrico real vs nominal','Control de presiones'],
+    estacional:['Limpieza química serpentina condensadora','Revisión modo frío/calor','Seteo y verificación de termostatos','Control de gas refrigerante']
+  },
+  'Piso techo':{
+    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas de refrigerante','Verificar drenaje de condensados'],
+    trimestral:['Verificar sujeciones y estructura de soporte','Control de vibración y ruidos','Estado de paletas y deflectores','Revisión de borneras eléctricas'],
+    estacional:['Limpieza química serpentina','Revisión modo frío/calor','Seteo de termostatos','Control de gas refrigerante']
+  },
+  'Baja silueta':{
+    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas','Verificar drenaje'],
+    trimestral:['Revisión de borneras eléctricas','Limpieza profunda interior','Verificar consumo eléctrico'],
+    estacional:['Limpieza química serpentina','Revisión modo frío/calor','Seteo de termostatos']
+  },
+  'Cassette':{
+    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas','Verificar drenaje y bomba de condensados'],
+    trimestral:['Revisión de borneras eléctricas','Limpieza profunda unidad interior','Control de presiones','Verificar consumo eléctrico'],
+    estacional:['Limpieza química serpentina condensadora','Revisión modo frío/calor','Seteo de termostatos','Control de gas refrigerante']
+  },
+  'Rooftop':{
+    mensual:['Control de amperaje','Limpieza de filtros','Control visual de fugas de refrigerante','Verificar caudal de aire'],
+    trimestral:['Tensión y estado de correas','Estado de poleas','Verificar presión alta y baja','Engrase de rodamientos','Revisión de borneras eléctricas'],
+    estacional:['Limpieza química serpentinas evaporadora y condensadora','Revisión economizadores','Revisión modo frío/calor','Seteo de termostatos']
+  },
+  'VRV / VRF':{
+    mensual:['Control de amperaje unidades interiores','Limpieza de filtros','Control visual de fugas en ramificaciones'],
+    trimestral:['Verificar presiones del sistema','Revisión de borneras y comunicaciones','Limpieza profunda unidades interiores','Control de válvulas de expansión'],
+    estacional:['Limpieza química serpentinas','Revisión modo frío/calor','Verificar equilibrio de cargas','Actualización de parámetros de control']
+  },
+  'Fan Coil':{
+    mensual:['Limpieza de filtros','Verificar caudal de agua','Control de amperaje del ventilador','Verificar válvula de control'],
+    trimestral:['Limpieza de serpentina','Purga de aire del circuito','Verificar estado de la bandeja de condensados','Revisión de borneras'],
+    estacional:['Limpieza química serpentina','Revisión válvulas de cierre','Verificar aislación térmica de tuberías']
+  },
+  'Chiller centrífugo':{
+    mensual:['Control de amperaje compresor','Verificar presión alta/baja','Control visual fugas de refrigerante','Verificar caudal y temperatura agua'],
+    trimestral:['Limpieza intercambiadores','Verificar bomba de circulación','Control de concentración de glicol','Verificar sensores de flujo','Engrase de rodamientos'],
+    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración de sensores de temperatura y presión','Análisis de agua del circuito']
+  },
+  'Chiller tornillo':{
+    mensual:['Control de amperaje','Verificar presiones alta/baja','Control visual de fugas','Verificar nivel de aceite'],
+    trimestral:['Análisis de aceite lubricante','Limpieza intercambiadores','Verificar bomba de circulación','Control de concentración de glicol'],
+    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración de sensores','Verificar sistema de control']
+  },
+  'Chiller reciprocante':{
+    mensual:['Control de amperaje compresor','Verificar presiones','Control visual de fugas','Verificar nivel de aceite'],
+    trimestral:['Análisis de aceite','Limpieza intercambiadores','Verificar bomba y válvulas','Control de glicol'],
+    estacional:['Limpieza química intercambiadores','Revisión válvulas de seguridad','Calibración sensores']
+  },
+  'Chiller absorción':{
+    mensual:['Control visual de fugas de solución','Verificar presión del generador','Verificar caudal agua torre','Control temperatura solución'],
+    trimestral:['Análisis de solución bromuro de litio','Limpieza intercambiadores','Verificar bomba de solución','Estado de purga'],
+    estacional:['Limpieza química intercambiadores','Revisión de válvulas de control','Calibración de sensores','Análisis completo de agua']
+  },
+  'Torre de enfriamiento':{
+    mensual:['Control visual de fugas','Verificar nivel de agua','Control de amperaje del ventilador','Verificar dosificación de biocidas'],
+    trimestral:['Limpieza de relleno','Verificar estado de aspersores','Control de correas y rodamientos del ventilador','Análisis de agua de torre'],
+    estacional:['Limpieza química completa del sistema','Revisión de válvulas flotante y de control','Inspección estructura y cubeta']
+  }
+};
+const _TAREAS_GENERICAS={
+  mensual:['Control visual del equipo','Limpieza de filtros y superficies','Verificar funcionamiento general','Control de amperaje'],
+  trimestral:['Revisión de borneras eléctricas','Verificar consumo eléctrico','Control de conexiones'],
+  estacional:['Limpieza profunda','Verificar modos de operación','Seteo de parámetros de control']
+};
+
+function calcularFrecuenciaRecomendada(tipo){
+  // Todos retornan 30 días (mensual) salvo que se especifique
+  return 30;
+}
+
+function _getEstacion(fecha){
+  // Hemisferio sur (Argentina)
+  const m=new Date(fecha).getMonth(); // 0=ene
+  if(m>=2&&m<=4)return 'otoño';
+  if(m>=5&&m<=7)return 'invierno';
+  if(m>=8&&m<=10)return 'primavera';
+  return 'verano';
+}
+
+function getTareasEquipo(tipo, ultimoPreventivo){
+  const matriz=MATRIZ_MANTENIMIENTO[tipo]||_TAREAS_GENERICAS;
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const tareas_hoy=[];
+  let badge_estacional=false,badge_trimestral=false;
+
+  if(!ultimoPreventivo){
+    // Sin historial: mostrar todo
+    tareas_hoy.push(...(matriz.mensual||[]).map(t=>({tarea:t,nivel:'mensual'})));
+    tareas_hoy.push(...(matriz.trimestral||[]).map(t=>({tarea:t,nivel:'trimestral'})));
+    tareas_hoy.push(...(matriz.estacional||[]).map(t=>({tarea:t,nivel:'estacional'})));
+    badge_estacional=true;badge_trimestral=true;
+    return {tareas_hoy,badge_estacional,badge_trimestral};
+  }
+
+  const desde=new Date(ultimoPreventivo);desde.setHours(0,0,0,0);
+  const diasTranscurridos=Math.ceil((hoy-desde)/(1000*60*60*24));
+
+  // Siempre tareas mensuales
+  tareas_hoy.push(...(matriz.mensual||[]).map(t=>({tarea:t,nivel:'mensual'})));
+
+  // Trimestral si pasaron ≥90 días
+  if(diasTranscurridos>=90){
+    tareas_hoy.push(...(matriz.trimestral||[]).map(t=>({tarea:t,nivel:'trimestral'})));
+    badge_trimestral=true;
+  }else if(diasTranscurridos>=60){
+    badge_trimestral=true; // próximo a vencer
+  }
+
+  // Estacional si cambió la estación desde el último preventivo
+  const estActual=_getEstacion(hoy);
+  const estUltimo=_getEstacion(ultimoPreventivo);
+  if(estActual!==estUltimo){
+    tareas_hoy.push(...(matriz.estacional||[]).map(t=>({tarea:t,nivel:'estacional'})));
+    badge_estacional=true;
+  }
+
+  return {tareas_hoy,badge_estacional,badge_trimestral};
+}
 
 async function api(path, opts={}) {
   const r = await fetch(SURL+'/rest/v1/'+path, {headers:H, ...opts});
@@ -1699,7 +1832,7 @@ function renderCli(lista){
               <div style="flex:1;min-width:120px;">
                 <div class="equipo-nombre">⚙️ ${eq.nombre}</div>
                 <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'Sin detalles'}</div>
-                <div>${proxPrevHTML(eq)}</div>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px;">${proxPrevHTML(eq)}${(()=>{const {badge_estacional,badge_trimestral}=getTareasEquipo(eq.tipo||'',eq.ultimo_preventivo||null);const bs=badge_estacional?'<span style="display:inline-flex;align-items:center;background:var(--yellow-bg);border:1px solid var(--yellow-border);color:#92400e;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">🍂 Estacionales pendientes</span>':'';const bt=badge_trimestral&&!badge_estacional?'<span style="display:inline-flex;align-items:center;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">⚙️ Trimestral vencido</span>':'';return bs+bt;})()}</div>
                 ${fotosHTML(eq.fotos)}
               </div>
               <span class="badge ${badgeEst(eq.estado)}">${eq.estado||'Operativo'}</span>
@@ -2338,10 +2471,15 @@ function abrirServiceEq(eqId){
   // Resetear selector visual
   const btnPrev=document.getElementById('sTipoPreventivo');
   const btnCorr=document.getElementById('sTipoCorrectivo');
-  btnPrev.style.background='rgba(52,211,153,0.08)';btnPrev.style.borderColor='rgba(52,211,153,0.35)';btnPrev.style.transform='scale(1)';
-  btnCorr.style.background='rgba(248,113,113,0.08)';btnCorr.style.borderColor='rgba(248,113,113,0.35)';btnCorr.style.transform='scale(1)';
+  btnPrev.style.background='var(--green-bg)';btnPrev.style.borderColor='var(--green-border)';btnPrev.style.transform='scale(1)';
+  btnCorr.style.background='var(--red-bg)';btnCorr.style.borderColor='var(--red-border)';btnCorr.style.transform='scale(1)';
   document.getElementById('sFormulario').style.display='none';
+  document.getElementById('sTareasWrap').style.display='none';
   document.getElementById('sCancelarSinTipo').style.display='block';
+
+  // Renderizar tareas recomendadas para este equipo
+  _renderTareasService(eq);
+
   const p=servicePlanilla[eqId];
   if(p){
     document.getElementById('sTrabajoRealizado').value=p.trabajo||'';
@@ -2357,6 +2495,32 @@ function abrirServiceEq(eqId){
   }
   document.getElementById('mServiceEq').classList.add('open');
 }
+
+function _renderTareasService(eq){
+  const ultP=eq.ultimo_preventivo||null;
+  const {tareas_hoy}=getTareasEquipo(eq.tipo||'',ultP);
+  const lista=document.getElementById('sTareasList');
+  if(!tareas_hoy.length){lista.innerHTML='<span style="color:var(--text-dim);font-size:12px;">No hay tareas específicas para este tipo de equipo.</span>';return;}
+  const nivelStyle={
+    mensual:'',
+    trimestral:'background:var(--yellow-bg);border:1px solid var(--yellow-border);border-radius:5px;padding:2px 5px;',
+    estacional:'background:#fffbeb;border:1px solid var(--yellow-border);border-radius:5px;padding:2px 5px;'
+  };
+  const nivelLabel={mensual:'',trimestral:' <span style="font-size:9px;color:var(--yellow);font-weight:700;text-transform:uppercase;letter-spacing:1px;">▲ trimestral</span>',estacional:' <span style="font-size:9px;color:#b45309;font-weight:700;text-transform:uppercase;letter-spacing:1px;">🍂 estacional</span>'};
+  lista.innerHTML=tareas_hoy.map((t,i)=>`
+    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.4;${nivelStyle[t.nivel]||''}">
+      <input type="checkbox" id="starea-${i}" checked style="margin-top:2px;flex-shrink:0;accent-color:var(--accent);"/>
+      <span>${t.tarea}${nivelLabel[t.nivel]||''}</span>
+    </label>`).join('');
+}
+
+function _getTareasChecked(){
+  const lista=document.getElementById('sTareasList');
+  if(!lista)return [];
+  return Array.from(lista.querySelectorAll('input[type=checkbox]'))
+    .filter(cb=>cb.checked)
+    .map(cb=>cb.closest('label').querySelector('span').textContent.trim());
+}
 function setServiceTipo(tipo){
   document.getElementById('sTipo').value=tipo;
   const esPrev=tipo==='Preventivo';
@@ -2370,6 +2534,8 @@ function setServiceTipo(tipo){
     btnCorr.style.background='rgba(239,68,68,0.22)';btnCorr.style.borderColor='var(--red)';btnCorr.style.transform='scale(1.03)';
     btnPrev.style.background='var(--green-bg)';btnPrev.style.borderColor='var(--green-border)';btnPrev.style.transform='scale(1)';
   }
+  // Tareas recomendadas: solo para Preventivo
+  document.getElementById('sTareasWrap').style.display=esPrev?'block':'none';
   // Mostrar formulario
   document.getElementById('sFormulario').style.display='block';
   document.getElementById('sCancelarSinTipo').style.display='none';
@@ -2378,6 +2544,14 @@ function setServiceTipo(tipo){
   document.getElementById('sTrabajoLabel').textContent=esPrev?'Trabajo realizado *':'Observaciones generales';
   document.getElementById('sCorrectivoDet').style.display=esPrev?'none':'';
   document.getElementById('sNecesitaGroup').style.display=esPrev?'none':'';
+  // Si es preventivo y el campo trabajo está vacío, pre-poblar con tareas marcadas
+  if(esPrev){
+    const campo=document.getElementById('sTrabajoRealizado');
+    if(!campo.value.trim()){
+      const tareas=_getTareasChecked();
+      if(tareas.length) campo.value=tareas.map((t,i)=>`${i+1}. ${t}`).join('\n');
+    }
+  }
   // Botón confirmar
   const btn=document.getElementById('sBtnConfirmar');
   btn.style.background=esPrev?'linear-gradient(135deg,#059669,#10b981)':'linear-gradient(135deg,#dc2626,#ef4444)';
@@ -2387,7 +2561,14 @@ function guardarServiceEq(){
   const eqId=document.getElementById('serviceEqId').value;
   const tipo=document.getElementById('sTipo').value;
   if(!tipo){showToast('Elegí el tipo de trabajo: Preventivo o Correctivo',true);return;}
-  const trabajo=document.getElementById('sTrabajoRealizado').value.trim();
+  // Si es preventivo y hay tareas marcadas no incluidas aún, agregarlas al trabajo
+  let trabajo=document.getElementById('sTrabajoRealizado').value.trim();
+  if(tipo==='Preventivo'){
+    const tareas=_getTareasChecked();
+    if(tareas.length&&!trabajo){
+      trabajo=tareas.map((t,i)=>`${i+1}. ${t}`).join('\n');
+    }
+  }
   const descCorrectivo=document.getElementById('sDescCorrectivo').value.trim()||null;
   const necesitaResolucion=document.getElementById('sNecesitaResolucion').value.trim()||null;
   if(tipo==='Correctivo'&&!descCorrectivo){showToast('Describí el problema detectado',true);return;}
