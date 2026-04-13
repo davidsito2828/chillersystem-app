@@ -896,8 +896,16 @@ tbody tr:hover{background:#f8faff;}
           <div class="foto-preview-grid" id="serviceFotoPreview"></div>
         </div>
       </div>
-      <div class="form-actions">
+        <!-- REPUESTOS (solo preventivo) -->
+        <div class="form-group full" id="sRepuestosGroup" style="display:none;">
+          <label class="form-label">Repuestos / materiales utilizados</label>
+          <input class="form-input" id="sRepuestos" placeholder="Filtros, correas, aceite, gas refrigerante..."/>
+        </div>
+
+      </div>
+      <div class="form-actions" style="flex-wrap:wrap;gap:8px;">
         <button class="btn-secondary" onclick="cerrar('mServiceEq')">Cancelar</button>
+        <button class="btn-secondary" id="sBtnImprimir" onclick="imprimirOrdenTrabajo()" style="display:none;">📄 Imprimir orden</button>
         <button class="btn-primary" id="sBtnConfirmar" onclick="guardarServiceEq()">✓ Confirmar equipo</button>
       </div>
     </div>
@@ -2202,12 +2210,18 @@ function renderIntervItem(i){
 
   let html='<div class="interv-item" style="margin-bottom:'+(esCorrectivo?'10px':'6px')+';'+(esCorrectivo?'border-left:3px solid '+(tieneResolucion?'var(--green)':'var(--red)')+';padding-left:10px;':'')+'">';
 
-  // ENCABEZADO — solo lectura, sin botones
-  html+='<div class="interv-header">';
+  // ENCABEZADO con botones editar/eliminar
+  const puedeEditar=usuarioActual&&(usuarioActual.rol==='admin'||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
+  const puedeEliminar=usuarioActual&&(usuarioActual.rol==='admin'||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
+  html+='<div class="interv-header" style="justify-content:flex-start;">';
   html+=esCorrectivo?'<span class="badge b-correctivo">🔴 Correctivo</span>':'<span class="badge b-preventivo2">'+i.tipo+'</span>';
   html+='<span class="interv-fecha">'+fmtF(i.fecha)+'</span>';
   if(i.tecnico) html+='<span class="interv-tecnico">'+i.tecnico+'</span>';
   if(i.firma) html+='<span style="font-size:10px;color:var(--green);">✍️ '+i.firma+'</span>';
+  html+='<span style="margin-left:auto;display:flex;gap:4px;">';
+  if(puedeEditar) html+='<button class="btn-edit" onclick="event.stopPropagation();abrirModalInterv(\''+i.id+'\')">✏️</button>';
+  if(puedeEliminar) html+='<button class="btn-danger" onclick="event.stopPropagation();elimInterv(\''+i.id+'\')">🗑</button>';
+  html+='</span>';
   html+='</div>';
 
   // CONTENIDO
@@ -2220,7 +2234,7 @@ function renderIntervItem(i){
 
   // CADENA CORRECTIVO — solo lectura
   if(esCorrectivo){
-    html+='<div style="margin-top:10px;padding:8px 10px;border-radius:7px;background:rgba(0,0,0,0.2);">';
+    html+='<div style="margin-top:10px;padding:8px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);">';
     html+='<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">';
     html+='<span style="color:var(--red);font-size:13px;flex-shrink:0;">🔴</span>';
     html+='<div><span style="color:var(--red);font-weight:700;font-size:12px;">Detectado el '+fmtF(i.fecha)+'</span>';
@@ -2341,11 +2355,16 @@ async function guardarInterv(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 async function elimInterv(id){
-  if(!confirm('¿Eliminar esta intervención?'))return;
-  try{await api('intervenciones?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
-    showToast('Eliminado');await loadIntervenciones();
+  if(!confirm('¿Eliminar esta intervención? Esta acción no se puede deshacer.'))return;
+  try{
+    // Eliminar tareas_realizadas asociadas (Mejora 3)
+    await api('tareas_realizadas?intervencion_id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+    await api('intervenciones?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Intervención eliminada','success');
+    await Promise.all([loadIntervenciones(),loadTareasConfig()]);
     if(histClienteActual) renderHistDetalle();
-  }catch(e){showToast('Error',true);}
+    calcAlertas();
+  }catch(e){showToast('Error: '+e.message,true);}
 }
 function abrirModalInterv(id=null,eqPre=null){
   ['intervId','iTecnico','iDesc','iSol','iRep','iHoras','iNotas'].forEach(x=>document.getElementById(x).value='');
@@ -2556,6 +2575,7 @@ function abrirServiceEq(eqId){
   document.getElementById('sPresBaja').value='';
   document.getElementById('sCorrienteComp').value='';
   document.getElementById('sCargaGas').value='';
+  document.getElementById('sRepuestos').value='';
   document.getElementById('serviceFotoPreview').innerHTML='';
   serviceFotosNuevas=[];
   // Resetear selector visual
@@ -2581,6 +2601,7 @@ function abrirServiceEq(eqId){
     document.getElementById('sPresBaja').value=p.lecturas_operativas?.presion_baja||'';
     document.getElementById('sCorrienteComp').value=p.lecturas_operativas?.corriente_compresor||'';
     document.getElementById('sCargaGas').value=p.lecturas_operativas?.carga_gas||'';
+    document.getElementById('sRepuestos').value=p.repuestos||'';
     setServiceTipo(p.tipo||'Preventivo');
   }
   document.getElementById('mServiceEq').classList.add('open');
@@ -2670,6 +2691,124 @@ function _getTareasChecked(){
       };
     });
 }
+function imprimirOrdenTrabajo(){
+  const eqId=document.getElementById('serviceEqId').value;
+  const eq=equipos.find(e=>e.id===eqId)||{nombre:'—'};
+  const cli=clientes.find(c=>c.id===eq.cliente_id)||{nombre:'—'};
+  const tecnico=document.getElementById('firmaTecnico')?.value||usuarioActual?.nombre||'—';
+  const fecha=document.getElementById('firmaFecha')?.value||new Date().toISOString().split('T')[0];
+  const nOrden=fecha.replace(/-/g,'')+(eqId?'-'+eqId.substring(0,6).toUpperCase():'');
+  const lec={
+    temperatura_inyeccion:document.getElementById('sTempInyeccion').value||null,
+    temperatura_retorno:document.getElementById('sTempRetorno').value||null,
+    presion_alta:document.getElementById('sPresAlta').value||null,
+    presion_baja:document.getElementById('sPresBaja').value||null,
+    corriente_compresor:document.getElementById('sCorrienteComp').value||null,
+    carga_gas:document.getElementById('sCargaGas').value||null
+  };
+  const repuestos=document.getElementById('sRepuestos').value||'';
+  const observaciones=document.getElementById('sTrabajoRealizado').value||'';
+  // Tareas con estado
+  const tareasItems=Array.from(document.getElementById('sTareasList').querySelectorAll('label')).map(lbl=>{
+    const cb=lbl.querySelector('input[type=checkbox]');
+    const nombre=lbl.dataset.nombre||lbl.querySelector('div,span')?.textContent?.split('\n')[0]?.trim()||'';
+    const checked=cb?.checked;
+    const info=lbl.querySelector('div div')?.textContent||'';
+    return {nombre,checked,info};
+  });
+  const lecRows=[
+    ['T° inyección',lec.temperatura_inyeccion,'°C'],
+    ['T° retorno',lec.temperatura_retorno,'°C'],
+    ['Presión alta',lec.presion_alta,'bar'],
+    ['Presión baja',lec.presion_baja,'bar'],
+    ['Corriente compresor',lec.corriente_compresor,'A'],
+    ['Carga de gas',lec.carga_gas,'']
+  ].filter(r=>r[1]);
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+  <title>Orden de Trabajo ${nOrden}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:16px;}
+    .header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px;}
+    .logo{font-size:18px;font-weight:900;letter-spacing:-0.5px;}
+    .logo small{display:block;font-size:9px;font-weight:400;letter-spacing:1px;color:#555;}
+    .orden-num{text-align:right;font-size:10px;color:#555;}
+    .orden-num strong{display:block;font-size:14px;color:#111;font-weight:900;}
+    .section{margin-bottom:10px;}
+    .section-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#555;border-bottom:1px solid #ccc;padding-bottom:3px;margin-bottom:7px;}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;}
+    .info-item label{font-size:9px;color:#777;text-transform:uppercase;letter-spacing:1px;display:block;}
+    .info-item span{font-weight:700;font-size:11px;}
+    .task-row{display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px solid #eee;}
+    .task-row:last-child{border-bottom:none;}
+    .task-cb{width:12px;height:12px;border:1.5px solid #333;border-radius:2px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;}
+    .task-cb.done{background:#111;color:#fff;}
+    .task-info{font-size:9px;color:#777;}
+    .cat-header{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#444;background:#f5f5f5;padding:4px 8px;margin:6px 0 4px;}
+    table{width:100%;border-collapse:collapse;font-size:11px;}
+    td,th{border:1px solid #ccc;padding:5px 8px;}
+    th{background:#f0f0f0;font-weight:700;font-size:9px;text-transform:uppercase;}
+    .firma-box{border:1px solid #ccc;border-radius:4px;padding:10px 14px;min-height:50px;margin-top:4px;}
+    .footer{margin-top:16px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center;}
+    @media print{body{padding:8px;}@page{margin:1cm;}}
+  </style></head><body>
+  <div class="header">
+    <div class="logo">ChillerSystem<small>Gestión Técnica de HVAC</small></div>
+    <div class="orden-num">Orden de Trabajo<strong>#${nOrden}</strong><span>${fmtF(fecha)}</span></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Datos del servicio</div>
+    <div class="info-grid">
+      <div class="info-item"><label>Equipo</label><span>${eq.nombre}</span></div>
+      <div class="info-item"><label>Cliente</label><span>${cli.nombre}</span></div>
+      <div class="info-item"><label>Tipo / Marca</label><span>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</span></div>
+      <div class="info-item"><label>Técnico</label><span>${tecnico}</span></div>
+      <div class="info-item"><label>Fecha</label><span>${fmtF(fecha)}</span></div>
+      <div class="info-item"><label>Empresa</label><span>${cli.empresa||'—'}</span></div>
+    </div>
+  </div>
+
+  ${tareasItems.length?`<div class="section">
+    <div class="section-title">Checklist de tareas</div>
+    ${tareasItems.map(t=>`<div class="task-row">
+      <div class="task-cb ${t.checked?'done':''}">${t.checked?'✓':''}</div>
+      <div><div>${t.nombre}</div>${t.info?`<div class="task-info">${t.info}</div>`:''}</div>
+    </div>`).join('')}
+  </div>`:''}
+
+  ${lecRows.length?`<div class="section">
+    <div class="section-title">Lecturas operativas</div>
+    <table><thead><tr><th>Parámetro</th><th>Valor</th><th>Unidad</th></tr></thead>
+    <tbody>${lecRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`:''}
+
+  ${repuestos?`<div class="section">
+    <div class="section-title">Repuestos / materiales utilizados</div>
+    <div style="padding:6px;border:1px solid #ccc;border-radius:3px;">${repuestos}</div>
+  </div>`:''}
+
+  ${observaciones?`<div class="section">
+    <div class="section-title">Observaciones generales</div>
+    <div style="padding:6px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${observaciones}</div>
+  </div>`:''}
+
+  <div class="section" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px;">
+    <div><div class="section-title">Firma del técnico</div><div class="firma-box"></div><div style="margin-top:4px;font-size:9px;color:#777;">${tecnico}</div></div>
+    <div><div class="section-title">Conformidad del cliente</div><div class="firma-box"></div><div style="margin-top:4px;font-size:9px;color:#777;">Aclaración y aclaración</div></div>
+  </div>
+
+  <div class="footer">ChillerSystem · Gestión Técnica — Orden generada el ${new Date().toLocaleDateString('es-AR')}</div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=800,height=700');
+  w.document.write(html);
+  w.document.close();
+}
+
 function setServiceTipo(tipo){
   document.getElementById('sTipo').value=tipo;
   const esPrev=tipo==='Preventivo';
@@ -2693,6 +2832,8 @@ function setServiceTipo(tipo){
   document.getElementById('sTrabajoLabel').textContent=esPrev?'Trabajo realizado *':'Observaciones generales';
   document.getElementById('sCorrectivoDet').style.display=esPrev?'none':'';
   document.getElementById('sNecesitaGroup').style.display=esPrev?'none':'';
+  document.getElementById('sRepuestosGroup').style.display=esPrev?'':'none';
+  document.getElementById('sBtnImprimir').style.display=esPrev?'':'none';
   // Si es preventivo y el campo trabajo está vacío, pre-poblar con tareas marcadas
   if(esPrev){
     const campo=document.getElementById('sTrabajoRealizado');
@@ -2734,9 +2875,10 @@ function guardarServiceEq(){
     desc_correctivo:tipo==='Correctivo'?descCorrectivo:null,
     necesita_resolucion:tipo==='Correctivo'?necesitaResolucion:null,
     lecturas_operativas:lecturas,
+    repuestos:document.getElementById('sRepuestos').value.trim()||null,
     fotos_nuevas:serviceFotosNuevas,
     fotos:[],
-    tareas_realizadas:tareasChecked // guardamos para registrar en BD al guardar planilla
+    tareas_realizadas:tareasChecked
   };
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
@@ -2810,6 +2952,7 @@ async function guardarPlanilla(){
       const data={equipo_id:eqId,tipo:p.tipo||'Preventivo',fecha,tecnico:tecnico||firma,
         descripcion:descCorr||p.trabajo||null,
         solucion:p.tipo==='Correctivo'?null:p.trabajo,
+        repuestos:p.repuestos||null,
         notas:document.getElementById('firmaObservaciones').value.trim()||null,
         fotos:fotosUrls,
         necesita_correctivo:p.tipo==='Correctivo',
