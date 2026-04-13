@@ -906,7 +906,7 @@ tbody tr:hover{background:#f8faff;}
       </div>
       <div class="form-actions" style="flex-wrap:wrap;gap:8px;">
         <button class="btn-secondary" onclick="cerrar('mServiceEq')">Cancelar</button>
-        <button class="btn-secondary" id="sBtnImprimir" onclick="imprimirOrdenTrabajo()" style="display:none;">📄 Imprimir orden</button>
+        <button class="btn-secondary" id="sBtnImprimir" onclick="imprimirOrdenTrabajo()" style="display:none;">🖨️ Imprimir orden</button>
         <button class="btn-primary" id="sBtnConfirmar" onclick="guardarServiceEq()">✓ Confirmar equipo</button>
       </div>
     </div>
@@ -1678,7 +1678,7 @@ function getTareasParaHoy(equipoId, tipoEquipo){
       :'ok';
     return {...tarea, ultima_fecha:ultimaRealizada?.fecha_realizada||null, dias_desde:diasDesde, pendiente, urgencia};
   }).sort((a,b)=>{
-    const ord={vencida:0,nunca:1,pendiente:2,proxima:3,ok:4};
+    const ord={vencida:0,pendiente:1,proxima:2,nunca:3,ok:4};
     return (ord[a.urgencia]??5)-(ord[b.urgencia]??5);
   });
 }
@@ -2640,8 +2640,8 @@ function _renderTareasService(eq){
     // Agrupar por categoría
     const cats=['mensual','trimestral','estacional','anual'];
     const catLabel={mensual:'📅 Mensuales',trimestral:'🔧 Trimestrales',estacional:'🍂 Estacionales',anual:'📆 Anuales'};
-    const urgColor={vencida:'var(--red)',nunca:'var(--red)',pendiente:'var(--yellow)',proxima:'#b45309',ok:'var(--green)'};
-    const urgBg={vencida:'var(--red-bg)',nunca:'#fef2f2',pendiente:'var(--yellow-bg)',proxima:'#fff7ed',ok:'var(--green-bg)'};
+    const urgColor={vencida:'var(--red)',nunca:'var(--text-dim)',pendiente:'var(--yellow)',proxima:'#b45309',ok:'var(--green)'};
+    const urgBg={vencida:'var(--red-bg)',nunca:'transparent',pendiente:'var(--yellow-bg)',proxima:'#fff7ed',ok:'var(--green-bg)'};
     let idx=0;
     let html='';
     cats.forEach(cat=>{
@@ -2651,14 +2651,19 @@ function _renderTareasService(eq){
       grupo.forEach(t=>{
         const color=urgColor[t.urgencia]||'var(--text)';
         const bg=urgBg[t.urgencia]||'transparent';
-        const diasInfo=t.dias_desde===null
-          ?'<span style="color:var(--red);font-size:10px;font-weight:700;">nunca realizada</span>'
-          :t.urgencia==='ok'
-          ?`<span style="color:var(--green);font-size:10px;">hace ${t.dias_desde}d</span>`
-          :`<span style="color:${color};font-size:10px;font-weight:600;">hace ${t.dias_desde}d — vence c/${t.frecuencia_dias}d</span>`;
-        const preCheck=t.urgencia!=='ok';
+        let diasInfo;
+        if(t.dias_desde===null){
+          diasInfo='<span style="color:var(--text-dim);font-size:10px;">📅 Pendiente — programar</span>';
+        } else {
+          const ultFmt=new Date(t.ultima_fecha+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+          const proxFecha=calcProx(t.ultima_fecha,t.frecuencia_dias);
+          const proxFmt=new Date(proxFecha+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+          const infoColor=t.urgencia==='ok'?'var(--green)':t.urgencia==='proxima'?'#b45309':'var(--yellow)';
+          diasInfo=`<span style="color:${infoColor};font-size:10px;font-weight:600;">✓ Último: ${ultFmt} — próximo: ${proxFmt}</span>`;
+        }
+        const preCheck=t.urgencia!=='ok'&&t.urgencia!=='nunca';
         html+=`<label data-tarea-id="${t.tarea_id}" data-nombre="${t.nombre_tarea.replace(/"/g,'&quot;')}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.45;background:${bg};border-radius:5px;padding:4px 6px;margin-bottom:2px;">
-          <input type="checkbox" id="starea-${idx}" ${preCheck?'checked':''} style="margin-top:2px;flex-shrink:0;accent-color:var(--accent);"/>
+          <input type="checkbox" id="starea-${idx}" ${preCheck?'checked':''} style="margin-top:2px;flex-shrink:0;accent-color:${t.urgencia==='nunca'?'var(--text-dim)':t.urgencia==='ok'?'var(--green)':'var(--accent)'};"/>
           <div><div>${t.nombre_tarea}</div><div style="margin-top:1px;">${diasInfo}</div></div>
         </label>`;
         idx++;
@@ -2772,7 +2777,7 @@ function imprimirOrdenTrabajo(){
     @media print{body{padding:8px;}@page{margin:1cm;}}
   </style></head><body>
   <div class="header">
-    <div class="logo">ChillerSystem<small>Gestión Técnica de HVAC</small></div>
+    <div class="logo">ChillerService S.A.<small>Gestión Técnica de HVAC</small></div>
     <div class="orden-num">Orden de Trabajo<strong>#${nOrden}</strong><span>${fmtF(fecha)}</span></div>
   </div>
 
