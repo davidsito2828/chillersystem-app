@@ -577,6 +577,28 @@ tbody tr:hover{background:#f8faff;}
   .stat-mini-num{font-size:18px;}
   table{min-width:500px;}
 }
+/* ── ORDEN DE TRABAJO PDF ── */
+#ordenPdfContainer{position:absolute;left:-9999px;top:0;width:190mm;background:#fff;font-family:Arial,sans-serif;font-size:11px;color:#111;padding:16px;box-sizing:border-box;}
+.ot-header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px;}
+.ot-logo{font-size:18px;font-weight:900;letter-spacing:-0.5px;}
+.ot-logo small{display:block;font-size:9px;font-weight:400;letter-spacing:1px;color:#555;}
+.ot-num{text-align:right;font-size:10px;color:#555;}
+.ot-num strong{display:block;font-size:14px;color:#111;font-weight:900;}
+.ot-sec{margin-bottom:10px;}
+.ot-sec-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#555;border-bottom:1px solid #ccc;padding-bottom:3px;margin-bottom:7px;}
+.ot-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;}
+.ot-item-lbl{font-size:9px;color:#777;text-transform:uppercase;letter-spacing:1px;display:block;}
+.ot-item-val{font-weight:700;font-size:11px;}
+.ot-task{display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px solid #eee;}
+.ot-task:last-child{border-bottom:none;}
+.ot-cb{width:12px;height:12px;border:1.5px solid #333;border-radius:2px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;}
+.ot-cb-done{background:#111;color:#fff;}
+.ot-task-info{font-size:9px;color:#777;}
+.ot-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.ot-tbl td,.ot-tbl th{border:1px solid #ccc;padding:5px 8px;}
+.ot-tbl th{background:#f0f0f0;font-weight:700;font-size:9px;text-transform:uppercase;}
+.ot-firma-box{border:1px solid #ccc;border-radius:4px;padding:10px 14px;min-height:50px;margin-top:4px;}
+.ot-footer{margin-top:16px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center;}
 </style>
 </head>
 <body>
@@ -1415,6 +1437,7 @@ tbody tr:hover{background:#f8faff;}
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="ordenPdfContainer"></div>
 
 <script>
 const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
@@ -2747,32 +2770,9 @@ function imprimirOrdenTrabajo(){
     ['Carga de gas',lec.carga_gas,'']
   ].filter(r=>r[1]);
 
-  // Construir contenido como elemento DOM temporal
-  const temp=document.createElement('div');
-  temp.style.cssText='position:fixed;left:-9999px;top:0;width:190mm;background:#fff;font-family:Arial,sans-serif;font-size:11px;color:#111;padding:16px;box-sizing:border-box;';
-  temp.innerHTML=`
-  <style>
-    .ot-header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px;}
-    .ot-logo{font-size:18px;font-weight:900;letter-spacing:-0.5px;}
-    .ot-logo small{display:block;font-size:9px;font-weight:400;letter-spacing:1px;color:#555;}
-    .ot-num{text-align:right;font-size:10px;color:#555;}
-    .ot-num strong{display:block;font-size:14px;color:#111;font-weight:900;}
-    .ot-sec{margin-bottom:10px;}
-    .ot-sec-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#555;border-bottom:1px solid #ccc;padding-bottom:3px;margin-bottom:7px;}
-    .ot-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;}
-    .ot-item-lbl{font-size:9px;color:#777;text-transform:uppercase;letter-spacing:1px;display:block;}
-    .ot-item-val{font-weight:700;font-size:11px;}
-    .ot-task{display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px solid #eee;}
-    .ot-task:last-child{border-bottom:none;}
-    .ot-cb{width:12px;height:12px;border:1.5px solid #333;border-radius:2px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;}
-    .ot-cb-done{background:#111;color:#fff;}
-    .ot-task-info{font-size:9px;color:#777;}
-    .ot-tbl{width:100%;border-collapse:collapse;font-size:11px;}
-    .ot-tbl td,.ot-tbl th{border:1px solid #ccc;padding:5px 8px;}
-    .ot-tbl th{background:#f0f0f0;font-weight:700;font-size:9px;text-transform:uppercase;}
-    .ot-firma-box{border:1px solid #ccc;border-radius:4px;padding:10px 14px;min-height:50px;margin-top:4px;}
-    .ot-footer{margin-top:16px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center;}
-  </style>
+  // Poblar el div persistente #ordenPdfContainer con el contenido de la orden
+  const container=document.getElementById('ordenPdfContainer');
+  container.innerHTML=`
   <div class="ot-header">
     <div class="ot-logo">ChillerService S.A.<small>Gestión Técnica de HVAC</small></div>
     <div class="ot-num">Orden de Trabajo<strong>#${nOrden}</strong><span>${fmtF(fecha)}</span></div>
@@ -2815,7 +2815,6 @@ function imprimirOrdenTrabajo(){
   </div>
   <div class="ot-footer">ChillerService S.A. · Gestión Técnica — Orden generada el ${new Date().toLocaleDateString('es-AR')}</div>`;
 
-  document.body.appendChild(temp);
   showToast('Generando PDF...');
   html2pdf().set({
     margin:[10,10,10,10],
@@ -2823,8 +2822,8 @@ function imprimirOrdenTrabajo(){
     image:{type:'jpeg',quality:0.98},
     html2canvas:{scale:2,useCORS:true,logging:false},
     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-  }).from(temp).save().then(()=>{
-    document.body.removeChild(temp);
+  }).from(container).save().then(()=>{
+    container.innerHTML='';
     showToast('PDF descargado ✓','success');
   });
 }
