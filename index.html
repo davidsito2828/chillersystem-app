@@ -1508,8 +1508,19 @@ function _getEstacion(fecha){
   return 'verano';
 }
 
+function _norm(s){
+  // Normaliza string: minúsculas + sin tildes + sin espacios extra
+  return (s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+
 function getTareasEquipo(tipo, ultimoPreventivo){
-  const matriz=MATRIZ_MANTENIMIENTO[tipo]||_TAREAS_GENERICAS;
+  // Buscar con normalización para tolerar diferencias de tildes/mayúsculas
+  const tipoNorm=_norm(tipo);
+  const claveExacta=Object.keys(MATRIZ_MANTENIMIENTO).find(k=>_norm(k)===tipoNorm);
+  const claveParcial=claveExacta||Object.keys(MATRIZ_MANTENIMIENTO).find(k=>{const kn=_norm(k);return kn.includes(tipoNorm)||tipoNorm.includes(kn);});
+  const matriz=MATRIZ_MANTENIMIENTO[claveParcial]||_TAREAS_GENERICAS;
   const hoy=new Date();hoy.setHours(0,0,0,0);
   const tareas_hoy=[];
   let badge_estacional=false,badge_trimestral=false;
@@ -1621,10 +1632,18 @@ async function loadTareasConfig(){
 // Retorna array de tareas con estado para un equipo específico
 function getTareasParaHoy(equipoId, tipoEquipo){
   const hoy=new Date();hoy.setHours(0,0,0,0);
-  // Si hay configuración en BD para este tipo, usarla
-  const configTipo=tareasConfig.filter(t=>t.tipo_equipo===tipoEquipo);
+  const tipoNorm=_norm(tipoEquipo);
+  // 1) Coincidencia exacta normalizada
+  let configTipo=tareasConfig.filter(t=>_norm(t.tipo_equipo)===tipoNorm);
+  // 2) Fallback: coincidencia parcial (uno contiene al otro)
+  if(!configTipo.length&&tipoNorm){
+    configTipo=tareasConfig.filter(t=>{
+      const tn=_norm(t.tipo_equipo);
+      return tn.includes(tipoNorm)||tipoNorm.includes(tn);
+    });
+  }
   if(!configTipo.length){
-    // Fallback a MATRIZ_MANTENIMIENTO en memoria
+    // Sin datos en BD → usar MATRIZ_MANTENIMIENTO en memoria
     return null;
   }
   return configTipo.map(tarea=>{
