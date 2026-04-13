@@ -662,6 +662,7 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn" id="tabEventual" onclick="showTab('eventual',this)">🔖 Eventuales</button>
   <button class="nav-btn admin-only" id="tabPpto" onclick="showTab('presupuestos',this)">💼 Presupuestos</button>
   <button class="nav-btn admin-only" id="tabInformes" onclick="showTab('informes',this)">📊 Informes</button>
+  <button class="nav-btn admin-only" id="tabTareas" onclick="showTab('tareas',this)">⚙️ Config. Tareas</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -1142,6 +1143,33 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- ═══ CONFIG. TAREAS (solo admin) ═══ -->
+<div id="tab-tareas" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">⚙️ Configuración de Tareas</div>
+      <div class="panel-count" id="tareasCount">—</div>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <select class="search-box" style="width:auto;" id="filtroTipoTareas" onchange="renderConfigTareas()">
+        <option value="">Todos los tipos</option>
+        <option>Chiller centrífugo</option><option>Chiller tornillo</option><option>Chiller reciprocante</option>
+        <option>Split / Multisplit</option><option>Baja silueta</option><option>Cassette</option>
+        <option>Piso techo</option><option>Rooftop</option><option>VRV / VRF</option>
+        <option>Fan Coil</option><option>Torre de enfriamiento</option>
+      </select>
+      <select class="search-box" style="width:auto;" id="filtroCategoriaTareas" onchange="renderConfigTareas()">
+        <option value="">Todas las categorías</option>
+        <option value="mensual">Mensual</option><option value="trimestral">Trimestral</option>
+        <option value="estacional">Estacional</option><option value="anual">Anual</option>
+      </select>
+    </div>
+  </div>
+  <div id="tareasConfigBody">
+    <div class="loading"><span class="spinner"></span>Cargando...</div>
+  </div>
+</div>
+
 <!-- MODAL INFORME -->
 <div class="modal-overlay" id="mInforme">
   <div class="modal" style="max-width:700px;">
@@ -1392,6 +1420,8 @@ let serviceClienteActual=null;
 let filtroEmp='todas',filtroHE='',filtroHT='';
 let usuarioActual=null;
 let eqFotosNuevas=[],intervFotosNuevas=[];
+let tareasConfig=[];    // configuración de tareas desde Supabase
+let tareasRealizadas=[]; // historial de tareas realizadas por equipo
 
 // ══════════════════════════════════════════
 //  MOTOR DE MANTENIMIENTO
@@ -1572,10 +1602,51 @@ async function iniciarApp(){
     document.getElementById('tabCli').classList.remove('active');
   }
   try{
-    await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos(),loadInformes()]);
+    await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos(),loadInformes(),loadTareasConfig()]);
     if(isAdmin) await loadUsuarios();
     setStatus(true); calcAlertas();
   }catch(e){setStatus(false);showToast('Error de conexión',true);}
+}
+
+async function loadTareasConfig(){
+  try{
+    tareasConfig=await api('tareas_configuracion?select=*&activa=eq.true&order=tipo_equipo,orden')||[];
+    tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc')||[];
+  }catch(e){
+    // tablas no existen aún → silencioso, usar MATRIZ_MANTENIMIENTO de fallback
+    tareasConfig=[];tareasRealizadas=[];
+  }
+}
+
+// Retorna array de tareas con estado para un equipo específico
+function getTareasParaHoy(equipoId, tipoEquipo){
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  // Si hay configuración en BD para este tipo, usarla
+  const configTipo=tareasConfig.filter(t=>t.tipo_equipo===tipoEquipo);
+  if(!configTipo.length){
+    // Fallback a MATRIZ_MANTENIMIENTO en memoria
+    return null;
+  }
+  return configTipo.map(tarea=>{
+    // Última vez que se realizó esta tarea para este equipo
+    const historial=tareasRealizadas.filter(r=>r.equipo_id===equipoId&&r.tarea_id===tarea.tarea_id);
+    const ultimaRealizada=historial.length
+      ?historial.reduce((a,b)=>a.fecha_realizada>b.fecha_realizada?a:b)
+      :null;
+    const diasDesde=ultimaRealizada
+      ?Math.ceil((hoy-new Date(ultimaRealizada.fecha_realizada))/(1000*60*60*24))
+      :null;
+    const pendiente=diasDesde===null||(diasDesde>=tarea.frecuencia_dias);
+    const urgencia=diasDesde===null?'nunca'
+      :diasDesde>=tarea.frecuencia_dias*1.5?'vencida'
+      :diasDesde>=tarea.frecuencia_dias?'pendiente'
+      :diasDesde>=tarea.frecuencia_dias*0.8?'proxima'
+      :'ok';
+    return {...tarea, ultima_fecha:ultimaRealizada?.fecha_realizada||null, dias_desde:diasDesde, pendiente, urgencia};
+  }).sort((a,b)=>{
+    const ord={vencida:0,nunca:1,pendiente:2,proxima:3,ok:4};
+    return (ord[a.urgencia]??5)-(ord[b.urgencia]??5);
+  });
 }
 
 function setStatus(ok){
@@ -2497,29 +2568,88 @@ function abrirServiceEq(eqId){
 }
 
 function _renderTareasService(eq){
-  const ultP=eq.ultimo_preventivo||null;
-  const {tareas_hoy}=getTareasEquipo(eq.tipo||'',ultP);
   const lista=document.getElementById('sTareasList');
-  if(!tareas_hoy.length){lista.innerHTML='<span style="color:var(--text-dim);font-size:12px;">No hay tareas específicas para este tipo de equipo.</span>';return;}
-  const nivelStyle={
-    mensual:'',
-    trimestral:'background:var(--yellow-bg);border:1px solid var(--yellow-border);border-radius:5px;padding:2px 5px;',
-    estacional:'background:#fffbeb;border:1px solid var(--yellow-border);border-radius:5px;padding:2px 5px;'
-  };
-  const nivelLabel={mensual:'',trimestral:' <span style="font-size:9px;color:var(--yellow);font-weight:700;text-transform:uppercase;letter-spacing:1px;">▲ trimestral</span>',estacional:' <span style="font-size:9px;color:#b45309;font-weight:700;text-transform:uppercase;letter-spacing:1px;">🍂 estacional</span>'};
-  lista.innerHTML=tareas_hoy.map((t,i)=>`
-    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.4;${nivelStyle[t.nivel]||''}">
-      <input type="checkbox" id="starea-${i}" checked style="margin-top:2px;flex-shrink:0;accent-color:var(--accent);"/>
-      <span>${t.tarea}${nivelLabel[t.nivel]||''}</span>
-    </label>`).join('');
+  // Intentar usar datos de BD primero
+  const tareasDB=getTareasParaHoy(eq.id, eq.tipo||'');
+  if(tareasDB){
+    // ── Datos desde Supabase ──
+    // Filtrar solo pendientes o vencidas o próximas (excluir 'ok' a menos que sean todas ok)
+    const relevantes=tareasDB.filter(t=>t.urgencia!=='ok'||tareasDB.every(x=>x.urgencia==='ok'));
+    if(!relevantes.length){
+      lista.innerHTML='<div style="color:var(--green);font-size:12px;font-weight:600;">✓ Todas las tareas están al día para este equipo.</div>';
+      return;
+    }
+    // Agrupar por categoría
+    const cats=['mensual','trimestral','estacional','anual'];
+    const catLabel={mensual:'📅 Mensuales',trimestral:'🔧 Trimestrales',estacional:'🍂 Estacionales',anual:'📆 Anuales'};
+    const urgColor={vencida:'var(--red)',nunca:'var(--red)',pendiente:'var(--yellow)',proxima:'#b45309',ok:'var(--green)'};
+    const urgBg={vencida:'var(--red-bg)',nunca:'#fef2f2',pendiente:'var(--yellow-bg)',proxima:'#fff7ed',ok:'var(--green-bg)'};
+    let idx=0;
+    let html='';
+    cats.forEach(cat=>{
+      const grupo=relevantes.filter(t=>t.categoria===cat);
+      if(!grupo.length)return;
+      html+=`<div style="font-size:10px;letter-spacing:1.2px;color:var(--text-dim);text-transform:uppercase;font-weight:700;margin:8px 0 4px;">${catLabel[cat]||cat}</div>`;
+      grupo.forEach(t=>{
+        const color=urgColor[t.urgencia]||'var(--text)';
+        const bg=urgBg[t.urgencia]||'transparent';
+        const diasInfo=t.dias_desde===null
+          ?'<span style="color:var(--red);font-size:10px;font-weight:700;">nunca realizada</span>'
+          :t.urgencia==='ok'
+          ?`<span style="color:var(--green);font-size:10px;">hace ${t.dias_desde}d</span>`
+          :`<span style="color:${color};font-size:10px;font-weight:600;">hace ${t.dias_desde}d — vence c/${t.frecuencia_dias}d</span>`;
+        const preCheck=t.urgencia!=='ok';
+        html+=`<label data-tarea-id="${t.tarea_id}" data-nombre="${t.nombre_tarea.replace(/"/g,'&quot;')}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.45;background:${bg};border-radius:5px;padding:4px 6px;margin-bottom:2px;">
+          <input type="checkbox" id="starea-${idx}" ${preCheck?'checked':''} style="margin-top:2px;flex-shrink:0;accent-color:var(--accent);"/>
+          <div><div>${t.nombre_tarea}</div><div style="margin-top:1px;">${diasInfo}</div></div>
+        </label>`;
+        idx++;
+      });
+    });
+    lista.innerHTML=html;
+  } else {
+    // ── Fallback: MATRIZ_MANTENIMIENTO en memoria ──
+    const ultP=eq.ultimo_preventivo||null;
+    const {tareas_hoy}=getTareasEquipo(eq.tipo||'',ultP);
+    if(!tareas_hoy.length){
+      lista.innerHTML='<span style="color:var(--text-dim);font-size:12px;">No hay tareas configuradas para este tipo de equipo.</span>';
+      return;
+    }
+    const cats=['mensual','trimestral','estacional'];
+    const catLabel={mensual:'📅 Mensuales',trimestral:'🔧 Trimestrales',estacional:'🍂 Estacionales'};
+    const catBg={mensual:'',trimestral:'var(--yellow-bg)',estacional:'#fffbeb'};
+    const catTag={mensual:'',trimestral:'<span style="font-size:9px;color:var(--yellow);font-weight:700;margin-left:5px;">▲ TRIMESTRAL</span>',estacional:'<span style="font-size:9px;color:#b45309;font-weight:700;margin-left:5px;">🍂 ESTACIONAL</span>'};
+    let idx=0;
+    let html='';
+    cats.forEach(cat=>{
+      const grupo=tareas_hoy.filter(t=>t.nivel===cat);
+      if(!grupo.length)return;
+      html+=`<div style="font-size:10px;letter-spacing:1.2px;color:var(--text-dim);text-transform:uppercase;font-weight:700;margin:8px 0 4px;">${catLabel[cat]}</div>`;
+      grupo.forEach(t=>{
+        html+=`<label data-tarea-id="" data-nombre="${t.tarea.replace(/"/g,'&quot;')}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.4;background:${catBg[cat]||''};border-radius:5px;padding:3px 5px;margin-bottom:2px;">
+          <input type="checkbox" id="starea-${idx}" checked style="margin-top:2px;flex-shrink:0;accent-color:var(--accent);"/>
+          <span>${t.tarea}${catTag[cat]||''}</span>
+        </label>`;
+        idx++;
+      });
+    });
+    lista.innerHTML=html;
+  }
 }
 
 function _getTareasChecked(){
+  // Retorna [{tarea_id, nombre}] para las tareas marcadas
   const lista=document.getElementById('sTareasList');
   if(!lista)return [];
   return Array.from(lista.querySelectorAll('input[type=checkbox]'))
     .filter(cb=>cb.checked)
-    .map(cb=>cb.closest('label').querySelector('span').textContent.trim());
+    .map(cb=>{
+      const lbl=cb.closest('label');
+      return {
+        tarea_id:lbl.dataset.tareaId||'',
+        nombre:lbl.dataset.nombre||lbl.querySelector('span,div')?.textContent?.split('\n')[0]?.trim()||''
+      };
+    });
 }
 function setServiceTipo(tipo){
   document.getElementById('sTipo').value=tipo;
@@ -2549,7 +2679,7 @@ function setServiceTipo(tipo){
     const campo=document.getElementById('sTrabajoRealizado');
     if(!campo.value.trim()){
       const tareas=_getTareasChecked();
-      if(tareas.length) campo.value=tareas.map((t,i)=>`${i+1}. ${t}`).join('\n');
+      if(tareas.length) campo.value=tareas.map((t,i)=>`${i+1}. ${t.nombre}`).join('\n');
     }
   }
   // Botón confirmar
@@ -2563,11 +2693,9 @@ function guardarServiceEq(){
   if(!tipo){showToast('Elegí el tipo de trabajo: Preventivo o Correctivo',true);return;}
   // Si es preventivo y hay tareas marcadas no incluidas aún, agregarlas al trabajo
   let trabajo=document.getElementById('sTrabajoRealizado').value.trim();
-  if(tipo==='Preventivo'){
-    const tareas=_getTareasChecked();
-    if(tareas.length&&!trabajo){
-      trabajo=tareas.map((t,i)=>`${i+1}. ${t}`).join('\n');
-    }
+  const tareasChecked=tipo==='Preventivo'?_getTareasChecked():[];
+  if(tipo==='Preventivo'&&tareasChecked.length&&!trabajo){
+    trabajo=tareasChecked.map((t,i)=>`${i+1}. ${t.nombre}`).join('\n');
   }
   const descCorrectivo=document.getElementById('sDescCorrectivo').value.trim()||null;
   const necesitaResolucion=document.getElementById('sNecesitaResolucion').value.trim()||null;
@@ -2588,7 +2716,8 @@ function guardarServiceEq(){
     necesita_resolucion:tipo==='Correctivo'?necesitaResolucion:null,
     lecturas_operativas:lecturas,
     fotos_nuevas:serviceFotosNuevas,
-    fotos:[]
+    fotos:[],
+    tareas_realizadas:tareasChecked // guardamos para registrar en BD al guardar planilla
   };
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
@@ -2673,10 +2802,25 @@ async function guardarPlanilla(){
         const eq=equipos.find(e=>e.id===eqId);
         const frec=eq?eq.frecuencia_dias||30:30;
         await api('equipos?id=eq.'+eqId,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
+        // Guardar historial de tareas realizadas (si hay datos de BD)
+        if(tareasConfig.length&&p.tareas_realizadas&&p.tareas_realizadas.length){
+          // Obtener id de la intervención recién creada para referenciarla
+          const intvsRecientes=await api(`tareas_realizadas?select=id&equipo_id=eq.${eqId}&order=created_at.desc&limit=1`).catch(()=>null);
+          for(const t of p.tareas_realizadas){
+            if(!t.tarea_id)continue;
+            await api('tareas_realizadas',{method:'POST',body:JSON.stringify({
+              equipo_id:eqId,
+              tarea_id:t.tarea_id,
+              nombre_tarea:t.nombre,
+              fecha_realizada:fecha,
+              tecnico:tecnico||firma
+            }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+          }
+        }
       }
     }
     showToast('Planilla guardada ✓ — '+Object.keys(servicePlanilla).length+' equipo(s)','success');
-    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes()]);
+    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig()]);
     calcAlertas();volverListaService();
   }catch(e){showToast('Error: '+e.message,true);}
   finally{document.getElementById('btnGuardarPlanilla').disabled=false;}
@@ -2736,7 +2880,7 @@ function setFiltro(v,btn){
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
@@ -2744,6 +2888,7 @@ function showTab(id,btn){
   if(id==='eventual'){renderEventuales(eventualesFiltrados());}
   if(id==='presupuestos'){loadPresupuestos();}
   if(id==='informes'){loadInformes();}
+  if(id==='tareas'){renderConfigTareas();}
 }
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){
@@ -3678,6 +3823,77 @@ function showToast(msg,type=''){
   clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),3000);
 }
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+
+// ── CONFIG. TAREAS (admin) ──
+const _catColor={mensual:'var(--accent)',trimestral:'var(--yellow)',estacional:'#b45309',anual:'var(--red)'};
+const _catBg={mensual:'#eff6ff',trimestral:'var(--yellow-bg)',estacional:'#fff7ed',anual:'var(--red-bg)'};
+const _catBorder={mensual:'#bfdbfe',trimestral:'var(--yellow-border)',estacional:'#fed7aa',anual:'var(--red-border)'};
+
+function renderConfigTareas(){
+  const el=document.getElementById('tareasConfigBody');
+  if(!tareasConfig.length){
+    el.innerHTML=`<div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Sin datos de configuración</div><div style="font-size:12px;color:var(--text-dim);margin-top:6px;">Ejecutá el archivo <strong>supabase-migration.sql</strong> en tu proyecto de Supabase para cargar las tareas.</div></div>`;
+    document.getElementById('tareasCount').textContent='Sin datos de BD';
+    return;
+  }
+  const filtroTipo=document.getElementById('filtroTipoTareas').value;
+  const filtrocat=document.getElementById('filtroCategoriaTareas').value;
+  let lista=tareasConfig;
+  if(filtroTipo) lista=lista.filter(t=>t.tipo_equipo===filtroTipo);
+  if(filtrocat) lista=lista.filter(t=>t.categoria===filtrocat);
+  document.getElementById('tareasCount').textContent=lista.length+' tarea(s)';
+  if(!lista.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">Sin tareas para el filtro seleccionado</div></div>';return;}
+  // Agrupar por tipo_equipo
+  const grupos={};
+  lista.forEach(t=>{if(!grupos[t.tipo_equipo])grupos[t.tipo_equipo]=[];grupos[t.tipo_equipo].push(t);});
+  el.innerHTML=Object.entries(grupos).map(([tipo,tareas])=>`
+    <div style="border-bottom:1px solid var(--border);padding:14px 18px;">
+      <div style="font-weight:700;color:var(--text);font-size:13px;margin-bottom:10px;">⚙️ ${tipo}</div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        ${tareas.map(t=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:${t.activa?'var(--bg3)':'#fafafa'};border:1px solid var(--border);border-radius:var(--r);opacity:${t.activa?1:0.55};">
+            <span style="display:inline-flex;align-items:center;background:${_catBg[t.categoria]};border:1px solid ${_catBorder[t.categoria]};color:${_catColor[t.categoria]};border-radius:4px;padding:1px 8px;font-size:10px;font-weight:700;white-space:nowrap;min-width:78px;justify-content:center;text-transform:uppercase;">${t.categoria}</span>
+            <span style="flex:1;font-size:12px;color:var(--text);">${t.nombre_tarea}</span>
+            <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+              <label style="font-size:11px;color:var(--text-dim);">c/</label>
+              <input type="number" value="${t.frecuencia_dias}" min="1" max="730"
+                style="width:58px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text);font-family:inherit;text-align:right;"
+                onchange="guardarFrecuenciaTarea('${t.id}',this.value)"
+                onblur="guardarFrecuenciaTarea('${t.id}',this.value)"/>
+              <label style="font-size:11px;color:var(--text-dim);">días</label>
+            </div>
+            <button onclick="toggleTareaActiva('${t.id}',${t.activa})"
+              style="padding:3px 10px;font-size:11px;border-radius:4px;cursor:pointer;font-family:inherit;border:1px solid;white-space:nowrap;
+              background:${t.activa?'var(--red-bg)':'var(--green-bg)'};
+              color:${t.activa?'var(--red)':'var(--green)'};
+              border-color:${t.activa?'var(--red-border)':'var(--green-border)'};">
+              ${t.activa?'✕ Desactivar':'✓ Activar'}
+            </button>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+async function toggleTareaActiva(id, activa){
+  try{
+    await api(`tareas_configuracion?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({activa:!activa}),headers:{...H,'Prefer':'return=minimal'}});
+    await loadTareasConfig();
+    renderConfigTareas();
+    showToast(activa?'Tarea desactivada':'Tarea activada','success');
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function guardarFrecuenciaTarea(id, dias){
+  const d=parseInt(dias);
+  if(!d||d<1)return;
+  try{
+    await api(`tareas_configuracion?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({frecuencia_dias:d}),headers:{...H,'Prefer':'return=minimal'}});
+    // Actualizar local sin recargar toda la tabla
+    const t=tareasConfig.find(x=>x.id===id);
+    if(t) t.frecuencia_dias=d;
+    showToast('Frecuencia actualizada','success');
+  }catch(e){showToast('Error: '+e.message,true);}
+}
 
 </script>
 <script>
