@@ -2377,7 +2377,7 @@ function filtrarHistClientes(q){
 
 let histClienteActual=null;
 
-function abrirHistCliente(cliId){
+async function abrirHistCliente(cliId){
   histClienteActual=cliId;
   const c=clientes.find(x=>x.id===cliId);
   const eqs=equipos.filter(e=>e.cliente_id===cliId);
@@ -2388,6 +2388,11 @@ function abrirHistCliente(cliId){
   // Poblar filtro de equipos
   document.getElementById('filtroEqHist').innerHTML='<option value="">Todos los equipos</option>'+eqs.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('');
   filtroHE=''; filtroHT='';
+  // Asegurar que el mapa de aprobaciones esté cargado antes de renderizar
+  if(!window._aprobacionesByInterv||!Object.keys(window._aprobacionesByInterv).length){
+    await loadAprobaciones();
+  }
+  console.log('[abrirHistCliente] _aprobacionesByInterv keys:',Object.keys(window._aprobacionesByInterv||{}).length);
   renderHistDetalle();
 }
 
@@ -2436,6 +2441,7 @@ function renderIntervItem(i){
   if(i.notas) html+='<div class="interv-rep">📝 '+i.notas+'</div>';
   html+=lecHtml;
   // ARCHIVOS ADJUNTOS — fotos + informe de aprobación
+  console.log('[historial interv]',i.id,window._aprobacionesByInterv);
   const aprobacion=(window._aprobacionesByInterv&&window._aprobacionesByInterv[i.id])||aprobaciones.find(a=>a.intervencion_id===i.id);
   const tieneFotos=i.fotos&&i.fotos.length;
   const tieneInforme=aprobacion&&aprobacion.pdf_url;
@@ -3343,93 +3349,25 @@ function renderAprobaciones(){
   </table></div>`;
 }
 
-async function subirInformeHTML(htmlContent, nombre){
-  const blob=new Blob([htmlContent],{type:'text/html;charset=utf-8'});
-  const r=await fetch(SURL+'/storage/v1/object/informes-preventivos/'+nombre,{
-    method:'POST',
-    headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'text/html','x-upsert':'true'},
-    body:blob
-  });
-  if(r.ok) return SURL+'/storage/v1/object/public/informes-preventivos/'+nombre;
-  const err=await r.json().catch(()=>({}));
-  throw new Error(err.error||'Error al subir informe: '+r.status);
-}
-
-async function aprobarPreventivo(aprobId){
-  const a=aprobaciones.find(x=>x.id===aprobId);
-  if(!a){showToast('Registro no encontrado',true);return;}
-  const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente',telefono:null};
-  const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'Equipo'};
-  const fechaFmt=fmtF(a.fecha_servicio);
-  const interv=intervenciones.find(i=>i.id===a.intervencion_id)||{};
-
-  // Construir HTML del informe
-  const firmaImg=a.firma_cliente==='click_confirmado'
-    ?'<div style="padding:8px;color:#059669;font-weight:700;">✅ Conformidad confirmada digitalmente</div>'
-    :a.firma_cliente
-    ?`<img src="${a.firma_cliente}" style="max-width:200px;max-height:80px;border:1px solid #ccc;border-radius:4px;"/>`
-    :'';
-  const informeHTML=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
-<title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
-<style>
-  body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
-  h1{font-size:20px;font-weight:900;font-style:italic;}
-  h2{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:18px 0 10px;}
-  table{width:100%;border-collapse:collapse;margin-bottom:12px;}
-  td,th{border:1px solid #bbb;padding:5px 9px;font-size:11px;vertical-align:top;}
-  th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
-  .hdr td{border:none;vertical-align:middle;}
-  .footer{margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center;}
-</style></head><body>
-<table class="hdr" style="margin-bottom:20px;">
-  <tr>
-    <td style="width:60%;"><h1>ChillerService S.A.</h1><div style="font-size:11px;color:#555;">Servicios e Instalaciones Termomecánicas</div></td>
-    <td style="text-align:right;line-height:1.7;">
-      <strong style="font-size:13px;">Informe de Preventivo</strong><br/>
-      Fecha: ${fechaFmt}<br/>
-      Técnico: ${a.tecnico||'—'}
-    </td>
-  </tr>
-</table>
-<h2>Datos del servicio</h2>
-<table>
-  <tr><th>Cliente</th><td>${cli.nombre}</td><th>Equipo</th><td>${eq.nombre}</td></tr>
-  <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Fecha</th><td>${fechaFmt}</td></tr>
-</table>
-${interv.descripcion||interv.solucion?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${interv.solucion||interv.descripcion||''}</div>`:''}
-${interv.repuestos?`<h2>Repuestos utilizados</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;">${interv.repuestos}</div>`:''}
-<h2>Conformidad del cliente</h2>
-<table>
-  <tr><th>Nombre</th><td>${a.nombre_firmante||'—'}</td><th>Tipo</th><td>${a.firma_tipo==='canvas'?'Firma manuscrita digital':'Confirmación por click'}</td></tr>
-</table>
-${firmaImg}
-<div class="footer">ChillerService S.A. · Esmeralda 762 2°B Cap.Fed. · Tel.: 5032-4033<br/>Aprobado por: ${usuarioActual?.nombre||'Admin'} — ${new Date().toLocaleDateString('es-AR')}</div>
-</body></html>`;
-
-  showToast('Aprobando preventivo...');
+async function aprobarPreventivo(id){
+  const aprobacion=aprobaciones.find(a=>a.id===id);
+  if(!aprobacion) return;
+  const informeUrl=`https://chillersystem-gestion-app.vercel.app?informe=true&id=${id}`;
   try{
-    // Intentar subir informe a Storage — si falla, continuar igual
-    let url=null;
-    try{
-      const fechaArchivo=(a.fecha_servicio||new Date().toISOString().split('T')[0]).replace(/-/g,'');
-      const nombre=`preventivo-${aprobId}-${fechaArchivo}.html`;
-      url=await subirInformeHTML(informeHTML,nombre);
-    }catch(storageErr){
-      console.warn('[aprobarPreventivo] Storage no disponible, continuando sin URL:',storageErr.message);
-    }
-    // Actualizar registro (con o sin URL de informe)
-    await api(`preventivos_aprobacion?id=eq.${aprobId}`,{method:'PATCH',body:JSON.stringify({
-      estado:'aprobado',
-      pdf_url:url||null,
-      aprobado_por:usuarioActual?.nombre||'admin',
-      fecha_aprobacion:new Date().toISOString()
-    }),headers:{...H,'Prefer':'return=minimal'}});
-    // Recargar
+    await api('preventivos_aprobacion?id=eq.'+id,{
+      method:'PATCH',
+      body:JSON.stringify({
+        estado:'aprobado',
+        pdf_url:informeUrl,
+        aprobado_por:usuarioActual.nombre,
+        fecha_aprobacion:new Date().toISOString()
+      }),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
     await loadAprobaciones();
     renderAprobaciones();
-    showToast('✅ Aprobado — seleccioná destinatario de WhatsApp','success');
-    // Mostrar modal de selección de destinatario
-    setTimeout(()=>mostrarModalWhatsApp(aprobId, url), 400);
+    mostrarModalWhatsApp(id);
+    showToast('✅ Preventivo aprobado','success');
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
@@ -4513,7 +4451,7 @@ let _waAprobId=null;
 let _waInformeUrl=null;
 function mostrarModalWhatsApp(aprobId, informeUrl){
   _waAprobId=aprobId;
-  _waInformeUrl=informeUrl;
+  _waInformeUrl=informeUrl||generarUrlInforme(aprobId);
   const a=aprobaciones.find(x=>x.id===aprobId)||{};
   const cli=clientes.find(c=>c.id===a.cliente_id)||{};
   const telLimpio=cli.telefono?cli.telefono.replace(/\D/g,''):'';
@@ -4530,6 +4468,9 @@ function mostrarModalWhatsApp(aprobId, informeUrl){
 function onWaRadioChange(which){
   document.getElementById('waOtroNumero').style.display=which==='otro'?'block':'none';
 }
+function generarUrlInforme(aprobId){
+  return `https://chillersystem-gestion-app.vercel.app?informe=true&id=${aprobId}`;
+}
 function enviarWhatsAppModal(){
   const a=aprobaciones.find(x=>x.id===_waAprobId)||{};
   const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente'};
@@ -4542,14 +4483,75 @@ function enviarWhatsAppModal(){
     tel=document.getElementById('waInputNumero').value.replace(/\D/g,'');
   }
   if(!tel){showToast('Ingresá un número de teléfono',true);return;}
+  const informeUrl=_waInformeUrl||(_waAprobId?generarUrlInforme(_waAprobId):null);
   const msg=encodeURIComponent(
     `Estimado/a ${cli.nombre}, le informamos que el service técnico del ${fechaFmt} fue completado y aprobado. ✅ El equipo queda operativo. Ante cualquier consulta contáctenos. *ChillerService S.A.*`+
-    (_waInformeUrl?`\n\n📄 Informe: ${_waInformeUrl}`:'')
+    (informeUrl?`\n\n📄 Ver informe completo aquí:\n${informeUrl}`:'')
   );
   const waUrl=`https://wa.me/${tel}?text=${msg}`;
   cerrar('mWaEnvio');
   setTimeout(()=>window.open(waUrl,'_blank'),200);
 }
+
+// ── VISOR DE INFORME PÚBLICO (sin login) ──────────────────
+(async function checkInformePublico(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('informe')!=='true'||!params.get('id')) return;
+  const aprobId=params.get('id');
+  // Ocultar login/app, mostrar visor
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appScreen').style.display='none';
+  // Crear contenedor de visor
+  const viewer=document.createElement('div');
+  viewer.id='informeViewer';
+  viewer.style.cssText='position:fixed;inset:0;background:#fff;z-index:99999;overflow:auto;padding:20px;font-family:Arial,sans-serif;';
+  viewer.innerHTML='<div style="max-width:800px;margin:0 auto;text-align:center;padding:40px 20px;"><div style="font-size:24px;margin-bottom:8px;">⏳</div><div style="font-size:14px;color:#555;">Cargando informe...</div></div>';
+  document.body.appendChild(viewer);
+  try{
+    const res=await fetch(SURL+'/rest/v1/preventivos_aprobacion?id=eq.'+aprobId+'&select=*',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}});
+    const data=await res.json();
+    const a=data&&data[0];
+    if(!a){viewer.innerHTML='<div style="max-width:800px;margin:40px auto;text-align:center;"><h2 style="color:#dc2626;">Informe no encontrado</h2><p style="color:#555;">El enlace puede ser inválido o el informe fue eliminado.</p></div>';return;}
+    // Cargar datos relacionados
+    const [cliRes,equiposRes,intervRes]=await Promise.all([
+      fetch(SURL+'/rest/v1/clientes?id=eq.'+a.cliente_id+'&select=*',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}}).then(r=>r.json()).catch(()=>[]),
+      fetch(SURL+'/rest/v1/equipos?id=eq.'+(a.equipo_id||'00000000-0000-0000-0000-000000000000')+'&select=*',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}}).then(r=>r.json()).catch(()=>[]),
+      a.intervencion_id?fetch(SURL+'/rest/v1/intervenciones?id=eq.'+a.intervencion_id+'&select=*',{headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}}).then(r=>r.json()).catch(()=>[]):Promise.resolve([])
+    ]);
+    const cli=cliRes[0]||{nombre:'Cliente'};
+    const eq=equiposRes[0]||{nombre:'—'};
+    const interv=intervRes[0]||{};
+    const fechaFmt=a.fecha_servicio?new Date(a.fecha_servicio+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+    const firmaImg=a.firma_cliente==='click_confirmado'
+      ?'<div style="padding:8px;color:#059669;font-weight:700;border:1px solid #a7f3d0;border-radius:4px;background:#ecfdf5;">✅ Conformidad confirmada digitalmente</div>'
+      :a.firma_cliente
+      ?`<img src="${a.firma_cliente}" style="max-width:220px;max-height:90px;border:1px solid #ccc;border-radius:4px;display:block;margin-top:6px;"/>`
+      :'<div style="height:60px;border:1px dashed #ccc;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;">Sin firma</div>';
+    viewer.innerHTML=`<div style="max-width:800px;margin:0 auto;">
+      <div style="text-align:right;margin-bottom:12px;"><button onclick="window.print()" style="padding:8px 18px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">🖨️ Imprimir / Guardar PDF</button></div>
+      <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-radius:8px;" id="informeContenido">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><tr>
+          <td style="vertical-align:middle;"><h1 style="font-size:22px;font-weight:900;font-style:italic;margin:0;">ChillerService S.A.</h1><div style="font-size:11px;color:#555;margin-top:2px;">Servicios e Instalaciones Termomecánicas</div></td>
+          <td style="text-align:right;vertical-align:middle;line-height:1.8;font-size:12px;"><strong style="font-size:14px;">Informe de Preventivo</strong><br/>Fecha: ${fechaFmt}<br/>Técnico: ${a.tecnico||'—'}</td>
+        </tr></table>
+        <h2 style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:16px 0 10px;">Datos del servicio</h2>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px;">
+          <tr><th style="background:#f0f0f0;border:1px solid #bbb;padding:5px 9px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;">Cliente</th><td style="border:1px solid #bbb;padding:5px 9px;">${cli.nombre}</td><th style="background:#f0f0f0;border:1px solid #bbb;padding:5px 9px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;">Equipo</th><td style="border:1px solid #bbb;padding:5px 9px;">${eq.nombre}</td></tr>
+          <tr><th style="background:#f0f0f0;border:1px solid #bbb;padding:5px 9px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;">Tipo / Marca</th><td style="border:1px solid #bbb;padding:5px 9px;">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th style="background:#f0f0f0;border:1px solid #bbb;padding:5px 9px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;">Estado</th><td style="border:1px solid #bbb;padding:5px 9px;color:#059669;font-weight:700;">${a.estado==='aprobado'?'✅ Aprobado':'⏳ Pendiente'}</td></tr>
+        </table>
+        ${interv.solucion||interv.descripcion?`<h2 style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:16px 0 10px;">Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:12px;">${interv.solucion||interv.descripcion}</div>`:''}
+        ${interv.repuestos?`<h2 style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:16px 0 10px;">Repuestos utilizados</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;font-size:12px;">${interv.repuestos}</div>`:''}
+        <h2 style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:16px 0 10px;">Conformidad del cliente</h2>
+        ${firmaImg}
+        ${a.nombre_firmante?`<div style="font-size:11px;color:#555;margin-top:4px;">Firmado por: <strong>${a.nombre_firmante}</strong></div>`:''}
+        <div style="margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center;">ChillerService S.A. · Esmeralda 762 2°B Cap.Fed. · Tel.: 5032-4033<br/>${a.aprobado_por?'Aprobado por: '+a.aprobado_por+' — ':''} ${new Date().toLocaleDateString('es-AR')}</div>
+      </div>
+    </div>
+    <style>@media print{button{display:none!important;}body{margin:0;}#informeViewer{padding:0;}}</style>`;
+  }catch(err){
+    viewer.innerHTML='<div style="max-width:800px;margin:40px auto;text-align:center;"><h2 style="color:#dc2626;">Error al cargar el informe</h2><p style="color:#555;">'+err.message+'</p></div>';
+  }
+})();
 
 // PWA Install prompt
 let deferredPrompt;
