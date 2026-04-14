@@ -859,6 +859,10 @@ tbody tr:hover{background:#f8faff;}
           </div>
           <button class="btn-secondary" type="button" onclick="confirmarConformidadClick()" id="sBtnConformidadClick" style="width:100%;padding:9px;font-size:13px;font-weight:700;">✅ Confirmo conformidad sin firma manuscrita</button>
         </div>
+        <!-- BOTÓN IMPRIMIR ORDEN -->
+        <div style="margin-top:12px;">
+          <button id="sBtnImprimir" onclick="imprimirOrdenTrabajo()" style="width:100%;padding:10px;background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);">📄 Imprimir orden de trabajo</button>
+        </div>
         <!-- BOTONES GUARDAR -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">
           <button id="btnGuardarPreventivo" onclick="guardarSoloPreventivo()"
@@ -963,7 +967,6 @@ tbody tr:hover{background:#f8faff;}
 
       <div class="form-actions" style="flex-wrap:wrap;gap:8px;">
         <button class="btn-secondary" onclick="cerrar('mServiceEq')">Cancelar</button>
-        <button class="btn-secondary" id="sBtnImprimir" onclick="imprimirOrdenTrabajo()" style="display:none;">🖨️ Imprimir orden</button>
         <button class="btn-primary" id="sBtnConfirmar" onclick="guardarServiceEq()">✓ Confirmar equipo</button>
       </div>
     </div>
@@ -2481,22 +2484,30 @@ function renderHistDetalle(){
   }).join('');
   document.getElementById('histCount').textContent=c.nombre+' · '+total+' registro(s)';
 
-  // INFORMES DE PREVENTIVO APROBADOS para este cliente
-  const informesCliente=aprobaciones.filter(a=>a.cliente_id===histClienteActual&&a.estado==='aprobado'&&a.informe_url);
+  // INFORMES DE PREVENTIVO (aprobados + pendientes) para este cliente
+  const informesCliente=aprobaciones.filter(a=>a.cliente_id===histClienteActual);
   if(informesCliente.length){
+    const aprobados=informesCliente.filter(a=>a.estado==='aprobado');
+    const pendientes=informesCliente.filter(a=>a.estado==='pendiente');
     let informesHTML='<div style="margin-top:20px;padding-top:14px;border-top:2px solid var(--green-border);">';
     informesHTML+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">';
-    informesHTML+='<span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:var(--green);">📄 Informes de preventivo aprobados</span>';
-    informesHTML+='<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+informesCliente.length+' informe(s)</span>';
+    informesHTML+='<span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:var(--green);">📄 Informes de preventivo</span>';
+    informesHTML+='<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+informesCliente.length+' registro(s)</span>';
     informesHTML+='</div>';
     informesHTML+=informesCliente.map(a=>{
       const eqI=equipos.find(e=>e.id===a.equipo_id);
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:6px;margin-bottom:6px;flex-wrap:wrap;">
+      const esAprobado=a.estado==='aprobado';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${esAprobado?'var(--green-bg)':'var(--bg3)'};border:1px solid ${esAprobado?'var(--green-border)':'var(--border)'};border-radius:6px;margin-bottom:6px;flex-wrap:wrap;">
         <span style="font-size:11px;color:var(--text-dim);">${fmtF(a.fecha_servicio)}</span>
-        <span style="font-weight:600;font-size:12px;">${eqI?eqI.nombre:'Equipo'}</span>
+        <span style="font-weight:600;font-size:12px;">${eqI?eqI.nombre:'General'}</span>
         <span style="font-size:11px;color:var(--text-dim);">· ${a.tecnico||'—'}</span>
-        <span class="badge-aprobado" style="margin-left:auto;">✅ Aprobado por: ${a.aprobado_por||'admin'}</span>
-        <a href="${a.informe_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
+        ${esAprobado
+          ?`<span class="badge-aprobado" style="margin-left:auto;">✅ Aprobado por: ${a.aprobado_por||'admin'}</span>`
+          :`<span class="badge-pendiente" style="margin-left:auto;">⏳ Pendiente aprobación</span>`}
+        ${esAprobado&&a.informe_url
+          ?`<a href="${a.informe_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
+          :esAprobado?'<span style="font-size:11px;color:var(--text-dim);">⏳ Procesando</span>'
+          :''}
       </div>`;
     }).join('');
     informesHTML+='</div>';
@@ -3046,7 +3057,6 @@ function setServiceTipo(tipo){
   document.getElementById('sCorrectivoDet').style.display=esPrev?'none':'';
   document.getElementById('sNecesitaGroup').style.display=esPrev?'none':'';
   document.getElementById('sRepuestosGroup').style.display=esPrev?'':'none';
-  document.getElementById('sBtnImprimir').style.display=esPrev?'':'none';
   // Si es preventivo y el campo trabajo está vacío, pre-poblar con tareas marcadas
   if(esPrev){
     const campo=document.getElementById('sTrabajoRealizado');
@@ -3105,17 +3115,19 @@ async function guardarSoloPreventivo(){
   if(!fecha){showToast('Ingresá la fecha del service',true);return;}
   const eqs=equipos.filter(e=>e.cliente_id===serviceClienteActual);
   if(!eqs.length){showToast('Sin equipos para registrar',true);return;}
+  // Capturar firma del cliente del panel global
+  const firmaClienteSP=getFirmaData();
+  const nombreFirmanteSP=document.getElementById('sNombreFirmante')?.value.trim()||null;
   showToast('Guardando preventivo...');
   document.getElementById('btnGuardarPreventivo').disabled=true;
   try{
     for(const eq of eqs){
-      // Solo guardar si no tiene ya registro en servicePlanilla (que puede ser correctivo)
       if(!servicePlanilla[eq.id]){
         const frec=eq.frecuencia_dias||30;
         await api('equipos?id=eq.'+eq.id,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
       }
     }
-    // Guardar una sola intervención general por el cliente
+    // Guardar intervención general con return=representation para obtener id
     const cli=clientes.find(c=>c.id===serviceClienteActual);
     const data={
       cliente_id:serviceClienteActual,
@@ -3127,7 +3139,23 @@ async function guardarSoloPreventivo(){
       notas:document.getElementById('firmaObservaciones').value.trim()||null,
       es_planilla:true, necesita_correctivo:false, fotos:[]
     };
-    await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
+    const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
+    console.log('[guardarSoloPreventivo] intervId:',intervId,'firma:',firmaClienteSP.base64?'sí':'no');
+    // Guardar en preventivos_aprobacion si hay firma del cliente
+    if(firmaClienteSP.base64&&intervId){
+      await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
+        intervencion_id:intervId,
+        cliente_id:serviceClienteActual,
+        equipo_id:null,
+        tecnico:tecnico||firma,
+        fecha_servicio:fecha,
+        firma_cliente:firmaClienteSP.base64,
+        firma_tipo:firmaClienteSP.tipo||'click',
+        nombre_firmante:nombreFirmanteSP,
+        estado:'pendiente'
+      }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion insert]',e));
+    }
     // Si hay correctivos marcados en planilla, guardarlos también
     for(const eqId of Object.keys(servicePlanilla)){
       const p=servicePlanilla[eqId];
@@ -3139,7 +3167,7 @@ async function guardarSoloPreventivo(){
       }
     }
     showToast('Preventivo guardado ✓','success');
-    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes()]);
+    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadAprobaciones()]);
     calcAlertas(); volverListaService();
   }catch(e){showToast('Error: '+e.message,true);}
   finally{document.getElementById('btnGuardarPreventivo').disabled=false;}
@@ -3211,7 +3239,7 @@ async function guardarPlanilla(){
       }
     }
     showToast('Planilla guardada ✓ — '+Object.keys(servicePlanilla).length+' equipo(s)','success');
-    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig()]);
+    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
     calcAlertas();volverListaService();
   }catch(e){showToast('Error: '+e.message,true);}
   finally{document.getElementById('btnGuardarPlanilla').disabled=false;}
@@ -3222,9 +3250,13 @@ async function guardarPlanilla(){
 // ══════════════════════════════════════════
 async function loadAprobaciones(){
   try{
-    aprobaciones=await api('preventivos_aprobacion?select=*&order=created_at.desc');
-    if(!aprobaciones) aprobaciones=[];
-  }catch(e){aprobaciones=[];}
+    const res=await api('preventivos_aprobacion?select=*&order=created_at.desc');
+    aprobaciones=res||[];
+    console.log('[Aprobaciones] cargadas:',aprobaciones.length,aprobaciones);
+  }catch(e){
+    console.error('[Aprobaciones] error al cargar:',e);
+    aprobaciones=[];
+  }
 }
 
 function renderAprobaciones(){
