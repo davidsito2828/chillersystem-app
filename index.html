@@ -2436,16 +2436,16 @@ function renderIntervItem(i){
   if(i.notas) html+='<div class="interv-rep">📝 '+i.notas+'</div>';
   html+=lecHtml;
   // ARCHIVOS ADJUNTOS — fotos + informe de aprobación
-  const aprobacion=aprobaciones.find(a=>a.intervencion_id===i.id);
+  const aprobacion=(window._aprobacionesByInterv&&window._aprobacionesByInterv[i.id])||aprobaciones.find(a=>a.intervencion_id===i.id);
   const tieneFotos=i.fotos&&i.fotos.length;
-  const tieneInforme=aprobacion&&aprobacion.informe_url;
+  const tieneInforme=aprobacion&&aprobacion.pdf_url;
   if(tieneFotos||tieneInforme){
     html+='<div style="margin-top:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;">';
     html+='<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:6px;">📎 Archivos adjuntos</div>';
     if(tieneInforme){
       const esAprobado=aprobacion.estado==='aprobado';
       html+=`<div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
-      html+=`<a href="${aprobacion.informe_url}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--accent);color:#fff;border-radius:5px;font-size:11px;font-weight:600;text-decoration:none;">📄 Ver orden de trabajo</a>`;
+      html+=`<a href="${aprobacion.pdf_url}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--accent);color:#fff;border-radius:5px;font-size:11px;font-weight:600;text-decoration:none;">📄 Ver orden de trabajo</a>`;
       if(esAprobado) html+=`<span class="badge-aprobado" style="font-size:10px;">✅ Aprobado por ${aprobacion.aprobado_por||'admin'}</span>`;
       else html+=`<span class="badge-pendiente" style="font-size:10px;">⏳ Pendiente aprobación</span>`;
       html+='</div>';
@@ -2542,8 +2542,8 @@ function renderHistDetalle(){
         ${esAprobado
           ?`<span class="badge-aprobado" style="margin-left:auto;">✅ Aprobado por: ${a.aprobado_por||'admin'}</span>`
           :`<span class="badge-pendiente" style="margin-left:auto;">⏳ Pendiente aprobación</span>`}
-        ${esAprobado&&a.informe_url
-          ?`<a href="${a.informe_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
+        ${esAprobado&&a.pdf_url
+          ?`<a href="${a.pdf_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
           :esAprobado?'<span style="font-size:11px;color:var(--text-dim);">⏳ Procesando</span>'
           :''}
       </div>`;
@@ -3109,9 +3109,11 @@ function setServiceTipo(tipo){
   btn.textContent=esPrev?'✅ Confirmar preventivo':'🔴 Registrar correctivo';
 }
 function guardarServiceEq(){
+  if(guardarServiceEq._running) return;
+  guardarServiceEq._running=true;
   const eqId=document.getElementById('serviceEqId').value;
   const tipo=document.getElementById('sTipo').value;
-  if(!tipo){showToast('Elegí el tipo de trabajo: Preventivo o Correctivo',true);return;}
+  if(!tipo){guardarServiceEq._running=false;showToast('Elegí el tipo de trabajo: Preventivo o Correctivo',true);return;}
   // Si es preventivo y hay tareas marcadas no incluidas aún, agregarlas al trabajo
   let trabajo=document.getElementById('sTrabajoRealizado').value.trim();
   const tareasChecked=tipo==='Preventivo'?_getTareasChecked():[];
@@ -3120,7 +3122,7 @@ function guardarServiceEq(){
   }
   const descCorrectivo=document.getElementById('sDescCorrectivo').value.trim()||null;
   const necesitaResolucion=document.getElementById('sNecesitaResolucion').value.trim()||null;
-  if(tipo==='Correctivo'&&!descCorrectivo){showToast('Describí el problema detectado',true);return;}
+  if(tipo==='Correctivo'&&!descCorrectivo){guardarServiceEq._running=false;showToast('Describí el problema detectado',true);return;}
   const lecturas={
     temperatura_inyeccion:parseFloat(document.getElementById('sTempInyeccion').value)||null,
     temperatura_retorno:parseFloat(document.getElementById('sTempRetorno').value)||null,
@@ -3144,6 +3146,7 @@ function guardarServiceEq(){
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
   showToast('Equipo confirmado ✓','success');
+  guardarServiceEq._running=false;
 }
 async function guardarSoloPreventivo(){
   const firma=document.getElementById('firmaDigital').value.trim();
@@ -3288,6 +3291,8 @@ async function loadAprobaciones(){
   try{
     const res=await api('preventivos_aprobacion?select=*&order=created_at.desc');
     aprobaciones=res||[];
+    window._aprobacionesByInterv={};
+    aprobaciones.forEach(a=>{if(a.intervencion_id)window._aprobacionesByInterv[a.intervencion_id]=a;});
     console.log('[Aprobaciones] cargadas:',aprobaciones.length,aprobaciones);
   }catch(e){
     console.error('[Aprobaciones] error al cargar:',e);
@@ -3323,8 +3328,8 @@ function renderAprobaciones(){
       <td>
         ${esPendiente
           ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarPreventivo('${a.id}')">✅ Aprobar y enviar</button>`
-          :a.informe_url
-          ?`<a href="${a.informe_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
+          :a.pdf_url
+          ?`<a href="${a.pdf_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
           :'—'
         }
       </td>
@@ -3415,7 +3420,7 @@ ${firmaImg}
     // Actualizar registro (con o sin URL de informe)
     await api(`preventivos_aprobacion?id=eq.${aprobId}`,{method:'PATCH',body:JSON.stringify({
       estado:'aprobado',
-      informe_url:url||null,
+      pdf_url:url||null,
       aprobado_por:usuarioActual?.nombre||'admin',
       fecha_aprobacion:new Date().toISOString()
     }),headers:{...H,'Prefer':'return=minimal'}});
