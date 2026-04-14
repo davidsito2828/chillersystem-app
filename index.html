@@ -840,6 +840,25 @@ tbody tr:hover{background:#f8faff;}
             <input class="form-input" id="firmaDigital" placeholder="Nombre completo como firma de confirmación"/>
           </div>
         </div>
+        <!-- CONFORMIDAD DEL CLIENTE -->
+        <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;">
+          <div style="font-size:10px;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase;font-weight:700;margin-bottom:10px;">✍️ Conformidad del cliente</div>
+          <div class="form-group full" style="margin-bottom:10px;">
+            <label class="form-label">Nombre del cliente que firma (opcional)</label>
+            <input class="form-input" id="sNombreFirmante" placeholder="Nombre y apellido del responsable"/>
+          </div>
+          <div style="margin-bottom:6px;font-size:11px;color:var(--text-dim);font-weight:600;">Opción A — Firma manuscrita:</div>
+          <canvas id="firmaClienteCanvas" style="width:100%;height:160px;border:1.5px dashed var(--border);border-radius:6px;background:#fff;cursor:crosshair;touch-action:none;display:block;box-sizing:border-box;"></canvas>
+          <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-secondary" type="button" onclick="limpiarFirmaCanvas()" style="padding:4px 12px;font-size:12px;">🗑 Limpiar</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin:10px 0;">
+            <div style="flex:1;height:1px;background:var(--border);"></div>
+            <span style="color:var(--text-dim);font-size:11px;">ó</span>
+            <div style="flex:1;height:1px;background:var(--border);"></div>
+          </div>
+          <button class="btn-secondary" type="button" onclick="confirmarConformidadClick()" id="sBtnConformidadClick" style="width:100%;padding:9px;font-size:13px;font-weight:700;">✅ Confirmo conformidad sin firma manuscrita</button>
+        </div>
         <!-- BOTONES GUARDAR -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">
           <button id="btnGuardarPreventivo" onclick="guardarSoloPreventivo()"
@@ -940,21 +959,6 @@ tbody tr:hover{background:#f8faff;}
           <input class="form-input" id="sRepuestos" placeholder="Filtros, correas, aceite, gas refrigerante..."/>
         </div>
 
-      </div>
-
-      <!-- CONFORMIDAD DEL CLIENTE (solo preventivo) -->
-      <div id="sFirmaClienteGroup" class="firma-canvas-wrap" style="display:none;">
-        <div class="firma-canvas-title">✍️ Conformidad del cliente</div>
-        <canvas id="firmaClienteCanvas"></canvas>
-        <div class="firma-canvas-btns">
-          <button class="btn-secondary" type="button" onclick="limpiarFirmaCanvas()" style="padding:4px 12px;font-size:12px;">🗑 Limpiar</button>
-          <span style="color:var(--text-dim);font-size:11px;">— o —</span>
-          <button class="btn-secondary" type="button" onclick="confirmarConformidadClick()" id="sBtnConformidadClick" style="padding:4px 12px;font-size:12px;flex:1;">✅ Confirmo conformidad (sin firma)</button>
-        </div>
-        <div class="form-group" style="margin-top:8px;">
-          <label class="form-label">Nombre del cliente que firma (opcional)</label>
-          <input class="form-input" id="sNombreFirmante" placeholder="Nombre y apellido del responsable"/>
-        </div>
       </div>
 
       <div class="form-actions" style="flex-wrap:wrap;gap:8px;">
@@ -2476,6 +2480,28 @@ function renderHistDetalle(){
     </div>`;
   }).join('');
   document.getElementById('histCount').textContent=c.nombre+' · '+total+' registro(s)';
+
+  // INFORMES DE PREVENTIVO APROBADOS para este cliente
+  const informesCliente=aprobaciones.filter(a=>a.cliente_id===histClienteActual&&a.estado==='aprobado'&&a.informe_url);
+  if(informesCliente.length){
+    let informesHTML='<div style="margin-top:20px;padding-top:14px;border-top:2px solid var(--green-border);">';
+    informesHTML+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">';
+    informesHTML+='<span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:var(--green);">📄 Informes de preventivo aprobados</span>';
+    informesHTML+='<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+informesCliente.length+' informe(s)</span>';
+    informesHTML+='</div>';
+    informesHTML+=informesCliente.map(a=>{
+      const eqI=equipos.find(e=>e.id===a.equipo_id);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:6px;margin-bottom:6px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:var(--text-dim);">${fmtF(a.fecha_servicio)}</span>
+        <span style="font-weight:600;font-size:12px;">${eqI?eqI.nombre:'Equipo'}</span>
+        <span style="font-size:11px;color:var(--text-dim);">· ${a.tecnico||'—'}</span>
+        <span class="badge-aprobado" style="margin-left:auto;">✅ Aprobado por: ${a.aprobado_por||'admin'}</span>
+        <a href="${a.informe_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
+      </div>`;
+    }).join('');
+    informesHTML+='</div>';
+    el.innerHTML+=informesHTML;
+  }
 }
 
 function volverHistClientes(){
@@ -2648,6 +2674,8 @@ function mostrarTabService(){
   document.getElementById('firmaFecha').value=hoy;
   if(usuarioActual) document.getElementById('firmaTecnico').value=usuarioActual.nombre;
   calcCorrectivosAlert();
+  // Init firma canvas (canvas is in the service panel, always visible)
+  setTimeout(initFirmaCanvas, 80);
 }
 function calcCorrectivosAlert(){
   const correctivos=intervenciones.filter(i=>i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto&&!dismissedAlertas.has('corr-'+i.id));
@@ -2782,8 +2810,6 @@ function abrirServiceEq(eqId){
     setServiceTipo(p.tipo||'Preventivo');
   }
   document.getElementById('mServiceEq').classList.add('open');
-  // Init canvas after modal is visible (needs layout for offsetWidth)
-  setTimeout(initFirmaCanvas, 80);
 }
 
 function _renderTareasService(eq){
@@ -2908,6 +2934,15 @@ function imprimirOrdenTrabajo(){
     ['Corriente Comp.',lec.amp,'A'],['Carga de gas',lec.gas,'']
   ].filter(r=>r[1]);
 
+  // Firma del cliente desde el panel global del service
+  const firmaOT=getFirmaData();
+  const nombreFirmanteOT=document.getElementById('sNombreFirmante')?.value.trim()||'';
+  const firmaClienteHTML=firmaOT.base64==='click_confirmado'
+    ?`<div style="padding:10px;color:#059669;font-size:12px;font-weight:700;border:1px solid #a7f3d0;border-radius:4px;background:#ecfdf5;">✅ Conformidad confirmada digitalmente${nombreFirmanteOT?' — '+nombreFirmanteOT:''}<br/><span style="font-size:10px;font-weight:400;">${new Date().toLocaleString('es-AR')}</span></div>`
+    :firmaOT.base64
+    ?`<img src="${firmaOT.base64}" style="max-width:240px;max-height:100px;border:1px solid #ccc;border-radius:4px;display:block;"/>${nombreFirmanteOT?`<div style="font-size:10px;color:#777;margin-top:4px;">${nombreFirmanteOT}</div>`:''}`
+    :'<div style="height:60px;border:1px dashed #ccc;border-radius:4px;"></div>';
+
   const w=window.open('','_blank','width=820,height=950');
   w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
 <title>Orden de Trabajo #${nOrden}</title>
@@ -2970,7 +3005,10 @@ ${trabajo?`<h2>Trabajo realizado / Observaciones</h2>
 
 <div style="display:flex;justify-content:space-between;margin-top:16px;">
   <div class="firma-area">${tecnico}<br/><span style="font-size:10px;color:#777;">Firma del Técnico</span></div>
-  <div class="firma-area">&nbsp;<br/><span style="font-size:10px;color:#777;">Conformidad del Cliente</span></div>
+  <div class="firma-area" style="text-align:left;min-width:240px;">
+    ${firmaClienteHTML}
+    <div style="margin-top:6px;font-size:10px;color:#777;text-align:center;">Conformidad del Cliente</div>
+  </div>
 </div>
 
 <div class="footer">ChillerService S.A. · Esmeralda 762 2°B Cap.Fed. · Tel.: 5032-4033 — Generada: ${new Date().toLocaleDateString('es-AR')}</div>
@@ -3009,7 +3047,6 @@ function setServiceTipo(tipo){
   document.getElementById('sNecesitaGroup').style.display=esPrev?'none':'';
   document.getElementById('sRepuestosGroup').style.display=esPrev?'':'none';
   document.getElementById('sBtnImprimir').style.display=esPrev?'':'none';
-  document.getElementById('sFirmaClienteGroup').style.display=esPrev?'block':'none';
   // Si es preventivo y el campo trabajo está vacío, pre-poblar con tareas marcadas
   if(esPrev){
     const campo=document.getElementById('sTrabajoRealizado');
@@ -3044,7 +3081,6 @@ function guardarServiceEq(){
     corriente_compresor:parseFloat(document.getElementById('sCorrienteComp').value)||null,
     carga_gas:document.getElementById('sCargaGas').value.trim()||null
   };
-  const firmaData=getFirmaData();
   servicePlanilla[eqId]={
     tipo,
     trabajo:trabajo||null,
@@ -3055,10 +3091,7 @@ function guardarServiceEq(){
     repuestos:document.getElementById('sRepuestos').value.trim()||null,
     fotos_nuevas:serviceFotosNuevas,
     fotos:[],
-    tareas_realizadas:tareasChecked,
-    firma_cliente:firmaData.base64,
-    firma_tipo:firmaData.tipo,
-    nombre_firmante:document.getElementById('sNombreFirmante')?.value.trim()||null
+    tareas_realizadas:tareasChecked
   };
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
@@ -3119,6 +3152,9 @@ async function guardarPlanilla(){
   if(!firma){showToast('Completá la firma digital',true);return;}
   if(!fecha){showToast('Ingresá la fecha',true);return;}
   if(!Object.keys(servicePlanilla).length){showToast('Registrá al menos un equipo',true);return;}
+  // Capturar firma del cliente UNA vez (panel global del service)
+  const firmaClienteData=getFirmaData();
+  const nombreFirmante=document.getElementById('sNombreFirmante')?.value.trim()||null;
   showToast('Guardando planilla...');
   document.getElementById('btnGuardarPlanilla').disabled=true;
   try{
@@ -3159,16 +3195,16 @@ async function guardarPlanilla(){
           }
         }
         // Guardar aprobación pendiente si hay firma del cliente
-        if(p.firma_cliente&&intervId){
+        if(firmaClienteData.base64&&intervId){
           await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
             intervencion_id:intervId,
             cliente_id:serviceClienteActual,
             equipo_id:eqId,
             tecnico:tecnico||firma,
             fecha_servicio:fecha,
-            firma_cliente:p.firma_cliente,
-            firma_tipo:p.firma_tipo||'click',
-            nombre_firmante:p.nombre_firmante||null,
+            firma_cliente:firmaClienteData.base64,
+            firma_tipo:firmaClienteData.tipo||'click',
+            nombre_firmante:nombreFirmante,
             estado:'pendiente'
           }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
         }
