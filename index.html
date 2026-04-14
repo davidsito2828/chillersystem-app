@@ -577,6 +577,20 @@ tbody tr:hover{background:#f8faff;}
   .stat-mini-num{font-size:18px;}
   table{min-width:500px;}
 }
+/* ── FIRMA CANVAS ── */
+.firma-canvas-wrap{border-top:1px solid var(--border);padding-top:14px;margin-top:6px;}
+.firma-canvas-title{font-size:10px;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:8px;}
+#firmaClienteCanvas{width:100%;height:150px;border:1.5px solid var(--border);border-radius:6px;background:#fff;cursor:crosshair;touch-action:none;display:block;box-sizing:border-box;}
+#firmaClienteCanvas.has-firma{border-color:var(--green);}
+.firma-canvas-btns{display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap;}
+/* ── APROBACIONES PANEL ── */
+.aprob-table{width:100%;border-collapse:collapse;font-size:12px;}
+.aprob-table th{background:var(--bg4);color:var(--text-dim);font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:8px 10px;text-align:left;font-weight:600;border-bottom:1px solid var(--border);}
+.aprob-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.aprob-table tr:last-child td{border-bottom:none;}
+.aprob-firma-thumb{max-width:80px;max-height:40px;border:1px solid var(--border);border-radius:4px;object-fit:contain;background:#fff;}
+.badge-pendiente{background:#fef9c3;color:#92400e;border:1px solid #fde68a;border-radius:12px;padding:2px 9px;font-size:10px;font-weight:700;}
+.badge-aprobado{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);border-radius:12px;padding:2px 9px;font-size:10px;font-weight:700;}
 /* ── ORDEN DE TRABAJO PDF ── */
 #ordenPdfContainer{position:absolute;left:-9999px;top:0;width:190mm;background:#fff;font-family:Arial,sans-serif;font-size:11px;color:#111;padding:16px;box-sizing:border-box;}
 .ot-header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px;}
@@ -686,6 +700,7 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn admin-only" id="tabPpto" onclick="showTab('presupuestos',this)">💼 Presupuestos</button>
   <button class="nav-btn admin-only" id="tabInformes" onclick="showTab('informes',this)">📊 Informes</button>
   <button class="nav-btn admin-only" id="tabTareas" onclick="showTab('tareas',this)">⚙️ Config. Tareas</button>
+  <button class="nav-btn admin-only" id="tabAprobaciones" onclick="showTab('aprobaciones',this)">✅ Aprobaciones</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -926,6 +941,22 @@ tbody tr:hover{background:#f8faff;}
         </div>
 
       </div>
+
+      <!-- CONFORMIDAD DEL CLIENTE (solo preventivo) -->
+      <div id="sFirmaClienteGroup" class="firma-canvas-wrap" style="display:none;">
+        <div class="firma-canvas-title">✍️ Conformidad del cliente</div>
+        <canvas id="firmaClienteCanvas"></canvas>
+        <div class="firma-canvas-btns">
+          <button class="btn-secondary" type="button" onclick="limpiarFirmaCanvas()" style="padding:4px 12px;font-size:12px;">🗑 Limpiar</button>
+          <span style="color:var(--text-dim);font-size:11px;">— o —</span>
+          <button class="btn-secondary" type="button" onclick="confirmarConformidadClick()" id="sBtnConformidadClick" style="padding:4px 12px;font-size:12px;flex:1;">✅ Confirmo conformidad (sin firma)</button>
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <label class="form-label">Nombre del cliente que firma (opcional)</label>
+          <input class="form-input" id="sNombreFirmante" placeholder="Nombre y apellido del responsable"/>
+        </div>
+      </div>
+
       <div class="form-actions" style="flex-wrap:wrap;gap:8px;">
         <button class="btn-secondary" onclick="cerrar('mServiceEq')">Cancelar</button>
         <button class="btn-secondary" id="sBtnImprimir" onclick="imprimirOrdenTrabajo()" style="display:none;">🖨️ Imprimir orden</button>
@@ -1201,6 +1232,27 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- ═══ APROBACIONES ═══ -->
+<div id="tab-aprobaciones" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">✅ Aprobaciones de Preventivos</div>
+      <div class="panel-count" id="aprobCount">—</div>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+      <select class="search-box" style="width:auto;" id="filtroAprobEstado" onchange="renderAprobaciones()">
+        <option value="">Todos</option>
+        <option value="pendiente">Pendientes</option>
+        <option value="aprobado">Aprobados</option>
+      </select>
+      <button class="btn-secondary" style="padding:5px 12px;font-size:12px;" onclick="loadAprobaciones().then(renderAprobaciones)">↻ Actualizar</button>
+    </div>
+  </div>
+  <div id="aprobBody">
+    <div class="loading"><span class="spinner"></span>Cargando...</div>
+  </div>
+</div>
+
 <!-- MODAL INFORME -->
 <div class="modal-overlay" id="mInforme">
   <div class="modal" style="max-width:700px;">
@@ -1455,6 +1507,7 @@ let eqFotosNuevas=[],intervFotosNuevas=[];
 let tareasConfig=[];    // configuración de tareas desde Supabase
 let tareasRealizadas=[]; // historial de tareas realizadas por equipo
 let dismissedAlertas=new Set(); // alertas descartadas temporalmente
+let aprobaciones=[]; // preventivos pendientes/aprobados
 
 // ══════════════════════════════════════════
 //  MOTOR DE MANTENIMIENTO
@@ -1530,6 +1583,79 @@ const _TAREAS_GENERICAS={
 function dismissAlerta(key){
   dismissedAlertas.add(key);
   calcAlertas();
+}
+
+// ══════════════════════════════════════════
+//  FIRMA DIGITAL CANVAS
+// ══════════════════════════════════════════
+function initFirmaCanvas(){
+  const canvas=document.getElementById('firmaClienteCanvas');
+  if(!canvas)return;
+  // Reset click-confirmation button
+  const clickBtn=document.getElementById('sBtnConformidadClick');
+  if(clickBtn){clickBtn.style.background='';clickBtn.style.color='';clickBtn.textContent='✅ Confirmo conformidad (sin firma)';}
+  document.getElementById('sNombreFirmante').value='';
+  canvas.classList.remove('has-firma');
+  // Set proper pixel dimensions
+  const w=canvas.offsetWidth||canvas.parentElement?.offsetWidth||300;
+  canvas.width=w;
+  canvas.height=150;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,0,w,150);
+  // Remove old listeners by replacing node
+  const fresh=canvas.cloneNode(false);
+  canvas.parentNode.replaceChild(fresh,canvas);
+  fresh.width=w; fresh.height=150;
+  const ctx2=fresh.getContext('2d');
+  ctx2.fillStyle='#fff'; ctx2.fillRect(0,0,w,150);
+  ctx2.strokeStyle='#111'; ctx2.lineWidth=2.5; ctx2.lineCap='round'; ctx2.lineJoin='round';
+  let drawing=false,lx=0,ly=0;
+  function pos(e){
+    const r=fresh.getBoundingClientRect();
+    const sx=fresh.width/r.width, sy=fresh.height/r.height;
+    if(e.touches) return {x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};
+    return {x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};
+  }
+  fresh.addEventListener('mousedown',e=>{drawing=true;const p=pos(e);lx=p.x;ly=p.y;});
+  fresh.addEventListener('mousemove',e=>{if(!drawing)return;const p=pos(e);ctx2.beginPath();ctx2.moveTo(lx,ly);ctx2.lineTo(p.x,p.y);ctx2.stroke();lx=p.x;ly=p.y;fresh.classList.add('has-firma');});
+  fresh.addEventListener('mouseup',()=>drawing=false);
+  fresh.addEventListener('mouseleave',()=>drawing=false);
+  fresh.addEventListener('touchstart',e=>{drawing=true;const p=pos(e);lx=p.x;ly=p.y;e.preventDefault();},{passive:false});
+  fresh.addEventListener('touchmove',e=>{if(!drawing)return;const p=pos(e);ctx2.beginPath();ctx2.moveTo(lx,ly);ctx2.lineTo(p.x,p.y);ctx2.stroke();lx=p.x;ly=p.y;fresh.classList.add('has-firma');e.preventDefault();},{passive:false});
+  fresh.addEventListener('touchend',()=>drawing=false);
+}
+function limpiarFirmaCanvas(){
+  const canvas=document.getElementById('firmaClienteCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  canvas.classList.remove('has-firma');
+  const btn=document.getElementById('sBtnConformidadClick');
+  if(btn){btn.style.background='';btn.style.color='';btn.textContent='✅ Confirmo conformidad (sin firma)';}
+}
+function confirmarConformidadClick(){
+  const btn=document.getElementById('sBtnConformidadClick');
+  btn.style.background='var(--green)'; btn.style.color='#fff';
+  btn.textContent='✅ Conformidad confirmada';
+  // Write confirmation text on canvas
+  const canvas=document.getElementById('firmaClienteCanvas');
+  if(canvas){
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#059669'; ctx.font='bold 15px Arial'; ctx.textAlign='center';
+    ctx.fillText('✓ Conformidad confirmada digitalmente',canvas.width/2,canvas.height/2-8);
+    const nombre=document.getElementById('sNombreFirmante')?.value;
+    if(nombre){ctx.font='12px Arial';ctx.fillStyle='#374151';ctx.fillText(nombre,canvas.width/2,canvas.height/2+14);}
+    canvas.classList.add('has-firma');
+  }
+}
+function getFirmaData(){
+  const btn=document.getElementById('sBtnConformidadClick');
+  if(btn&&btn.textContent.includes('confirmada')) return {base64:'click_confirmado',tipo:'click'};
+  const canvas=document.getElementById('firmaClienteCanvas');
+  if(!canvas||!canvas.classList.contains('has-firma')) return {base64:null,tipo:null};
+  return {base64:canvas.toDataURL('image/png'),tipo:'canvas'};
 }
 
 function calcularFrecuenciaRecomendada(tipo){
@@ -1652,7 +1778,7 @@ async function iniciarApp(){
   }
   try{
     await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos(),loadInformes(),loadTareasConfig()]);
-    if(isAdmin) await loadUsuarios();
+    if(isAdmin){await loadUsuarios();await loadAprobaciones();}
     setStatus(true); calcAlertas();
   }catch(e){setStatus(false);showToast('Error de conexión',true);}
 }
@@ -2273,6 +2399,16 @@ function renderIntervItem(i){
   html+=lecHtml;
   if(i.fotos&&i.fotos.length) html+=fotosHTML(i.fotos);
 
+  // INFORME APROBADO — badge si existe aprobación para esta intervención
+  const aprobacion=aprobaciones.find(a=>a.intervencion_id===i.id&&a.estado==='aprobado');
+  if(aprobacion){
+    html+='<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+    html+='<span class="badge-aprobado">📄 Informe disponible</span>';
+    if(aprobacion.informe_url) html+=`<a href="${aprobacion.informe_url}" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:underline;">Descargar informe</a>`;
+    html+=`<span style="font-size:10px;color:var(--text-dim);">Aprobado por ${aprobacion.aprobado_por||'admin'} · ${fmtF((aprobacion.fecha_aprobacion||'').split('T')[0])}</span>`;
+    html+='</div>';
+  }
+
   // CADENA CORRECTIVO — solo lectura
   if(esCorrectivo){
     html+='<div style="margin-top:10px;padding:8px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--border);">';
@@ -2646,6 +2782,8 @@ function abrirServiceEq(eqId){
     setServiceTipo(p.tipo||'Preventivo');
   }
   document.getElementById('mServiceEq').classList.add('open');
+  // Init canvas after modal is visible (needs layout for offsetWidth)
+  setTimeout(initFirmaCanvas, 80);
 }
 
 function _renderTareasService(eq){
@@ -2871,6 +3009,7 @@ function setServiceTipo(tipo){
   document.getElementById('sNecesitaGroup').style.display=esPrev?'none':'';
   document.getElementById('sRepuestosGroup').style.display=esPrev?'':'none';
   document.getElementById('sBtnImprimir').style.display=esPrev?'':'none';
+  document.getElementById('sFirmaClienteGroup').style.display=esPrev?'block':'none';
   // Si es preventivo y el campo trabajo está vacío, pre-poblar con tareas marcadas
   if(esPrev){
     const campo=document.getElementById('sTrabajoRealizado');
@@ -2905,6 +3044,7 @@ function guardarServiceEq(){
     corriente_compresor:parseFloat(document.getElementById('sCorrienteComp').value)||null,
     carga_gas:document.getElementById('sCargaGas').value.trim()||null
   };
+  const firmaData=getFirmaData();
   servicePlanilla[eqId]={
     tipo,
     trabajo:trabajo||null,
@@ -2915,7 +3055,10 @@ function guardarServiceEq(){
     repuestos:document.getElementById('sRepuestos').value.trim()||null,
     fotos_nuevas:serviceFotosNuevas,
     fotos:[],
-    tareas_realizadas:tareasChecked
+    tareas_realizadas:tareasChecked,
+    firma_cliente:firmaData.base64,
+    firma_tipo:firmaData.tipo,
+    nombre_firmante:document.getElementById('sNombreFirmante')?.value.trim()||null
   };
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
@@ -2996,15 +3139,14 @@ async function guardarPlanilla(){
         correctivo_resuelto:p.tipo==='Correctivo'?false:null,
         lecturas_operativas:p.lecturas_operativas||null,
         firma:firma,es_planilla:true};
-      await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+      const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
+      const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
       if(p.tipo!=='Correctivo'){
         const eq=equipos.find(e=>e.id===eqId);
         const frec=eq?eq.frecuencia_dias||30:30;
         await api('equipos?id=eq.'+eqId,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
         // Guardar historial de tareas realizadas (si hay datos de BD)
         if(tareasConfig.length&&p.tareas_realizadas&&p.tareas_realizadas.length){
-          // Obtener id de la intervención recién creada para referenciarla
-          const intvsRecientes=await api(`tareas_realizadas?select=id&equipo_id=eq.${eqId}&order=created_at.desc&limit=1`).catch(()=>null);
           for(const t of p.tareas_realizadas){
             if(!t.tarea_id)continue;
             await api('tareas_realizadas',{method:'POST',body:JSON.stringify({
@@ -3016,6 +3158,20 @@ async function guardarPlanilla(){
             }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
           }
         }
+        // Guardar aprobación pendiente si hay firma del cliente
+        if(p.firma_cliente&&intervId){
+          await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
+            intervencion_id:intervId,
+            cliente_id:serviceClienteActual,
+            equipo_id:eqId,
+            tecnico:tecnico||firma,
+            fecha_servicio:fecha,
+            firma_cliente:p.firma_cliente,
+            firma_tipo:p.firma_tipo||'click',
+            nombre_firmante:p.nombre_firmante||null,
+            estado:'pendiente'
+          }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+        }
       }
     }
     showToast('Planilla guardada ✓ — '+Object.keys(servicePlanilla).length+' equipo(s)','success');
@@ -3023,6 +3179,153 @@ async function guardarPlanilla(){
     calcAlertas();volverListaService();
   }catch(e){showToast('Error: '+e.message,true);}
   finally{document.getElementById('btnGuardarPlanilla').disabled=false;}
+}
+
+// ══════════════════════════════════════════
+//  APROBACIONES DE PREVENTIVOS
+// ══════════════════════════════════════════
+async function loadAprobaciones(){
+  try{
+    aprobaciones=await api('preventivos_aprobacion?select=*&order=created_at.desc');
+    if(!aprobaciones) aprobaciones=[];
+  }catch(e){aprobaciones=[];}
+}
+
+function renderAprobaciones(){
+  const filtro=document.getElementById('filtroAprobEstado')?.value||'';
+  const lista=filtro?aprobaciones.filter(a=>a.estado===filtro):aprobaciones;
+  document.getElementById('aprobCount').textContent=lista.length+' registro(s)';
+  const el=document.getElementById('aprobBody');
+  if(!lista.length){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Sin registros de aprobación</div><div class="empty-sub">Los preventivos con firma del cliente aparecerán aquí.</div></div>';
+    return;
+  }
+  const rows=lista.map(a=>{
+    const cli=clientes.find(c=>c.id===a.cliente_id);
+    const eq=equipos.find(e=>e.id===a.equipo_id);
+    const esPendiente=a.estado==='pendiente';
+    const firmaHtml=a.firma_cliente==='click_confirmado'
+      ?'<span style="color:var(--green);font-size:11px;">✅ Click</span>'
+      :a.firma_tipo==='canvas'&&a.firma_cliente
+      ?`<img src="${a.firma_cliente}" class="aprob-firma-thumb" alt="firma"/>`
+      :'—';
+    return `<tr>
+      <td class="td-mono" style="font-size:11px;">${fmtF(a.fecha_servicio)}</td>
+      <td style="font-weight:600;">${cli?cli.nombre:'—'}</td>
+      <td>${eq?eq.nombre:'—'}</td>
+      <td>${a.tecnico||'—'}</td>
+      <td>${firmaHtml}${a.nombre_firmante?`<div style="font-size:10px;color:var(--text-dim);">${a.nombre_firmante}</div>`:''}</td>
+      <td><span class="${esPendiente?'badge-pendiente':'badge-aprobado'}">${esPendiente?'⏳ Pendiente':'✅ Aprobado'}</span></td>
+      <td>
+        ${esPendiente
+          ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarPreventivo('${a.id}')">✅ Aprobar y enviar</button>`
+          :a.informe_url
+          ?`<a href="${a.informe_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
+          :'—'
+        }
+      </td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<div style="overflow-x:auto;"><table class="aprob-table">
+    <thead><tr>
+      <th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Técnico</th><th>Firma</th><th>Estado</th><th>Acción</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+async function subirInformeHTML(htmlContent, nombre){
+  const blob=new Blob([htmlContent],{type:'text/html;charset=utf-8'});
+  const r=await fetch(SURL+'/storage/v1/object/informes-preventivos/'+nombre,{
+    method:'POST',
+    headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'text/html','x-upsert':'true'},
+    body:blob
+  });
+  if(r.ok) return SURL+'/storage/v1/object/public/informes-preventivos/'+nombre;
+  const err=await r.json().catch(()=>({}));
+  throw new Error(err.error||'Error al subir informe: '+r.status);
+}
+
+async function aprobarPreventivo(aprobId){
+  const a=aprobaciones.find(x=>x.id===aprobId);
+  if(!a){showToast('Registro no encontrado',true);return;}
+  const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente',telefono:null};
+  const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'Equipo'};
+  const fechaFmt=fmtF(a.fecha_servicio);
+  const interv=intervenciones.find(i=>i.id===a.intervencion_id)||{};
+
+  // Construir HTML del informe
+  const firmaImg=a.firma_cliente==='click_confirmado'
+    ?'<div style="padding:8px;color:#059669;font-weight:700;">✅ Conformidad confirmada digitalmente</div>'
+    :a.firma_cliente
+    ?`<img src="${a.firma_cliente}" style="max-width:200px;max-height:80px;border:1px solid #ccc;border-radius:4px;"/>`
+    :'';
+  const informeHTML=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+<title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
+  h1{font-size:20px;font-weight:900;font-style:italic;}
+  h2{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:18px 0 10px;}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px;}
+  td,th{border:1px solid #bbb;padding:5px 9px;font-size:11px;vertical-align:top;}
+  th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
+  .hdr td{border:none;vertical-align:middle;}
+  .footer{margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center;}
+</style></head><body>
+<table class="hdr" style="margin-bottom:20px;">
+  <tr>
+    <td style="width:60%;"><h1>ChillerService S.A.</h1><div style="font-size:11px;color:#555;">Servicios e Instalaciones Termomecánicas</div></td>
+    <td style="text-align:right;line-height:1.7;">
+      <strong style="font-size:13px;">Informe de Preventivo</strong><br/>
+      Fecha: ${fechaFmt}<br/>
+      Técnico: ${a.tecnico||'—'}
+    </td>
+  </tr>
+</table>
+<h2>Datos del servicio</h2>
+<table>
+  <tr><th>Cliente</th><td>${cli.nombre}</td><th>Equipo</th><td>${eq.nombre}</td></tr>
+  <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Fecha</th><td>${fechaFmt}</td></tr>
+</table>
+${interv.descripcion||interv.solucion?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${interv.solucion||interv.descripcion||''}</div>`:''}
+${interv.repuestos?`<h2>Repuestos utilizados</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;">${interv.repuestos}</div>`:''}
+<h2>Conformidad del cliente</h2>
+<table>
+  <tr><th>Nombre</th><td>${a.nombre_firmante||'—'}</td><th>Tipo</th><td>${a.firma_tipo==='canvas'?'Firma manuscrita digital':'Confirmación por click'}</td></tr>
+</table>
+${firmaImg}
+<div class="footer">ChillerService S.A. · Esmeralda 762 2°B Cap.Fed. · Tel.: 5032-4033<br/>Aprobado por: ${usuarioActual?.nombre||'Admin'} — ${new Date().toLocaleDateString('es-AR')}</div>
+</body></html>`;
+
+  showToast('Generando informe...');
+  try{
+    const nombre=`preventivo-${aprobId}.html`;
+    const url=await subirInformeHTML(informeHTML,nombre);
+    // Actualizar registro
+    await api(`preventivos_aprobacion?id=eq.${aprobId}`,{method:'PATCH',body:JSON.stringify({
+      estado:'aprobado',
+      informe_url:url,
+      aprobado_por:usuarioActual?.nombre||'admin',
+      fecha_aprobacion:new Date().toISOString()
+    }),headers:{...H,'Prefer':'return=minimal'}});
+    // Recargar
+    await loadAprobaciones();
+    renderAprobaciones();
+    showToast('✅ Aprobado — abriendo WhatsApp','success');
+    // Abrir WhatsApp
+    const tel=cli.telefono?cli.telefono.replace(/\D/g,''):'';
+    const msg=encodeURIComponent(
+      `Estimado/a ${cli.nombre},\n\n`+
+      `Le informamos que se realizó el service técnico del equipo *${eq.nombre}* el día ${fechaFmt}.\n\n`+
+      `✅ El trabajo fue aprobado y confirmado.\n\n`+
+      `📄 Puede ver y descargar el informe completo aquí:\n${url}\n\n`+
+      `Ante cualquier consulta no dude en contactarnos.\n\n`+
+      `*ChillerService S.A.*`
+    );
+    const waUrl=tel?`https://wa.me/${54}${tel}?text=${msg}`:`https://wa.me/?text=${msg}`;
+    if(!tel) showToast('⚠️ Cliente sin teléfono — completá el número manualmente','');
+    setTimeout(()=>window.open(waUrl,'_blank'),800);
+  }catch(e){showToast('Error: '+e.message,true);}
 }
 
 function abrirResolverCorrectivo(id){
@@ -3079,7 +3382,7 @@ function setFiltro(v,btn){
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas'].forEach(t=>document.getElementById('tab-'+t).style.display=t===id?'block':'none');
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
@@ -3088,6 +3391,7 @@ function showTab(id,btn){
   if(id==='presupuestos'){loadPresupuestos();}
   if(id==='informes'){loadInformes();}
   if(id==='tareas'){renderConfigTareas();}
+  if(id==='aprobaciones'){loadAprobaciones().then(renderAprobaciones);}
 }
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){
