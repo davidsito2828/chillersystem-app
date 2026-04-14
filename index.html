@@ -1003,7 +1003,7 @@ tbody tr:hover{background:#f8faff;}
       </label>
     </div>
     <div class="form-actions">
-      <button class="btn-secondary" onclick="cerrar('mWaEnvio')">Cancelar — solo aprobar</button>
+      <button class="btn-secondary" onclick="cerrar('mWaEnvio')">✅ Solo aprobar sin enviar</button>
       <button class="btn-primary" onclick="enviarWhatsAppModal()">📲 Enviar por WhatsApp</button>
     </div>
   </div>
@@ -3401,15 +3401,21 @@ ${firmaImg}
 <div class="footer">ChillerService S.A. · Esmeralda 762 2°B Cap.Fed. · Tel.: 5032-4033<br/>Aprobado por: ${usuarioActual?.nombre||'Admin'} — ${new Date().toLocaleDateString('es-AR')}</div>
 </body></html>`;
 
-  showToast('Generando informe...');
+  showToast('Aprobando preventivo...');
   try{
-    const fechaArchivo=(a.fecha_servicio||new Date().toISOString().split('T')[0]).replace(/-/g,'');
-    const nombre=`preventivo-${aprobId}-${fechaArchivo}.html`;
-    const url=await subirInformeHTML(informeHTML,nombre);
-    // Actualizar registro
+    // Intentar subir informe a Storage — si falla, continuar igual
+    let url=null;
+    try{
+      const fechaArchivo=(a.fecha_servicio||new Date().toISOString().split('T')[0]).replace(/-/g,'');
+      const nombre=`preventivo-${aprobId}-${fechaArchivo}.html`;
+      url=await subirInformeHTML(informeHTML,nombre);
+    }catch(storageErr){
+      console.warn('[aprobarPreventivo] Storage no disponible, continuando sin URL:',storageErr.message);
+    }
+    // Actualizar registro (con o sin URL de informe)
     await api(`preventivos_aprobacion?id=eq.${aprobId}`,{method:'PATCH',body:JSON.stringify({
       estado:'aprobado',
-      informe_url:url,
+      informe_url:url||null,
       aprobado_por:usuarioActual?.nombre||'admin',
       fecha_aprobacion:new Date().toISOString()
     }),headers:{...H,'Prefer':'return=minimal'}});
@@ -4532,12 +4538,8 @@ function enviarWhatsAppModal(){
   }
   if(!tel){showToast('Ingresá un número de teléfono',true);return;}
   const msg=encodeURIComponent(
-    `Estimado/a ${cli.nombre},\n\n`+
-    `Le informamos que se realizó el service técnico del equipo *${eq.nombre}* el día ${fechaFmt}.\n\n`+
-    `✅ El trabajo fue aprobado y confirmado.\n\n`+
-    (_waInformeUrl?`📄 Puede ver y descargar el informe completo aquí:\n${_waInformeUrl}\n\n`:'')+
-    `Ante cualquier consulta no dude en contactarnos.\n\n`+
-    `*ChillerService S.A.*`
+    `Estimado/a ${cli.nombre}, le informamos que el service técnico del ${fechaFmt} fue completado y aprobado. ✅ El equipo queda operativo. Ante cualquier consulta contáctenos. *ChillerService S.A.*`+
+    (_waInformeUrl?`\n\n📄 Informe: ${_waInformeUrl}`:'')
   );
   const waUrl=`https://wa.me/${tel}?text=${msg}`;
   cerrar('mWaEnvio');
