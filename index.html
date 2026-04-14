@@ -3190,7 +3190,6 @@ async function guardarSoloPreventivo(){
         fecha_servicio:fecha,
         firma_cliente:firmaClienteSP.base64||null,
         firma_tipo:firmaClienteSP.tipo||null,
-        nombre_firmante:nombreFirmanteSP,
         estado:'pendiente'
       }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion insert]',e));
     }
@@ -3270,7 +3269,6 @@ async function guardarPlanilla(){
             fecha_servicio:fecha,
             firma_cliente:firmaClienteData.base64||null,
             firma_tipo:firmaClienteData.tipo||null,
-            nombre_firmante:nombreFirmante,
             estado:'pendiente'
           }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
         }
