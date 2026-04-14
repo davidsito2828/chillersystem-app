@@ -1018,6 +1018,14 @@ tbody tr:hover{background:#f8faff;}
       <div class="form-group"><label class="form-label">Fecha de resolución *</label><input class="form-input" id="resFecha" type="date"/></div>
       <div class="form-group full"><label class="form-label">Técnico que resolvió</label><input class="form-input" id="resTecnico" placeholder="Nombre completo"/></div>
       <div class="form-group full"><label class="form-label">Descripción de la reparación</label><textarea class="form-textarea" id="resDesc" placeholder="Qué se hizo para resolver el correctivo..."></textarea></div>
+      <div class="form-group full">
+        <label class="form-label">📷 Fotos del correctivo realizado</label>
+        <div class="foto-upload-area" onclick="document.getElementById('resFotoInput').click()">
+          <input type="file" id="resFotoInput" accept="image/*" multiple onchange="previewFotos(this,'resFotoPreview','resFotosNuevas')"/>
+          <div style="color:var(--text-dim);font-size:13px;">📷 Subir fotos</div>
+        </div>
+        <div class="foto-preview-grid" id="resFotoPreview"></div>
+      </div>
     </div>
     <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mCorrectivoRes')">Cancelar</button><button class="btn-primary" onclick="guardarResolucionCorrectivo()">💾 Guardar resolución</button></div>
   </div>
@@ -1541,7 +1549,7 @@ let servicePlanilla={}; // {eqId: {trabajo, necesita_correctivo, desc_correctivo
 let serviceClienteActual=null;
 let filtroEmp='todas',filtroHE='',filtroHT='';
 let usuarioActual=null;
-let eqFotosNuevas=[],intervFotosNuevas=[];
+let eqFotosNuevas=[],intervFotosNuevas=[],resFotosNuevas=[];
 let tareasConfig=[];    // configuración de tareas desde Supabase
 let tareasRealizadas=[]; // historial de tareas realizadas por equipo
 let dismissedAlertas=new Set(); // alertas descartadas temporalmente
@@ -2019,6 +2027,7 @@ function proxPrevHTML(eq){
 function previewFotos(input,previewId,varName){
   const files=Array.from(input.files);
   if(varName==='eqFotosNuevas') eqFotosNuevas=files;
+  else if(varName==='resFotosNuevas') resFotosNuevas=files;
   else intervFotosNuevas=files;
   const prev=document.getElementById(previewId);
   prev.innerHTML=files.map((f,i)=>{
@@ -2028,6 +2037,7 @@ function previewFotos(input,previewId,varName){
 }
 function removeFotoPreview(idx,previewId,varName){
   if(varName==='eqFotosNuevas') eqFotosNuevas.splice(idx,1);
+  else if(varName==='resFotosNuevas') resFotosNuevas.splice(idx,1);
   else intervFotosNuevas.splice(idx,1);
   const prev=document.getElementById(previewId);
   const items=prev.querySelectorAll('.foto-preview');
@@ -3378,6 +3388,8 @@ function abrirResolverCorrectivo(id){
   document.getElementById('resFecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('resTecnico').value=usuarioActual?usuarioActual.nombre:'';
   document.getElementById('resDesc').value='';
+  resFotosNuevas=[];
+  document.getElementById('resFotoPreview').innerHTML='';
   document.getElementById('mCorrectivoRes').classList.add('open');
 }
 
@@ -3389,6 +3401,8 @@ async function guardarResolucionCorrectivo(){
   if(!fecha||!tecnico||!descripcion){showToast('Completá todos los campos de resolución',true);return;}
   showToast('Guardando resolución...');
   try{
+    let fotosUrls=[];
+    if(resFotosNuevas.length) fotosUrls=await subirFotos(resFotosNuevas,'correctivos');
     const resolveData={
       equipo_id:(intervenciones.find(x=>x.id===id)||{}).equipo_id||null,
       tipo:'Correctivo',
@@ -3397,7 +3411,7 @@ async function guardarResolucionCorrectivo(){
       descripcion:'Resolución de correctivo: '+descripcion,
       solucion:descripcion,
       notas:null,
-      fotos:[],
+      fotos:fotosUrls,
       necesita_correctivo:false,
       correctivo_resuelto:true,
       lecturas_operativas:null,
@@ -3411,6 +3425,7 @@ async function guardarResolucionCorrectivo(){
     }
     showToast('Correctivo resuelto ✓','success');
     cerrar('mCorrectivoRes');
+    resFotosNuevas=[];
     await loadIntervenciones();
     calcAlertas();
   }catch(e){showToast('Error: '+e.message,true);}
