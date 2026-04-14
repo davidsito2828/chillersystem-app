@@ -978,6 +978,37 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- MODAL WHATSAPP ENVÍO -->
+<div class="modal-overlay" id="mWaEnvio">
+  <div class="modal" style="max-width:440px;">
+    <button class="modal-close" onclick="cerrar('mWaEnvio')">✕</button>
+    <div class="modal-title">📲 Enviar informe al cliente</div>
+    <div style="margin-bottom:14px;">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+        <input type="radio" name="waDestinatario" id="waRadioCliente" value="" onchange="onWaRadioChange('cliente')" style="margin-top:2px;"/>
+        <div>
+          <div style="font-weight:600;font-size:13px;">✅ Enviar al contacto del cliente</div>
+          <div id="waContactoLabel" style="font-size:11px;color:var(--text-dim);margin-top:2px;">—</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px;border:1px solid var(--border);border-radius:8px;">
+        <input type="radio" name="waDestinatario" id="waRadioOtro" value="otro" onchange="onWaRadioChange('otro')" style="margin-top:2px;"/>
+        <div style="width:100%;">
+          <div style="font-weight:600;font-size:13px;">📱 Enviar a otro número</div>
+          <div id="waOtroNumero" style="display:none;margin-top:6px;">
+            <input class="form-input" id="waInputNumero" type="tel" placeholder="Ej: 5491112345678 (sin + ni espacios)" style="width:100%;"/>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Ingresá el número completo con código de país (ej: 5491112345678)</div>
+          </div>
+        </div>
+      </label>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mWaEnvio')">Cancelar — solo aprobar</button>
+      <button class="btn-primary" onclick="enviarWhatsAppModal()">📲 Enviar por WhatsApp</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="mCorrectivoRes">
   <div class="modal" style="max-width:520px;">
     <button class="modal-close" onclick="cerrar('mCorrectivoRes')">✕</button>
@@ -2404,15 +2435,22 @@ function renderIntervItem(i){
   if(i.repuestos) html+='<div class="interv-rep">🔩 '+i.repuestos+'</div>';
   if(i.notas) html+='<div class="interv-rep">📝 '+i.notas+'</div>';
   html+=lecHtml;
-  if(i.fotos&&i.fotos.length) html+=fotosHTML(i.fotos);
-
-  // INFORME APROBADO — badge si existe aprobación para esta intervención
-  const aprobacion=aprobaciones.find(a=>a.intervencion_id===i.id&&a.estado==='aprobado');
-  if(aprobacion){
-    html+='<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
-    html+='<span class="badge-aprobado">📄 Informe disponible</span>';
-    if(aprobacion.informe_url) html+=`<a href="${aprobacion.informe_url}" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:underline;">Descargar informe</a>`;
-    html+=`<span style="font-size:10px;color:var(--text-dim);">Aprobado por ${aprobacion.aprobado_por||'admin'} · ${fmtF((aprobacion.fecha_aprobacion||'').split('T')[0])}</span>`;
+  // ARCHIVOS ADJUNTOS — fotos + informe de aprobación
+  const aprobacion=aprobaciones.find(a=>a.intervencion_id===i.id);
+  const tieneFotos=i.fotos&&i.fotos.length;
+  const tieneInforme=aprobacion&&aprobacion.informe_url;
+  if(tieneFotos||tieneInforme){
+    html+='<div style="margin-top:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;">';
+    html+='<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:6px;">📎 Archivos adjuntos</div>';
+    if(tieneInforme){
+      const esAprobado=aprobacion.estado==='aprobado';
+      html+=`<div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
+      html+=`<a href="${aprobacion.informe_url}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--accent);color:#fff;border-radius:5px;font-size:11px;font-weight:600;text-decoration:none;">📄 Ver orden de trabajo</a>`;
+      if(esAprobado) html+=`<span class="badge-aprobado" style="font-size:10px;">✅ Aprobado por ${aprobacion.aprobado_por||'admin'}</span>`;
+      else html+=`<span class="badge-pendiente" style="font-size:10px;">⏳ Pendiente aprobación</span>`;
+      html+='</div>';
+    }
+    if(tieneFotos) html+=fotosHTML(i.fotos);
     html+='</div>';
   }
 
@@ -3142,16 +3180,16 @@ async function guardarSoloPreventivo(){
     const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
     const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
     console.log('[guardarSoloPreventivo] intervId:',intervId,'firma:',firmaClienteSP.base64?'sí':'no');
-    // Guardar en preventivos_aprobacion si hay firma del cliente
-    if(firmaClienteSP.base64&&intervId){
+    // Guardar en preventivos_aprobacion siempre (con o sin firma)
+    if(intervId){
       await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
         intervencion_id:intervId,
         cliente_id:serviceClienteActual,
         equipo_id:null,
         tecnico:tecnico||firma,
         fecha_servicio:fecha,
-        firma_cliente:firmaClienteSP.base64,
-        firma_tipo:firmaClienteSP.tipo||'click',
+        firma_cliente:firmaClienteSP.base64||null,
+        firma_tipo:firmaClienteSP.tipo||null,
         nombre_firmante:nombreFirmanteSP,
         estado:'pendiente'
       }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion insert]',e));
@@ -3222,16 +3260,16 @@ async function guardarPlanilla(){
             }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
           }
         }
-        // Guardar aprobación pendiente si hay firma del cliente
-        if(firmaClienteData.base64&&intervId){
+        // Guardar aprobación pendiente siempre (con o sin firma)
+        if(intervId){
           await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
             intervencion_id:intervId,
             cliente_id:serviceClienteActual,
             equipo_id:eqId,
             tecnico:tecnico||firma,
             fecha_servicio:fecha,
-            firma_cliente:firmaClienteData.base64,
-            firma_tipo:firmaClienteData.tipo||'click',
+            firma_cliente:firmaClienteData.base64||null,
+            firma_tipo:firmaClienteData.tipo||null,
             nombre_firmante:nombreFirmante,
             estado:'pendiente'
           }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
@@ -3367,7 +3405,8 @@ ${firmaImg}
 
   showToast('Generando informe...');
   try{
-    const nombre=`preventivo-${aprobId}.html`;
+    const fechaArchivo=(a.fecha_servicio||new Date().toISOString().split('T')[0]).replace(/-/g,'');
+    const nombre=`preventivo-${aprobId}-${fechaArchivo}.html`;
     const url=await subirInformeHTML(informeHTML,nombre);
     // Actualizar registro
     await api(`preventivos_aprobacion?id=eq.${aprobId}`,{method:'PATCH',body:JSON.stringify({
@@ -3379,20 +3418,9 @@ ${firmaImg}
     // Recargar
     await loadAprobaciones();
     renderAprobaciones();
-    showToast('✅ Aprobado — abriendo WhatsApp','success');
-    // Abrir WhatsApp
-    const tel=cli.telefono?cli.telefono.replace(/\D/g,''):'';
-    const msg=encodeURIComponent(
-      `Estimado/a ${cli.nombre},\n\n`+
-      `Le informamos que se realizó el service técnico del equipo *${eq.nombre}* el día ${fechaFmt}.\n\n`+
-      `✅ El trabajo fue aprobado y confirmado.\n\n`+
-      `📄 Puede ver y descargar el informe completo aquí:\n${url}\n\n`+
-      `Ante cualquier consulta no dude en contactarnos.\n\n`+
-      `*ChillerService S.A.*`
-    );
-    const waUrl=tel?`https://wa.me/${54}${tel}?text=${msg}`:`https://wa.me/?text=${msg}`;
-    if(!tel) showToast('⚠️ Cliente sin teléfono — completá el número manualmente','');
-    setTimeout(()=>window.open(waUrl,'_blank'),800);
+    showToast('✅ Aprobado — seleccioná destinatario de WhatsApp','success');
+    // Mostrar modal de selección de destinatario
+    setTimeout(()=>mostrarModalWhatsApp(aprobId, url), 400);
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
@@ -4471,6 +4499,53 @@ if('serviceWorker' in navigator){
       .catch(e=>console.log('SW error:',e));
   });
 }
+// WhatsApp envío modal
+let _waAprobId=null;
+let _waInformeUrl=null;
+function mostrarModalWhatsApp(aprobId, informeUrl){
+  _waAprobId=aprobId;
+  _waInformeUrl=informeUrl;
+  const a=aprobaciones.find(x=>x.id===aprobId)||{};
+  const cli=clientes.find(c=>c.id===a.cliente_id)||{};
+  const telLimpio=cli.telefono?cli.telefono.replace(/\D/g,''):'';
+  // Rellenar info del contacto del cliente
+  const contactoLabel=cli.nombre?(cli.nombre+(cli.contacto?' — '+cli.contacto:'')+(telLimpio?' ('+telLimpio+')':'')):'Sin contacto registrado';
+  document.getElementById('waContactoLabel').textContent=contactoLabel;
+  document.getElementById('waRadioCliente').value=telLimpio;
+  document.getElementById('waRadioCliente').checked=!!telLimpio;
+  document.getElementById('waRadioOtro').checked=!telLimpio;
+  document.getElementById('waOtroNumero').style.display=telLimpio?'none':'block';
+  document.getElementById('waInputNumero').value='';
+  document.getElementById('mWaEnvio').classList.add('open');
+}
+function onWaRadioChange(which){
+  document.getElementById('waOtroNumero').style.display=which==='otro'?'block':'none';
+}
+function enviarWhatsAppModal(){
+  const a=aprobaciones.find(x=>x.id===_waAprobId)||{};
+  const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente'};
+  const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'Equipo'};
+  const fechaFmt=fmtF(a.fecha_servicio);
+  let tel='';
+  if(document.getElementById('waRadioCliente').checked){
+    tel=document.getElementById('waRadioCliente').value;
+  } else {
+    tel=document.getElementById('waInputNumero').value.replace(/\D/g,'');
+  }
+  if(!tel){showToast('Ingresá un número de teléfono',true);return;}
+  const msg=encodeURIComponent(
+    `Estimado/a ${cli.nombre},\n\n`+
+    `Le informamos que se realizó el service técnico del equipo *${eq.nombre}* el día ${fechaFmt}.\n\n`+
+    `✅ El trabajo fue aprobado y confirmado.\n\n`+
+    (_waInformeUrl?`📄 Puede ver y descargar el informe completo aquí:\n${_waInformeUrl}\n\n`:'')+
+    `Ante cualquier consulta no dude en contactarnos.\n\n`+
+    `*ChillerService S.A.*`
+  );
+  const waUrl=`https://wa.me/${tel}?text=${msg}`;
+  cerrar('mWaEnvio');
+  setTimeout(()=>window.open(waUrl,'_blank'),200);
+}
+
 // PWA Install prompt
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt',(e)=>{
