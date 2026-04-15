@@ -2910,7 +2910,7 @@ function _renderTareasService(eq){
           diasInfo=`<span style="color:${infoColor};font-size:10px;font-weight:600;">✓ Último: ${ultFmt} — próximo: ${proxFmt}</span>`;
         }
         const preCheck=t.urgencia!=='ok'&&t.urgencia!=='nunca';
-        html+=`<label data-tarea-id="${t.tarea_id}" data-nombre="${t.nombre_tarea.replace(/"/g,'&quot;')}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.45;background:${bg};border-radius:5px;padding:4px 6px;margin-bottom:2px;">
+        html+=`<label class="checklist-row" data-tarea-id="${t.tarea_id}" data-tarea-nombre="${t.nombre_tarea.replace(/"/g,'&quot;')}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.45;background:${bg};border-radius:5px;padding:4px 6px;margin-bottom:2px;">
           <input type="checkbox" id="starea-${idx}" ${preCheck?'checked':''} style="margin-top:2px;flex-shrink:0;accent-color:${t.urgencia==='nunca'?'var(--text-dim)':t.urgencia==='ok'?'var(--green)':'var(--accent)'};"/>
           <div><div>${t.nombre_tarea}</div><div style="margin-top:1px;">${diasInfo}</div></div>
         </label>`;
@@ -2937,7 +2937,7 @@ function _renderTareasService(eq){
       if(!grupo.length)return;
       html+=`<div style="font-size:10px;letter-spacing:1.2px;color:var(--text-dim);text-transform:uppercase;font-weight:700;margin:8px 0 4px;">${catLabel[cat]}</div>`;
       grupo.forEach(t=>{
-        html+=`<label data-tarea-id="" data-nombre="${t.tarea.replace(/"/g,'&quot;')}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.4;background:${catBg[cat]||''};border-radius:5px;padding:3px 5px;margin-bottom:2px;">
+        html+=`<label class="checklist-row" data-tarea-id="" data-tarea-nombre="${t.tarea.replace(/"/g,'&quot;')}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;line-height:1.4;background:${catBg[cat]||''};border-radius:5px;padding:3px 5px;margin-bottom:2px;">
           <input type="checkbox" id="starea-${idx}" checked style="margin-top:2px;flex-shrink:0;accent-color:var(--accent);"/>
           <span>${t.tarea}${catTag[cat]||''}</span>
         </label>`;
@@ -2958,7 +2958,7 @@ function _getTareasChecked(){
       const lbl=cb.closest('label');
       return {
         tarea_id:lbl.dataset.tareaId||'',
-        nombre:lbl.dataset.nombre||lbl.querySelector('span,div')?.textContent?.split('\n')[0]?.trim()||''
+        nombre:lbl.dataset.tareaNombre||lbl.dataset.nombre||lbl.querySelector('span,div')?.textContent?.split('\n')[0]?.trim()||''
       };
     });
 }
@@ -3195,20 +3195,31 @@ async function guardarSoloPreventivo(){
     const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
     const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
     console.log('[guardarSoloPreventivo] intervId:',intervId,'firma:',firmaClienteSP.base64?'sí':'no');
-    // Guardar tareas realizadas del checklist con intervencion_id
-    if(intervId){
-      const tareasChecked=_getTareasChecked();
-      for(const t of tareasChecked){
-        if(!t.tarea_id&&!t.nombre) continue;
-        await api('tareas_realizadas',{method:'POST',body:JSON.stringify({
-          equipo_id:null,
-          tarea_id:t.tarea_id||null,
-          nombre_tarea:t.nombre,
-          fecha_realizada:fecha,
-          tecnico:tecnico||firma,
-          intervencion_id:intervId
-        }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+    // Guardar tareas del checklist marcadas
+    try{
+      const filasTareas=document.querySelectorAll('#sTareasList .checklist-row');
+      for(const fila of filasTareas){
+        const cb=fila.querySelector('input[type=checkbox]');
+        if(!cb||!cb.checked) continue;
+        const tareaId=fila.dataset.tareaId;
+        const tareaNombre=fila.dataset.tareaNombre;
+        if(!tareaId) continue;
+        await api('tareas_realizadas',{
+          method:'POST',
+          body:JSON.stringify({
+            equipo_id:null,
+            tarea_id:tareaId,
+            nombre_tarea:tareaNombre||tareaId,
+            fecha_realizada:fecha,
+            tecnico:tecnico||firma,
+            intervencion_id:intervId
+          }),
+          headers:{...H,'Prefer':'return=minimal'}
+        });
       }
+      console.log('[tareas guardadas] OK');
+    }catch(e){
+      console.warn('[tareas guardadas] Error:',e);
     }
     // Guardar en preventivos_aprobacion siempre (con o sin firma)
     if(intervId){
