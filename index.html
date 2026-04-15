@@ -980,32 +980,27 @@ tbody tr:hover{background:#f8faff;}
 
 <!-- MODAL WHATSAPP ENVÍO -->
 <div class="modal-overlay" id="mWaEnvio">
-  <div class="modal" style="max-width:440px;">
+  <div class="modal" style="max-width:420px;">
     <button class="modal-close" onclick="cerrar('mWaEnvio')">✕</button>
-    <div class="modal-title">📲 Enviar informe al cliente</div>
+    <div class="modal-title">📲 Enviar informe por WhatsApp</div>
+    <!-- Número del cliente -->
     <div style="margin-bottom:14px;">
-      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
-        <input type="radio" name="waDestinatario" id="waRadioCliente" value="" onchange="onWaRadioChange('cliente')" style="margin-top:2px;"/>
-        <div>
-          <div style="font-weight:600;font-size:13px;">✅ Enviar al contacto del cliente</div>
-          <div id="waContactoLabel" style="font-size:11px;color:var(--text-dim);margin-top:2px;">—</div>
-        </div>
-      </label>
-      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px;border:1px solid var(--border);border-radius:8px;">
-        <input type="radio" name="waDestinatario" id="waRadioOtro" value="otro" onchange="onWaRadioChange('otro')" style="margin-top:2px;"/>
-        <div style="width:100%;">
-          <div style="font-weight:600;font-size:13px;">📱 Enviar a otro número</div>
-          <div id="waOtroNumero" style="display:none;margin-top:6px;">
-            <input class="form-input" id="waInputNumero" type="tel" placeholder="Ej: 5491112345678 (sin + ni espacios)" style="width:100%;"/>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Ingresá el número completo con código de país (ej: 5491112345678)</div>
-          </div>
-        </div>
-      </label>
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:6px;">Número del cliente</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span id="waClienteTelLabel" style="flex:1;font-size:13px;font-weight:600;color:var(--text);">—</span>
+        <button id="waBtnClienteTel" class="btn-primary" style="padding:8px 14px;font-size:13px;" onclick="enviarWhatsAppA('cliente')">📲 Enviar a este número</button>
+      </div>
     </div>
-    <div class="form-actions">
-      <button class="btn-secondary" onclick="cerrar('mWaEnvio')">✅ Solo aprobar sin enviar</button>
-      <button class="btn-primary" onclick="enviarWhatsAppModal()">📲 Enviar por WhatsApp</button>
+    <!-- Otro número -->
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px;">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:6px;">Enviar a otro número</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="form-input" id="waInputNumero" type="tel" placeholder="Ej: 5491112345678" style="flex:1;"/>
+        <button class="btn-primary" style="padding:8px 14px;font-size:13px;white-space:nowrap;" onclick="enviarWhatsAppA('otro')">📲 Enviar</button>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Número completo con código de país, sin + ni espacios</div>
     </div>
+    <button class="btn-secondary" style="width:100%;padding:10px;" onclick="cerrar('mWaEnvio')">❌ Cerrar sin enviar</button>
   </div>
 </div>
 
@@ -2548,20 +2543,21 @@ function renderHistDetalle(){
     informesHTML+='<span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:var(--green);">📄 Informes de preventivo</span>';
     informesHTML+='<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+informesCliente.length+' registro(s)</span>';
     informesHTML+='</div>';
-    informesHTML+=informesCliente.map(a=>{
+    informesHTML+=informesCliente.sort((a,b)=>new Date(b.fecha_servicio)-new Date(a.fecha_servicio)).map(a=>{
       const eqI=equipos.find(e=>e.id===a.equipo_id);
       const esAprobado=a.estado==='aprobado';
+      const urlInforme=a.pdf_url||(esAprobado?generarUrlInforme(a.id):null);
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${esAprobado?'var(--green-bg)':'var(--bg3)'};border:1px solid ${esAprobado?'var(--green-border)':'var(--border)'};border-radius:6px;margin-bottom:6px;flex-wrap:wrap;">
         <span style="font-size:11px;color:var(--text-dim);">${fmtF(a.fecha_servicio)}</span>
         <span style="font-weight:600;font-size:12px;">${eqI?eqI.nombre:'General'}</span>
         <span style="font-size:11px;color:var(--text-dim);">· ${a.tecnico||'—'}</span>
         ${esAprobado
-          ?`<span class="badge-aprobado" style="margin-left:auto;">✅ Aprobado por: ${a.aprobado_por||'admin'}</span>`
-          :`<span class="badge-pendiente" style="margin-left:auto;">⏳ Pendiente aprobación</span>`}
-        ${esAprobado&&a.pdf_url
-          ?`<a href="${a.pdf_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
-          :esAprobado?'<span style="font-size:11px;color:var(--text-dim);">⏳ Procesando</span>'
-          :''}
+          ?`<span class="badge-aprobado">✅ ${a.aprobado_por||'admin'}</span>`
+          :`<span class="badge-pendiente">⏳ Pendiente</span>`}
+        <div style="display:flex;gap:5px;margin-left:auto;flex-wrap:wrap;">
+          ${esAprobado&&urlInforme?`<a href="${urlInforme}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`:''}
+          ${esAprobado?`<button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="mostrarModalWhatsApp('${a.id}')">📲 Reenviar</button>`:''}
+        </div>
       </div>`;
     }).join('');
     informesHTML+='</div>';
@@ -3334,6 +3330,7 @@ function renderAprobaciones(){
       :a.firma_tipo==='canvas'&&a.firma_cliente
       ?`<img src="${a.firma_cliente}" class="aprob-firma-thumb" alt="firma"/>`
       :'—';
+    const urlInforme=a.pdf_url||generarUrlInforme(a.id);
     return `<tr>
       <td class="td-mono" style="font-size:11px;">${fmtF(a.fecha_servicio)}</td>
       <td style="font-weight:600;">${cli?cli.nombre:'—'}</td>
@@ -3341,28 +3338,82 @@ function renderAprobaciones(){
       <td>${a.tecnico||'—'}</td>
       <td>${firmaHtml}${a.nombre_firmante?`<div style="font-size:10px;color:var(--text-dim);">${a.nombre_firmante}</div>`:''}</td>
       <td><span class="${esPendiente?'badge-pendiente':'badge-aprobado'}">${esPendiente?'⏳ Pendiente':'✅ Aprobado'}</span></td>
-      <td>
+      <td style="white-space:nowrap;">
         ${esPendiente
-          ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarPreventivo('${a.id}')">✅ Aprobar y enviar</button>`
-          :a.pdf_url
-          ?`<a href="${a.pdf_url}" target="_blank" class="btn-secondary" style="padding:4px 12px;font-size:11px;text-decoration:none;">📄 Ver informe</a>`
-          :'—'
+          ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarPreventivo('${a.id}')">✅ Aprobar</button>`
+          :`<div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <a href="${urlInforme}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
+              <button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="mostrarModalWhatsApp('${a.id}')">📲 WhatsApp</button>
+            </div>`
         }
       </td>
     </tr>`;
   }).join('');
   el.innerHTML=`<div style="overflow-x:auto;"><table class="aprob-table">
     <thead><tr>
-      <th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Técnico</th><th>Firma</th><th>Estado</th><th>Acción</th>
+      <th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Técnico</th><th>Firma</th><th>Estado</th><th>Acciones</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
 
+function generarHtmlInforme(a){
+  const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente'};
+  const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'—'};
+  const interv=intervenciones.find(i=>i.id===a.intervencion_id)||{};
+  const fechaFmt=fmtF(a.fecha_servicio);
+  const firmaImg=a.firma_cliente==='click_confirmado'
+    ?'<div style="padding:8px;color:#059669;font-weight:700;border:1px solid #a7f3d0;border-radius:4px;background:#ecfdf5;">✅ Conformidad confirmada digitalmente</div>'
+    :a.firma_cliente
+    ?`<img src="${a.firma_cliente}" style="max-width:220px;max-height:90px;border:1px solid #ccc;border-radius:4px;display:block;margin-top:6px;"/>`
+    :'<div style="height:50px;border:1px dashed #ccc;border-radius:4px;margin-top:6px;"></div>';
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
+<style>body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
+h1{font-size:20px;font-weight:900;font-style:italic;margin:0;}
+h2{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:16px 0 10px;}
+table{width:100%;border-collapse:collapse;margin-bottom:12px;}
+td,th{border:1px solid #bbb;padding:5px 9px;font-size:11px;vertical-align:top;}
+th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
+.hdr td{border:none;vertical-align:middle;}
+.footer{margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center;}
+@media print{.no-print{display:none!important;}}</style></head><body>
+<table class="hdr" style="margin-bottom:20px;"><tr>
+  <td style="width:60%;"><h1>ChillerService S.A.</h1><div style="font-size:11px;color:#555;margin-top:2px;">Servicios e Instalaciones Termomecánicas</div></td>
+  <td style="text-align:right;line-height:1.8;font-size:12px;"><strong style="font-size:14px;">Informe de Preventivo</strong><br/>Fecha: ${fechaFmt}<br/>Técnico: ${a.tecnico||'—'}</td>
+</tr></table>
+<h2>Datos del servicio</h2>
+<table>
+  <tr><th>Cliente</th><td>${cli.nombre}</td><th>Equipo</th><td>${eq.nombre}</td></tr>
+  <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Fecha</th><td>${fechaFmt}</td></tr>
+</table>
+${interv.solucion||interv.descripcion?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${interv.solucion||interv.descripcion}</div>`:''}
+${interv.repuestos?`<h2>Repuestos utilizados</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;">${interv.repuestos}</div>`:''}
+<h2>Conformidad del cliente</h2>
+${firmaImg}
+${a.nombre_firmante?`<div style="font-size:11px;color:#555;margin-top:4px;">Firmado por: <strong>${a.nombre_firmante}</strong></div>`:''}
+<div class="footer">ChillerService S.A. · Esmeralda 762 2°B Cap.Fed. · Tel.: 5032-4033<br/>${a.aprobado_por?'Aprobado por: '+a.aprobado_por+' — ':''} ${new Date().toLocaleDateString('es-AR')}</div>
+</body></html>`;
+}
+
 async function aprobarPreventivo(id){
   const aprobacion=aprobaciones.find(a=>a.id===id);
   if(!aprobacion) return;
-  const informeUrl=`https://chillersystem-gestion-app.vercel.app?informe=true&id=${id}`;
+  showToast('Aprobando...');
+  // Intentar subir HTML a Storage
+  let informeUrl=null;
+  try{
+    const htmlInforme=generarHtmlInforme(aprobacion);
+    const blob=new Blob([htmlInforme],{type:'text/html'});
+    const nombreArchivo=`preventivo-${id}-${Date.now()}.html`;
+    const uploadRes=await fetch(`${SURL}/storage/v1/object/informes-preventivos/${nombreArchivo}`,{
+      method:'POST',
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'text/html','x-upsert':'true'},
+      body:blob
+    });
+    if(uploadRes.ok) informeUrl=`${SURL}/storage/v1/object/public/informes-preventivos/${nombreArchivo}`;
+  }catch(e){console.warn('Storage no disponible:',e);}
+  // Fallback a URL de la app
+  if(!informeUrl) informeUrl=generarUrlInforme(id);
   try{
     await api('preventivos_aprobacion?id=eq.'+id,{
       method:'PATCH',
@@ -3376,8 +3427,8 @@ async function aprobarPreventivo(id){
     });
     await loadAprobaciones();
     renderAprobaciones();
-    mostrarModalWhatsApp(id);
     showToast('✅ Preventivo aprobado','success');
+    mostrarModalWhatsApp(id);
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
@@ -3420,9 +3471,10 @@ async function guardarResolucionCorrectivo(){
     };
     const res=await api('intervenciones',{method:'POST',body:JSON.stringify(resolveData),headers:{...H,'Prefer':'return=representation'}});
     const resId=(res&&res[0]&&res[0].id)||(res&&res.id)||null;
-    if(resId){
-      await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify({correctivo_resuelto:true,resuelto_por_id:resId}),headers:{...H,'Prefer':'return=minimal'}});
-    }
+    // Siempre marcar el correctivo original como resuelto, con o sin resuelto_por_id
+    const patchData={correctivo_resuelto:true};
+    if(resId) patchData.resuelto_por_id=resId;
+    await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patchData),headers:{...H,'Prefer':'return=minimal'}});
     showToast('Correctivo resuelto ✓','success');
     cerrar('mCorrectivoRes');
     resFotosNuevas=[];
@@ -4463,47 +4515,42 @@ if('serviceWorker' in navigator){
 }
 // WhatsApp envío modal
 let _waAprobId=null;
-let _waInformeUrl=null;
-function mostrarModalWhatsApp(aprobId, informeUrl){
-  _waAprobId=aprobId;
-  _waInformeUrl=informeUrl||generarUrlInforme(aprobId);
-  const a=aprobaciones.find(x=>x.id===aprobId)||{};
-  const cli=clientes.find(c=>c.id===a.cliente_id)||{};
-  const telLimpio=cli.telefono?cli.telefono.replace(/\D/g,''):'';
-  // Rellenar info del contacto del cliente
-  const contactoLabel=cli.nombre?(cli.nombre+(cli.contacto?' — '+cli.contacto:'')+(telLimpio?' ('+telLimpio+')':'')):'Sin contacto registrado';
-  document.getElementById('waContactoLabel').textContent=contactoLabel;
-  document.getElementById('waRadioCliente').value=telLimpio;
-  document.getElementById('waRadioCliente').checked=!!telLimpio;
-  document.getElementById('waRadioOtro').checked=!telLimpio;
-  document.getElementById('waOtroNumero').style.display=telLimpio?'none':'block';
-  document.getElementById('waInputNumero').value='';
-  document.getElementById('mWaEnvio').classList.add('open');
-}
-function onWaRadioChange(which){
-  document.getElementById('waOtroNumero').style.display=which==='otro'?'block':'none';
-}
 function generarUrlInforme(aprobId){
   return `https://chillersystem-gestion-app.vercel.app?informe=true&id=${aprobId}`;
 }
-function enviarWhatsAppModal(){
-  const a=aprobaciones.find(x=>x.id===_waAprobId)||{};
+function mostrarModalWhatsApp(aprobId){
+  _waAprobId=aprobId;
+  const a=aprobaciones.find(x=>x.id===aprobId)||{};
+  const cli=clientes.find(c=>c.id===a.cliente_id)||{};
+  const telLimpio=cli.telefono?cli.telefono.replace(/\D/g,''):'';
+  const telLabel=telLimpio?(cli.nombre?cli.nombre+' · ':'')+telLimpio:(cli.nombre||'Sin número registrado');
+  document.getElementById('waClienteTelLabel').textContent=telLabel;
+  document.getElementById('waBtnClienteTel').disabled=!telLimpio;
+  document.getElementById('waBtnClienteTel').style.opacity=telLimpio?'1':'0.4';
+  document.getElementById('waInputNumero').value='';
+  document.getElementById('mWaEnvio').classList.add('open');
+}
+function _buildWaMsg(aprobId){
+  const a=aprobaciones.find(x=>x.id===aprobId)||{};
   const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente'};
-  const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'Equipo'};
   const fechaFmt=fmtF(a.fecha_servicio);
+  const informeUrl=a.pdf_url||generarUrlInforme(aprobId);
+  return encodeURIComponent(
+    `Estimado/a ${cli.nombre}, le informamos que el service técnico del ${fechaFmt} fue completado y aprobado. ✅ El equipo queda operativo. Ante cualquier consulta contáctenos. *ChillerService S.A.*`+
+    `\n\n📄 Ver informe completo aquí:\n${informeUrl}`
+  );
+}
+function enviarWhatsAppA(cual){
+  const a=aprobaciones.find(x=>x.id===_waAprobId)||{};
+  const cli=clientes.find(c=>c.id===a.cliente_id)||{};
   let tel='';
-  if(document.getElementById('waRadioCliente').checked){
-    tel=document.getElementById('waRadioCliente').value;
+  if(cual==='cliente'){
+    tel=cli.telefono?cli.telefono.replace(/\D/g,''):'';
   } else {
     tel=document.getElementById('waInputNumero').value.replace(/\D/g,'');
   }
   if(!tel){showToast('Ingresá un número de teléfono',true);return;}
-  const informeUrl=_waInformeUrl||(_waAprobId?generarUrlInforme(_waAprobId):null);
-  const msg=encodeURIComponent(
-    `Estimado/a ${cli.nombre}, le informamos que el service técnico del ${fechaFmt} fue completado y aprobado. ✅ El equipo queda operativo. Ante cualquier consulta contáctenos. *ChillerService S.A.*`+
-    (informeUrl?`\n\n📄 Ver informe completo aquí:\n${informeUrl}`:'')
-  );
-  const waUrl=`https://wa.me/${tel}?text=${msg}`;
+  const waUrl=`https://wa.me/${tel}?text=${_buildWaMsg(_waAprobId)}`;
   cerrar('mWaEnvio');
   setTimeout(()=>window.open(waUrl,'_blank'),200);
 }
