@@ -3195,6 +3195,21 @@ async function guardarSoloPreventivo(){
     const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
     const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
     console.log('[guardarSoloPreventivo] intervId:',intervId,'firma:',firmaClienteSP.base64?'sí':'no');
+    // Guardar tareas realizadas del checklist con intervencion_id
+    if(intervId){
+      const tareasChecked=_getTareasChecked();
+      for(const t of tareasChecked){
+        if(!t.tarea_id&&!t.nombre) continue;
+        await api('tareas_realizadas',{method:'POST',body:JSON.stringify({
+          equipo_id:null,
+          tarea_id:t.tarea_id||null,
+          nombre_tarea:t.nombre,
+          fecha_realizada:fecha,
+          tecnico:tecnico||firma,
+          intervencion_id:intervId
+        }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+      }
+    }
     // Guardar en preventivos_aprobacion siempre (con o sin firma)
     if(intervId){
       await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
@@ -3262,15 +3277,16 @@ async function guardarPlanilla(){
         const frec=eq?eq.frecuencia_dias||30:30;
         await api('equipos?id=eq.'+eqId,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
         // Guardar historial de tareas realizadas (si hay datos de BD)
-        if(tareasConfig.length&&p.tareas_realizadas&&p.tareas_realizadas.length){
+        if(p.tareas_realizadas&&p.tareas_realizadas.length){
           for(const t of p.tareas_realizadas){
-            if(!t.tarea_id)continue;
+            if(!t.tarea_id&&!t.nombre)continue;
             await api('tareas_realizadas',{method:'POST',body:JSON.stringify({
               equipo_id:eqId,
-              tarea_id:t.tarea_id,
+              tarea_id:t.tarea_id||null,
               nombre_tarea:t.nombre,
               fecha_realizada:fecha,
-              tecnico:tecnico||firma
+              tecnico:tecnico||firma,
+              intervencion_id:intervId||null
             }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
           }
         }
@@ -3362,11 +3378,30 @@ function generarHtmlInforme(a){
   const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'—'};
   const interv=intervenciones.find(i=>i.id===a.intervencion_id)||{};
   const fechaFmt=fmtF(a.fecha_servicio);
+  // Debug tareas
+  console.log('[generarHtmlInforme] intervencion_id:',a.intervencion_id);
+  console.log('[generarHtmlInforme] tareasRealizadas total:',tareasRealizadas.length);
+  console.log('[generarHtmlInforme] tareas de esta interv:',tareasRealizadas.filter(t=>t.intervencion_id===a.intervencion_id));
+  // Tareas: buscar por intervencion_id, con fallback por fecha y equipo/cliente
+  let tareasDeEstaInterv=tareasRealizadas.filter(t=>t.intervencion_id===a.intervencion_id);
+  if(!tareasDeEstaInterv.length&&a.fecha_servicio){
+    // Fallback: tareas del mismo día para el mismo equipo (si hay) o cliente
+    const eqIds=a.equipo_id
+      ?[a.equipo_id]
+      :equipos.filter(e=>e.cliente_id===a.cliente_id).map(e=>e.id);
+    tareasDeEstaInterv=tareasRealizadas.filter(t=>
+      t.fecha_realizada===a.fecha_servicio&&eqIds.includes(t.equipo_id)
+    );
+  }
+  const tareasHtml=tareasDeEstaInterv.length
+    ?`<h2>Checklist de tareas realizadas</h2><ul style="margin:0;padding-left:18px;">${tareasDeEstaInterv.map(t=>`<li style="margin-bottom:3px;font-size:11px;">✓ ${t.nombre_tarea||t.tarea_id}</li>`).join('')}</ul>`
+    :'';
   const firmaImg=a.firma_cliente==='click_confirmado'
     ?'<div style="padding:8px;color:#059669;font-weight:700;border:1px solid #a7f3d0;border-radius:4px;background:#ecfdf5;">✅ Conformidad confirmada digitalmente</div>'
     :a.firma_cliente
     ?`<img src="${a.firma_cliente}" style="max-width:220px;max-height:90px;border:1px solid #ccc;border-radius:4px;display:block;margin-top:6px;"/>`
     :'<div style="height:50px;border:1px dashed #ccc;border-radius:4px;margin-top:6px;"></div>';
+  const trabajoRealizado=[interv.solucion,interv.descripcion].filter(Boolean).join('\n')||'';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
 <style>body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
 h1{font-size:20px;font-weight:900;font-style:italic;margin:0;}
@@ -3386,7 +3421,9 @@ th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
   <tr><th>Cliente</th><td>${cli.nombre}</td><th>Equipo</th><td>${eq.nombre}</td></tr>
   <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Fecha</th><td>${fechaFmt}</td></tr>
 </table>
-${interv.solucion||interv.descripcion?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${interv.solucion||interv.descripcion}</div>`:''}
+${trabajoRealizado?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${trabajoRealizado}</div>`:''}
+${tareasHtml}
+${interv.notas?`<h2>Observaciones</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${interv.notas}</div>`:''}
 ${interv.repuestos?`<h2>Repuestos utilizados</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;">${interv.repuestos}</div>`:''}
 <h2>Conformidad del cliente</h2>
 ${firmaImg}
