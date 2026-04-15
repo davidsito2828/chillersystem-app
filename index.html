@@ -3476,16 +3476,22 @@ async function aprobarPreventivo(id){
   // PASO 3: Aprobar en Supabase — esto siempre se ejecuta
   const urlPublica=window.location.origin+window.location.pathname+'?informe='+aprobacion.id;
   try{
+    // 3a: actualizar estado y metadatos
     await api('preventivos_aprobacion?id=eq.'+id,{
       method:'PATCH',
       body:JSON.stringify({
         estado:'aprobado',
         pdf_url:urlPublica,
-        informe_html:htmlInforme,
         aprobado_por:usuarioActual.nombre,
         fecha_aprobacion:new Date().toISOString()
       }),
       headers:{...H,'Prefer':'return=minimal'}
+    });
+    // 3b: guardar informe_html por separado (columna text grande)
+    await fetch(SURL+'/rest/v1/preventivos_aprobacion?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({informe_html:htmlInforme})
     });
     await loadAprobaciones();
     renderAprobaciones();
