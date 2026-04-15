@@ -3390,24 +3390,34 @@ function generarHtmlInforme(a){
   const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'—'};
   const interv=intervenciones.find(i=>i.id===a.intervencion_id)||{};
   const fechaFmt=fmtF(a.fecha_servicio);
-  // Debug tareas
+  const tareasDeEstaInterv=tareasRealizadas.filter(t=>t.intervencion_id===a.intervencion_id);
   console.log('[generarHtmlInforme] intervencion_id:',a.intervencion_id);
   console.log('[generarHtmlInforme] tareasRealizadas total:',tareasRealizadas.length);
-  console.log('[generarHtmlInforme] tareas de esta interv:',tareasRealizadas.filter(t=>t.intervencion_id===a.intervencion_id));
-  // Tareas: buscar por intervencion_id, con fallback por fecha y equipo/cliente
-  let tareasDeEstaInterv=tareasRealizadas.filter(t=>t.intervencion_id===a.intervencion_id);
-  if(!tareasDeEstaInterv.length&&a.fecha_servicio){
-    // Fallback: tareas del mismo día para el mismo equipo (si hay) o cliente
-    const eqIds=a.equipo_id
-      ?[a.equipo_id]
-      :equipos.filter(e=>e.cliente_id===a.cliente_id).map(e=>e.id);
-    tareasDeEstaInterv=tareasRealizadas.filter(t=>
-      t.fecha_realizada===a.fecha_servicio&&eqIds.includes(t.equipo_id)
-    );
+  console.log('[generarHtmlInforme] tareas a mostrar:',tareasDeEstaInterv.length,tareasDeEstaInterv);
+  let seccionTareas='';
+  if(tareasDeEstaInterv&&tareasDeEstaInterv.length>0){
+    seccionTareas+='<hr style="margin:16px 0;border-color:#ccc;"/>';
+    seccionTareas+='<div style="margin:16px 0;">';
+    seccionTareas+='<div style="font-size:13px;font-weight:bold;text-transform:uppercase;';
+    seccionTareas+='border-left:4px solid #1a2332;padding-left:10px;margin-bottom:12px;">';
+    seccionTareas+='✅ Checklist de tareas realizadas</div>';
+    seccionTareas+='<table width="100%" style="border-collapse:collapse;font-size:11px;">';
+    seccionTareas+='<thead><tr style="background:#1a2332;color:#fff;">';
+    seccionTareas+='<th style="padding:6px 8px;text-align:left;width:60%;">Tarea</th>';
+    seccionTareas+='<th style="padding:6px 8px;text-align:center;width:20%;">Estado</th>';
+    seccionTareas+='<th style="padding:6px 8px;text-align:left;width:20%;">Observación</th>';
+    seccionTareas+='</tr></thead><tbody>';
+    tareasDeEstaInterv.forEach((t,idx)=>{
+      const bg=idx%2===0?'#fff':'#f9f9f9';
+      const estado=t.estado==='ok'?'✅ OK':t.estado==='no_aplica'?'— N/A':t.estado==='pendiente'?'⚠️ Pendiente':t.estado||'—';
+      seccionTareas+='<tr style="background:'+bg+';border-bottom:1px solid #eee;">';
+      seccionTareas+='<td style="padding:5px 8px;">'+(t.nombre_tarea||t.tarea||'—')+'</td>';
+      seccionTareas+='<td style="padding:5px 8px;text-align:center;">'+estado+'</td>';
+      seccionTareas+='<td style="padding:5px 8px;font-style:italic;color:#555;">'+(t.observacion||'')+'</td>';
+      seccionTareas+='</tr>';
+    });
+    seccionTareas+='</tbody></table></div>';
   }
-  const tareasHtml=tareasDeEstaInterv.length
-    ?`<h2>Checklist de tareas realizadas</h2><ul style="margin:0;padding-left:18px;">${tareasDeEstaInterv.map(t=>`<li style="margin-bottom:3px;font-size:11px;">✓ ${t.nombre_tarea||t.tarea_id}</li>`).join('')}</ul>`
-    :'';
   const firmaImg=a.firma_cliente==='click_confirmado'
     ?'<div style="padding:8px;color:#059669;font-weight:700;border:1px solid #a7f3d0;border-radius:4px;background:#ecfdf5;">✅ Conformidad confirmada digitalmente</div>'
     :a.firma_cliente
@@ -3434,7 +3444,7 @@ th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
   <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Fecha</th><td>${fechaFmt}</td></tr>
 </table>
 ${trabajoRealizado?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${trabajoRealizado}</div>`:''}
-${tareasHtml}
+${seccionTareas}
 ${interv.notas?`<h2>Observaciones</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${interv.notas}</div>`:''}
 ${interv.repuestos?`<h2>Repuestos utilizados</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;">${interv.repuestos}</div>`:''}
 <h2>Conformidad del cliente</h2>
@@ -3448,11 +3458,12 @@ async function aprobarPreventivo(id){
   const aprobacion=aprobaciones.find(a=>a.id===id);
   if(!aprobacion) return;
   showToast('Aprobando...');
-  // Intentar subir HTML a Storage
-  let informeUrl=null;
+  // PASO 1: Cargar tareas y generar informe — fuera del bloque de Storage
+  tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
+  const htmlInforme=generarHtmlInforme(aprobacion);
+  // PASO 2: Intentar subir a Storage (puede fallar, no importa)
+  let informeUrl=window.location.origin+'?aprobacion='+aprobacion.id;
   try{
-    tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
-    const htmlInforme=generarHtmlInforme(aprobacion);
     const blob=new Blob([htmlInforme],{type:'text/html'});
     const nombreArchivo=`preventivo-${id}-${Date.now()}.html`;
     const uploadRes=await fetch(`${SURL}/storage/v1/object/informes-preventivos/${nombreArchivo}`,{
@@ -3461,9 +3472,8 @@ async function aprobarPreventivo(id){
       body:blob
     });
     if(uploadRes.ok) informeUrl=`${SURL}/storage/v1/object/public/informes-preventivos/${nombreArchivo}`;
-  }catch(e){console.warn('Storage no disponible:',e);}
-  // Fallback a URL de la app
-  if(!informeUrl) informeUrl=generarUrlInforme(id);
+  }catch(e){console.warn('Storage no disponible, usando URL de app como fallback:',e.message);}
+  // PASO 3: Aprobar en Supabase — esto siempre se ejecuta
   try{
     await api('preventivos_aprobacion?id=eq.'+id,{
       method:'PATCH',
