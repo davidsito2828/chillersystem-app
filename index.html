@@ -3330,6 +3330,7 @@ async function loadAprobaciones(){
   try{
     const res=await api('preventivos_aprobacion?select=*&order=created_at.desc');
     aprobaciones=res||[];
+    tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
     window._aprobacionesByInterv={};
     aprobaciones.forEach(a=>{if(a.intervencion_id)window._aprobacionesByInterv[a.intervencion_id]=a;});
     console.log('[Aprobaciones] cargadas:',aprobaciones.length,aprobaciones);
@@ -3450,6 +3451,7 @@ async function aprobarPreventivo(id){
   // Intentar subir HTML a Storage
   let informeUrl=null;
   try{
+    tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
     const htmlInforme=generarHtmlInforme(aprobacion);
     const blob=new Blob([htmlInforme],{type:'text/html'});
     const nombreArchivo=`preventivo-${id}-${Date.now()}.html`;
