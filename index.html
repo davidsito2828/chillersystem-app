@@ -3916,7 +3916,7 @@ function renderPresupuestos(){
         <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
         <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
         ${p.estado==='borrador'?`<button class="btn-green" onclick="aprobarPpto('${p.id}')">✅ OK</button>`:''}
-        ${puedeAvanzar?`<button class="btn-edit" style="background:#1e3a5f;" onclick="abrirModalAvanzarEstado('${p.id}','${flujo}','${p.numero}',${JSON.stringify(p.cliente_nombre||'')},${p.precio_total||0})">➡️</button>`:''}
+        ${puedeAvanzar?'<button class="btn-edit" style="background:#1e3a5f;" onclick="abrirModalAvanzarEstado(\''+p.id+'\',\''+flujo+'\',\''+p.numero+'\',\''+((p.cliente_nombre||'').replace(/'/g,"\\'"))+'\','+( p.precio_total||0)+')">➡️</button>':''}
         <button class="btn-danger" onclick="elimPpto('${p.id}')">🗑</button>
       </td>
     </tr>`;
