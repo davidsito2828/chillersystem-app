@@ -3488,11 +3488,16 @@ async function aprobarPreventivo(id){
       headers:{...H,'Prefer':'return=minimal'}
     });
     // 3b: guardar informe_html por separado (columna text grande)
-    await fetch(SURL+'/rest/v1/preventivos_aprobacion?id=eq.'+id,{
+    const resHtml=await fetch(SURL+'/rest/v1/preventivos_aprobacion?id=eq.'+aprobacion.id,{
       method:'PATCH',
-      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({informe_html:htmlInforme})
+      body:JSON.stringify({informe_html:htmlInforme}),
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json','Prefer':'return=minimal'}
     });
+    if(!resHtml.ok){
+      const errText=await resHtml.text();
+      console.error('Error guardando informe_html:',resHtml.status,errText);
+      showToast('Error al guardar informe: '+resHtml.status,true);
+    }
     await loadAprobaciones();
     renderAprobaciones();
     showToast('✅ Preventivo aprobado','success');
