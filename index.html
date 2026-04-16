@@ -3747,13 +3747,21 @@ function showTab(id,btn){
 async function renderGaleria(){
   const contenedor=document.getElementById('galeriaContenido');
   contenedor.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);">Cargando fotos...</div>';
+  // Recargar si el array está vacío (puede pasar si se abre la tab antes del init completo)
+  if(!intervenciones.length) await loadIntervenciones();
+  console.log('[Galería] Total intervenciones:',intervenciones.length);
+  console.log('[Galería] Intervenciones con fotos:',intervenciones.filter(i=>i.fotos&&i.fotos.length).length);
+  console.log('[Galería] Ejemplo fotos:',intervenciones.find(i=>i.fotos&&i.fotos.length)?.fotos);
   const todasLasFotos=[];
   intervenciones.forEach(i=>{
     if(i.fotos&&i.fotos.length){
       const eq=equipos.find(e=>e.id===i.equipo_id);
-      const cli=clientes.find(c=>c.id===i.cliente_id||(eq&&c.id===eq.cliente_id));
+      // intervenciones no tienen cliente_id propio — buscamos via equipo
+      const cli=eq?clientes.find(c=>c.id===eq.cliente_id):null;
       i.fotos.forEach(url=>{
-        todasLasFotos.push({url,fecha:i.fecha,tecnico:i.tecnico||'—',cliente:cli?cli.nombre:'—',equipo:eq?eq.nombre:'—',tipo:i.tipo,intervencion_id:i.id});
+        // Ignorar entradas que no sean string URL válida
+        if(typeof url!=='string'||!url.startsWith('http')) return;
+        todasLasFotos.push({url,fecha:i.fecha,tecnico:i.tecnico||'—',cliente:cli?cli.nombre:'—',equipo:eq?eq.nombre:'—',tipo:i.tipo||'—',intervencion_id:i.id});
       });
     }
   });
