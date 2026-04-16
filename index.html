@@ -3901,9 +3901,33 @@ function renderPresupuestos(){
     // CAMBIO 1: badge estado_flujo simple
     const flujo=p.estado_flujo||'borrador';
     const puedeAvanzar=puedeAvanzarEstadoPpto()&&!!siguienteEstado[flujo];
+    const facturado50i=p.facturado_50_inicial||false;
+    const facturado50f=p.facturado_50_final||false;
+    let badgeFacturacion='';
+    if(puedeVerPresupuestos()&&(flujo==='en_ejecucion'||flujo==='finalizado')){
+      badgeFacturacion='<div style="margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;">';
+      if(flujo==='en_ejecucion'||flujo==='finalizado'){
+        badgeFacturacion+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
+          '<input type="checkbox" '+(facturado50i?'checked':'')+
+          ' onchange="toggleFacturacion(\''+p.id+'\',\'inicial\',this.checked)"'+
+          ' style="accent-color:#059669;width:14px;height:14px;"/>'+
+          '<span style="color:'+(facturado50i?'#059669':'#6b7280')+';font-weight:'+(facturado50i?'700':'400')+
+          ';">50% inicial facturado</span></label>';
+      }
+      if(flujo==='finalizado'){
+        badgeFacturacion+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
+          '<input type="checkbox" '+(facturado50f?'checked':'')+
+          ' onchange="toggleFacturacion(\''+p.id+'\',\'final\',this.checked)"'+
+          ' style="accent-color:#059669;width:14px;height:14px;"/>'+
+          '<span style="color:'+(facturado50f?'#059669':'#6b7280')+';font-weight:'+(facturado50f?'700':'400')+
+          ';">50% final facturado</span></label>';
+      }
+      badgeFacturacion+='</div>';
+    }
     const badgeFlujo='<div style="margin-top:6px;">'+
       '<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(coloresFlujo[flujo]||'')+'">'+etiquetasFlujo[flujo]+'</span>'+
       '<div style="font-size:10px;color:#6b7280;margin-top:3px;">'+(responsables[flujo]||'')+'</div>'+
+      badgeFacturacion+
       '</div>';
     return `<tr>
       <td class="td-mono">${p.numero}</td>
@@ -3920,6 +3944,7 @@ function renderPresupuestos(){
         <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
         <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
         ${p.estado==='borrador'?`<button class="btn-green" onclick="aprobarPpto('${p.id}')">✅ OK</button>`:''}
+        ${puedeAvanzar&&flujo!=='borrador'?'<button class="btn-edit" style="background:#374151;" onclick="retrocederEstadoPpto(\''+p.id+'\',\''+flujo+'\',\''+p.numero+'\')">⬅️</button>':''}
         ${puedeAvanzar?'<button class="btn-edit" style="background:#1e3a5f;" onclick="abrirModalAvanzarEstado(\''+p.id+'\',\''+flujo+'\',\''+p.numero+'\',\''+((p.cliente_nombre||'').replace(/'/g,"\\'"))+'\','+( p.precio_total||0)+')">➡️</button>':''}
         <button class="btn-danger" onclick="elimPpto('${p.id}')">🗑</button>
       </td>
@@ -4148,6 +4173,64 @@ async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
     showToast('Estado actualizado ✓','success');
     await loadPresupuestos();
     await loadNotificaciones();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function toggleFacturacion(pptoId,tipo,checked){
+  const ppto=presupuestos.find(x=>x.id===pptoId);
+  if(!ppto) return;
+  const campo=tipo==='inicial'?'facturado_50_inicial':'facturado_50_final';
+  const historial=[...(ppto.historial_estados||[])];
+  historial.push({estado:'facturacion_'+tipo,accion:checked?'facturado':'desmarcado',fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
+  try{
+    await api('presupuestos?id=eq.'+pptoId,{
+      method:'PATCH',
+      body:JSON.stringify({[campo]:checked,historial_estados:historial}),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
+    if(checked){
+      await api('notificaciones?presupuesto_id=eq.'+pptoId+'&leida=eq.false',{
+        method:'PATCH',
+        body:JSON.stringify({leida:true}),
+        headers:{...H,'Prefer':'return=minimal'}
+      }).catch(()=>{});
+    }
+    showToast(checked?'✅ Facturación registrada':'Desmarcado','success');
+    await loadPresupuestos();
+    if(typeof loadNotificaciones==='function') await loadNotificaciones();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function retrocederEstadoPpto(pId,estadoActual,numero){
+  const estadoAnterior={
+    'en_revision':'borrador',
+    'enviado':'en_revision',
+    'aprobado_cliente':'enviado',
+    'en_ejecucion':'aprobado_cliente',
+    'finalizado':'en_ejecucion'
+  };
+  const etiquetas={
+    'borrador':'📝 Borrador',
+    'en_revision':'🔍 En revisión',
+    'enviado':'📤 Enviado al cliente',
+    'aprobado_cliente':'✅ Aprobado por cliente',
+    'en_ejecucion':'⚙️ En ejecución',
+    'finalizado':'🏁 Finalizado'
+  };
+  const anterior=estadoAnterior[estadoActual];
+  if(!anterior) return;
+  if(!confirm('⬅️ Retroceder Presupuesto #'+numero+'\n\nEstado actual: '+etiquetas[estadoActual]+'\nVolver a: '+etiquetas[anterior]+'\n\n¿Confirmar?')) return;
+  const ppto=presupuestos.find(x=>x.id===pId);
+  const historial=[...(ppto&&ppto.historial_estados||[])];
+  historial.push({estado:anterior,accion:'retroceso',fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
+  try{
+    await api('presupuestos?id=eq.'+pId,{
+      method:'PATCH',
+      body:JSON.stringify({estado_flujo:anterior,historial_estados:historial}),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
+    showToast('Estado retrocedido ✓','success');
+    await loadPresupuestos();
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
