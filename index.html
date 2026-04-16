@@ -3752,6 +3752,16 @@ async function renderGaleria(){
   console.log('[Galería] Total intervenciones:',intervenciones.length);
   console.log('[Galería] Intervenciones con fotos:',intervenciones.filter(i=>i.fotos&&i.fotos.length).length);
   console.log('[Galería] Ejemplo fotos:',intervenciones.find(i=>i.fotos&&i.fotos.length)?.fotos);
+  const primeraInterv=intervenciones[0];
+  console.log('[Galería] Estructura intervención:',JSON.stringify(primeraInterv));
+  intervenciones.forEach(i=>{
+    const campos=Object.keys(i);
+    const conFotos=campos.filter(c=>{
+      const val=i[c];
+      return val&&((Array.isArray(val)&&val.length>0)||(typeof val==='string'&&val.includes('http')));
+    });
+    if(conFotos.length) console.log('[Galería] Campos con datos en interv:',i.id,conFotos,conFotos.map(c=>i[c]));
+  });
   const todasLasFotos=[];
   intervenciones.forEach(i=>{
     if(i.fotos&&i.fotos.length){
