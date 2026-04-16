@@ -3419,7 +3419,7 @@ function renderAprobaciones(){
     const urlInforme=a.pdf_url||generarUrlInforme(a.id);
     return `<tr>
       <td class="td-mono" style="font-size:11px;">${fmtF(a.fecha_servicio)}</td>
-      <td style="font-weight:600;">${cli?cli.nombre:'—'}</td>
+      <td style="font-weight:600;">${'Informe #'+(a.numero||'—')+' — '+(cli?cli.nombre:'—')}</td>
       <td>${eq?eq.nombre:'—'}</td>
       <td>${a.tecnico||'—'}</td>
       <td>${firmaHtml}${a.nombre_firmante?`<div style="font-size:10px;color:var(--text-dim);">${a.nombre_firmante}</div>`:''}</td>
@@ -3437,7 +3437,7 @@ function renderAprobaciones(){
   }).join('');
   el.innerHTML=`<div style="overflow-x:auto;"><table class="aprob-table">
     <thead><tr>
-      <th>Fecha</th><th>Cliente</th><th>Equipo</th><th>Técnico</th><th>Firma</th><th>Estado</th><th>Acciones</th>
+      <th>Fecha</th><th>Informe / Cliente</th><th>Equipo</th><th>Técnico</th><th>Firma</th><th>Estado</th><th>Acciones</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
@@ -3533,11 +3533,15 @@ async function aprobarPreventivo(id){
   }catch(e){console.warn('Storage no disponible, usando URL de app como fallback:',e.message);}
   // PASO 3: Aprobar en Supabase — esto siempre se ejecuta
   const urlPublica=window.location.origin+window.location.pathname+'?informe='+aprobacion.id;
+  const aprobaciones_nums=await api('preventivos_aprobacion?select=numero&order=numero.desc&limit=1');
+  const ultimoNum=aprobaciones_nums&&aprobaciones_nums[0]&&aprobaciones_nums[0].numero?parseInt(aprobaciones_nums[0].numero):100;
+  const proximoNumAprobacion=ultimoNum+1;
   try{
     await api('preventivos_aprobacion?id=eq.'+id,{
       method:'PATCH',
       body:JSON.stringify({
         estado:'aprobado',
+        numero:proximoNumAprobacion,
         pdf_url:urlPublica,
         aprobado_por:usuarioActual.nombre,
         fecha_aprobacion:new Date().toISOString()
@@ -4036,6 +4040,9 @@ function abrirModalPpto(id=null){
     }
   }else{
     document.getElementById('tPpto').textContent='Nuevo Presupuesto';
+    const numeros=presupuestos.map(p=>parseInt(p.numero)||0).filter(n=>!isNaN(n));
+    const maxNumero=numeros.length?Math.max(...numeros):1989;
+    document.getElementById('pNumero').value=maxNumero+1;
     agregarSeccion();
   }
   renderSecciones();
