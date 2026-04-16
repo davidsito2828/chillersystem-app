@@ -703,7 +703,8 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn" id="tabEventual" onclick="showTab('eventual',this)">🔖 Eventuales</button>
   <button class="nav-btn admin-only" id="tabPpto" onclick="showTab('presupuestos',this)">💼 Presupuestos</button>
   <button class="nav-btn admin-only" id="tabInformes" onclick="showTab('informes',this)">📊 Informes</button>
-  <button class="nav-btn admin-only" id="tabTareas" onclick="showTab('tareas',this)">⚙️ Config. Tareas</button>
+  <button class="nav-btn" id="tabGaleria" onclick="showTab('galeria',this)">📷 Galería</button>
+  <button class="nav-btn" id="tabTareas" onclick="showTab('tareas',this)">⚙️ Config. Tareas</button>
   <button class="nav-btn admin-only" id="tabAprobaciones" onclick="showTab('aprobaciones',this)">✅ Aprobaciones</button>
 </div>
 
@@ -1329,6 +1330,16 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- ═══ GALERÍA ═══ -->
+<div id="tab-galeria" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">📷 Galería de trabajos</div>
+    </div>
+  </div>
+  <div id="galeriaContenido" style="padding:16px;"></div>
+</div>
+
 <!-- MODAL INFORME -->
 <div class="modal-overlay" id="mInforme">
   <div class="modal" style="max-width:700px;">
@@ -1867,6 +1878,7 @@ async function iniciarApp(){
   document.getElementById('tabCli').style.display=isAdmin?'':'none';
   document.getElementById('tabUsers').classList.toggle('hidden',!isAdmin);
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+  document.getElementById('tabGaleria').style.display=puedeVerGaleria()?'':'none';
   // Si técnico, ir directo a equipos
   if(!isAdmin){
     document.getElementById('tab-clientes').style.display='none';
@@ -2187,7 +2199,15 @@ async function subirFotos(files,carpeta){
 }
 function fotosHTML(fotos){
   if(!fotos||!fotos.length)return '';
-  return `<div class="fotos-grid">${fotos.map(u=>`<img class="foto-thumb" src="${u}" onclick="openLB('${u}')" loading="lazy"/>`).join('')}</div>`;
+  return '<div style="margin-top:8px;">'+
+    '<div style="font-size:10px;color:#3b82f6;font-weight:700;letter-spacing:1px;margin-bottom:6px;">📷 '+fotos.length+' FOTO(S)</div>'+
+    '<div class="fotos-grid">'+
+    fotos.map(u=>
+      '<img class="foto-thumb" src="'+u+'" onclick="openLB(\''+u+'\')" loading="lazy"'+
+      ' style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid #3b82f6;cursor:pointer;transition:transform 0.2s;"'+
+      ' onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'"/>'
+    ).join('')+
+    '</div></div>';
 }
 function openLB(url){document.getElementById('lbImg').src=url;document.getElementById('lightbox').classList.add('open');}
 function closeLB(){document.getElementById('lightbox').classList.remove('open');}
@@ -3477,6 +3497,7 @@ function renderAprobaciones(){
           :`<div style="display:flex;gap:5px;flex-wrap:wrap;">
               <a href="${urlInforme}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
               <button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="mostrarModalWhatsApp('${a.id}')">📲 WhatsApp</button>
+              ${esGerencia()?`<button onclick="eliminarAprobacion('${a.id}')" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">🗑️</button>`:''}
             </div>`
         }
       </td>
@@ -3602,6 +3623,15 @@ async function aprobarPreventivo(id){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
+async function eliminarAprobacion(id){
+  if(!confirm('¿Eliminar este informe de aprobación? Esta acción no se puede deshacer.')) return;
+  try{
+    await api('preventivos_aprobacion?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Informe eliminado ✓','success');
+    await loadAprobaciones();
+  }catch(e){showToast('Error al eliminar: '+e.message,true);}
+}
+
 async function mostrarInformePublico(aprobacionId){
   document.body.innerHTML='<div style="font-family:Arial,sans-serif;background:#f4f6f9;min-height:100vh;display:flex;justify-content:center;padding:20px;"><div id="informePublicoInner" style="width:100%;max-width:750px;"><div style="text-align:center;padding:40px;color:#666;">Cargando informe...</div></div></div>';
   try{
@@ -3699,8 +3729,9 @@ function setFiltro(v,btn){
   if(histClienteActual) volverHistClientes(); else renderHist();
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
+function puedeVerGaleria(){return !esTecnico();}
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
@@ -3710,6 +3741,68 @@ function showTab(id,btn){
   if(id==='informes'){loadInformes();}
   if(id==='tareas'){renderConfigTareas();}
   if(id==='aprobaciones'){loadAprobaciones().then(renderAprobaciones);}
+  if(id==='galeria'){renderGaleria();}
+}
+
+async function renderGaleria(){
+  const contenedor=document.getElementById('galeriaContenido');
+  contenedor.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);">Cargando fotos...</div>';
+  const todasLasFotos=[];
+  intervenciones.forEach(i=>{
+    if(i.fotos&&i.fotos.length){
+      const eq=equipos.find(e=>e.id===i.equipo_id);
+      const cli=clientes.find(c=>c.id===i.cliente_id||(eq&&c.id===eq.cliente_id));
+      i.fotos.forEach(url=>{
+        todasLasFotos.push({url,fecha:i.fecha,tecnico:i.tecnico||'—',cliente:cli?cli.nombre:'—',equipo:eq?eq.nombre:'—',tipo:i.tipo,intervencion_id:i.id});
+      });
+    }
+  });
+  const clientesConFotos=[...new Set(todasLasFotos.map(f=>f.cliente))].sort();
+  let html='';
+  html+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">';
+  html+='<select id="filtroGaleriaCliente" onchange="filtrarGaleria()" class="search-box" style="width:auto;min-width:200px;">'+
+    '<option value="">— Todos los clientes —</option>'+
+    clientesConFotos.map(c=>'<option value="'+c+'">'+c+'</option>').join('')+
+    '</select>';
+  html+='<select id="filtroGaleriaTipo" onchange="filtrarGaleria()" class="search-box" style="width:auto;">'+
+    '<option value="">— Todos los tipos —</option>'+
+    '<option value="Preventivo">Preventivo</option>'+
+    '<option value="Correctivo">Correctivo</option>'+
+    '</select>';
+  html+='<span id="galeriaCount" style="font-size:12px;color:var(--text-dim);">'+todasLasFotos.length+' foto(s)</span>';
+  html+='</div>';
+  html+='<div id="galeriaGrid">'+renderGaleriaGrid(todasLasFotos)+'</div>';
+  contenedor.innerHTML=html;
+  window._todasLasFotos=todasLasFotos;
+}
+
+function renderGaleriaGrid(fotos){
+  if(!fotos.length) return '<div style="text-align:center;padding:40px;color:var(--text-dim);">Sin fotos para mostrar</div>';
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">'+
+    fotos.map(f=>
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;" onclick="openLB(\''+f.url+'\')">'+
+      '<img src="'+f.url+'" loading="lazy" style="width:100%;height:130px;object-fit:cover;display:block;"/>'+
+      '<div style="padding:8px;">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+f.cliente+'</div>'+
+      '<div style="font-size:10px;color:var(--text-dim);">'+f.equipo+'</div>'+
+      '<div style="display:flex;justify-content:space-between;margin-top:4px;">'+
+      '<span style="font-size:10px;color:var(--text-dim);">'+fmtF(f.fecha)+'</span>'+
+      '<span class="badge '+(f.tipo==='Correctivo'?'b-correctivo':'b-preventivo2')+'" style="font-size:9px;padding:1px 5px;">'+f.tipo+'</span>'+
+      '</div>'+
+      '<div style="font-size:10px;color:var(--text-dim);margin-top:2px;">👷 '+f.tecnico+'</div>'+
+      '</div></div>'
+    ).join('')+
+  '</div>';
+}
+
+function filtrarGaleria(){
+  const cliente=document.getElementById('filtroGaleriaCliente').value;
+  const tipo=document.getElementById('filtroGaleriaTipo').value;
+  let fotos=window._todasLasFotos||[];
+  if(cliente) fotos=fotos.filter(f=>f.cliente===cliente);
+  if(tipo) fotos=fotos.filter(f=>f.tipo===tipo);
+  document.getElementById('galeriaCount').textContent=fotos.length+' foto(s)';
+  document.getElementById('galeriaGrid').innerHTML=renderGaleriaGrid(fotos);
 }
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){
@@ -3950,24 +4043,33 @@ function renderPresupuestos(){
     const puedeAvanzar=puedeAvanzarEstadoPpto()&&!!siguienteEstado[flujo];
     const facturado50i=p.facturado_50_inicial||false;
     const facturado50f=p.facturado_50_final||false;
+    const histFact=p.historial_estados||[];
+    const regInicial=histFact.filter(h=>h.estado==='facturacion_inicial'&&h.accion==='facturado').pop();
+    const regFinal=histFact.filter(h=>h.estado==='facturacion_final'&&h.accion==='facturado').pop();
     let badgeFacturacion='';
     if(puedeVerPresupuestos()&&(flujo==='en_ejecucion'||flujo==='finalizado')){
       badgeFacturacion='<div style="margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;">';
       if(flujo==='en_ejecucion'||flujo==='finalizado'){
-        badgeFacturacion+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
+        badgeFacturacion+='<div>'+
+          '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
           '<input type="checkbox" '+(facturado50i?'checked':'')+
           ' onchange="toggleFacturacion(\''+p.id+'\',\'inicial\',this.checked)"'+
           ' style="accent-color:#059669;width:14px;height:14px;"/>'+
           '<span style="color:'+(facturado50i?'#059669':'#6b7280')+';font-weight:'+(facturado50i?'700':'400')+
-          ';">50% inicial facturado</span></label>';
+          ';">50% inicial facturado</span></label>'+
+          (regInicial?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regInicial.usuario+' — '+fmtF(regInicial.fecha)+'</div>':'')+
+          '</div>';
       }
       if(flujo==='finalizado'){
-        badgeFacturacion+='<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
+        badgeFacturacion+='<div>'+
+          '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
           '<input type="checkbox" '+(facturado50f?'checked':'')+
           ' onchange="toggleFacturacion(\''+p.id+'\',\'final\',this.checked)"'+
           ' style="accent-color:#059669;width:14px;height:14px;"/>'+
           '<span style="color:'+(facturado50f?'#059669':'#6b7280')+';font-weight:'+(facturado50f?'700':'400')+
-          ';">50% final facturado</span></label>';
+          ';">50% final facturado</span></label>'+
+          (regFinal?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regFinal.usuario+' — '+fmtF(regFinal.fecha)+'</div>':'')+
+          '</div>';
       }
       badgeFacturacion+='</div>';
     }
@@ -4911,19 +5013,22 @@ function renderConfigTareas(){
             <span style="flex:1;font-size:12px;color:var(--text);">${t.nombre_tarea}</span>
             <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
               <label style="font-size:11px;color:var(--text-dim);">c/</label>
-              <input type="number" value="${t.frecuencia_dias}" min="1" max="730"
-                style="width:58px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text);font-family:inherit;text-align:right;"
-                onchange="guardarFrecuenciaTarea('${t.id}',this.value)"
-                onblur="guardarFrecuenciaTarea('${t.id}',this.value)"/>
+              ${!esTecnico()
+                ?`<input type="number" value="${t.frecuencia_dias}" min="1" max="730"
+                    style="width:58px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);color:var(--text);font-family:inherit;text-align:right;"
+                    onchange="guardarFrecuenciaTarea('${t.id}',this.value)"
+                    onblur="guardarFrecuenciaTarea('${t.id}',this.value)"/>`
+                :`<span style="width:58px;font-size:12px;padding:3px 6px;text-align:right;display:inline-block;">${t.frecuencia_dias}</span>`
+              }
               <label style="font-size:11px;color:var(--text-dim);">días</label>
             </div>
-            <button onclick="toggleTareaActiva('${t.id}',${t.activa})"
+            ${!esTecnico()?`<button onclick="toggleTareaActiva('${t.id}',${t.activa})"
               style="padding:3px 10px;font-size:11px;border-radius:4px;cursor:pointer;font-family:inherit;border:1px solid;white-space:nowrap;
               background:${t.activa?'var(--red-bg)':'var(--green-bg)'};
               color:${t.activa?'var(--red)':'var(--green)'};
               border-color:${t.activa?'var(--red-border)':'var(--green-border)'};">
               ${t.activa?'✕ Desactivar':'✓ Activar'}
-            </button>
+            </button>`:''}
           </div>`).join('')}
       </div>
     </div>`).join('');
