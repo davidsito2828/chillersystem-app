@@ -3476,7 +3476,6 @@ async function aprobarPreventivo(id){
   // PASO 3: Aprobar en Supabase — esto siempre se ejecuta
   const urlPublica=window.location.origin+window.location.pathname+'?informe='+aprobacion.id;
   try{
-    // 3a: actualizar estado y metadatos
     await api('preventivos_aprobacion?id=eq.'+id,{
       method:'PATCH',
       body:JSON.stringify({
@@ -3487,17 +3486,6 @@ async function aprobarPreventivo(id){
       }),
       headers:{...H,'Prefer':'return=minimal'}
     });
-    // 3b: guardar informe_html por separado (columna text grande)
-    const resHtml=await fetch(SURL+'/rest/v1/preventivos_aprobacion?id=eq.'+aprobacion.id,{
-      method:'PATCH',
-      body:JSON.stringify({informe_html:htmlInforme}),
-      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'application/json','Prefer':'return=minimal'}
-    });
-    if(!resHtml.ok){
-      const errText=await resHtml.text();
-      console.error('Error guardando informe_html:',resHtml.status,errText);
-      showToast('Error al guardar informe: '+resHtml.status,true);
-    }
     await loadAprobaciones();
     renderAprobaciones();
     showToast('✅ Preventivo aprobado','success');
@@ -3508,20 +3496,38 @@ async function aprobarPreventivo(id){
 async function mostrarInformePublico(aprobacionId){
   document.body.innerHTML='<div style="font-family:Arial,sans-serif;background:#f4f6f9;min-height:100vh;display:flex;justify-content:center;padding:20px;"><div id="informePublicoInner" style="width:100%;max-width:750px;"><div style="text-align:center;padding:40px;color:#666;">Cargando informe...</div></div></div>';
   try{
-    const res=await fetch(SURL+'/rest/v1/preventivos_aprobacion?id=eq.'+aprobacionId+'&select=informe_html',{
-      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY}
-    });
-    const data=await res.json();
-    if(!data||!data[0]||!data[0].informe_html){
-      document.getElementById('informePublicoInner').innerHTML='<div style="text-align:center;padding:40px;color:#e11d48;">⚠️ Informe no disponible o link inválido.</div>';
+    const H2={'apikey':SKEY,'Authorization':'Bearer '+SKEY};
+    const BASE=SURL+'/rest/v1';
+    // Traer aprobacion
+    const resAprob=await fetch(BASE+'/preventivos_aprobacion?id=eq.'+aprobacionId+'&select=*',{headers:H2});
+    const dataAprob=await resAprob.json();
+    if(!dataAprob||!dataAprob[0]){
+      document.getElementById('informePublicoInner').innerHTML='<div style="text-align:center;padding:40px;color:#e11d48;">⚠️ Informe no disponible.</div>';
       return;
     }
+    const aprob=dataAprob[0];
+    // Traer tareas e intervención en paralelo
+    const [resTareas,resInterv]=await Promise.all([
+      aprob.intervencion_id
+        ?fetch(BASE+'/tareas_realizadas?intervencion_id=eq.'+aprob.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
+        :Promise.resolve([]),
+      aprob.intervencion_id
+        ?fetch(BASE+'/intervenciones?id=eq.'+aprob.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
+        :Promise.resolve([])
+    ]);
+    const interv=resInterv[0]||{};
+    // Poblar globales mínimos para que generarHtmlInforme funcione
+    if(!clientes.length) clientes=await fetch(BASE+'/clientes?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
+    if(!equipos.length) equipos=await fetch(BASE+'/equipos?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
+    tareasRealizadas=resTareas||[];
+    if(!intervenciones.find(i=>i.id===aprob.intervencion_id)) intervenciones=[...intervenciones,interv];
+    const htmlInforme=generarHtmlInforme(aprob);
     document.getElementById('informePublicoInner').innerHTML=
       '<div style="text-align:right;margin-bottom:12px;">'+
       '<button onclick="window.print()" style="padding:10px 24px;background:#1a2332;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>'+
-      data[0].informe_html;
+      htmlInforme;
   }catch(e){
-    document.getElementById('informePublicoInner').innerHTML='<div style="text-align:center;padding:40px;color:#e11d48;">Error al cargar el informe.</div>';
+    document.getElementById('informePublicoInner').innerHTML='<div style="text-align:center;padding:40px;color:#e11d48;">Error al cargar el informe: '+e.message+'</div>';
   }
 }
 
