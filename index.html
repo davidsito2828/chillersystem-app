@@ -3855,7 +3855,37 @@ function renderPresupuestos(){
     tb.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">💼</div><div class="empty-title">Sin presupuestos</div></div></td></tr>';
     return;
   }
+  const responsables={
+    'borrador':         'Pendiente revisión — Norberto García',
+    'en_revision':      'Pendiente aprobación — Norberto García',
+    'enviado':          'Esperando respuesta del cliente',
+    'aprobado_cliente': 'Pendiente inicio — David / Norberto',
+    'en_ejecucion':     '🔔 Pendiente facturar 50% inicial — Lucas Dimarchi',
+    'finalizado':       '🔔 Pendiente facturar 50% final — Lucas Dimarchi'
+  };
+  const coloresFlujo={
+    'borrador':         'background:#e5e7eb;color:#374151;',
+    'en_revision':      'background:#fef3c7;color:#92400e;',
+    'enviado':          'background:#dbeafe;color:#1e40af;',
+    'aprobado_cliente': 'background:#d1fae5;color:#065f46;',
+    'en_ejecucion':     'background:#fed7aa;color:#92400e;',
+    'finalizado':       'background:#bbf7d0;color:#14532d;'
+  };
+  const etiquetasFlujo={
+    'borrador':         '📝 Borrador',
+    'en_revision':      '🔍 En revisión',
+    'enviado':          '📤 Enviado al cliente',
+    'aprobado_cliente': '✅ Aprobado por cliente',
+    'en_ejecucion':     '⚙️ En ejecución',
+    'finalizado':       '🏁 Finalizado'
+  };
+  const siguienteEstado={
+    'borrador':'en_revision','en_revision':'enviado','enviado':'aprobado_cliente',
+    'aprobado_cliente':'en_ejecucion','en_ejecucion':'finalizado'
+  };
   tb.innerHTML=lista.map(p=>{
+    // CAMBIO 2: sincronizar estado_flujo con estado existente
+    if(p.estado==='aprobado'&&(!p.estado_flujo||p.estado_flujo==='borrador')) p.estado_flujo='enviado';
     const estadoStyle=p.estado==='borrador'
       ?'color:var(--red);background:var(--red-bg);border-color:var(--red-border)'
       :p.estado==='aprobado'
@@ -3864,23 +3894,13 @@ function renderPresupuestos(){
     const estadoLabel=p.estado==='borrador'?'🔴 Borrador':p.estado==='aprobado'?'✅ Aprobado':'📤 Enviado';
     const isCS=p.empresa==='ChillerSystem';
     const total=p.precio_total?'$'+Number(p.precio_total).toLocaleString('es-AR'):'—';
-    // Badge estado_flujo
+    // CAMBIO 1: badge estado_flujo simple
     const flujo=p.estado_flujo||'borrador';
-    const flujoStyle=ESTADOS_FLUJO_COLOR[flujo]||ESTADOS_FLUJO_COLOR.borrador;
-    const flujoLabel=ESTADOS_FLUJO_LABEL[flujo]||flujo;
-    const flujoIcon=flujo==='en_ejecucion'?'🔔 ':flujo==='finalizado'?'🔔 ':'';
-    const idxFlujo=ESTADOS_FLUJO.indexOf(flujo);
-    const puedeAvanzar=puedeAvanzarEstadoPpto()&&idxFlujo<ESTADOS_FLUJO.length-1;
-    // Línea de tiempo
-    const timeline=ESTADOS_FLUJO.map((ef,i)=>{
-      const done=i<=idxFlujo;
-      const hist=p.historial_estados&&p.historial_estados.find(h=>h.estado===ef);
-      const tooltip=hist?`${hist.fecha||''}${hist.usuario?' · '+hist.usuario:''}`:ESTADOS_FLUJO_LABEL[ef];
-      return `<span title="${tooltip}" style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;">
-        <span style="width:10px;height:10px;border-radius:50%;background:${done?'#2563eb':'#374151'};border:2px solid ${done?'#2563eb':'#4b5563'};display:inline-block;"></span>
-        <span style="font-size:8px;color:${done?'#93c5fd':'#6b7280'};white-space:nowrap;max-width:52px;overflow:hidden;text-overflow:ellipsis;">${ESTADOS_FLUJO_LABEL[ef].split(' ')[0]}</span>
-      </span>${i<ESTADOS_FLUJO.length-1?`<span style="width:16px;height:2px;background:${i<idxFlujo?'#2563eb':'#374151'};display:inline-block;margin-bottom:10px;"></span>`:''}`;
-    }).join('');
+    const puedeAvanzar=puedeAvanzarEstadoPpto()&&!!siguienteEstado[flujo];
+    const badgeFlujo='<div style="margin-top:6px;">'+
+      '<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(coloresFlujo[flujo]||'')+'">'+etiquetasFlujo[flujo]+'</span>'+
+      '<div style="font-size:10px;color:#6b7280;margin-top:3px;">'+(responsables[flujo]||'')+'</div>'+
+      '</div>';
     return `<tr>
       <td class="td-mono">${p.numero}</td>
       <td><span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span></td>
@@ -3889,15 +3909,14 @@ function renderPresupuestos(){
       <td class="td-mono" style="color:var(--green);">${total}</td>
       <td>
         <span class="badge" style="${estadoStyle}">${estadoLabel}</span>
-        <span class="badge" style="${flujoStyle};margin-top:3px;display:block;">${flujoIcon}${flujoLabel}</span>
-        <div style="margin-top:5px;display:flex;align-items:center;">${timeline}</div>
+        ${badgeFlujo}
       </td>
       <td class="td-dim">${p.created_at?fmtF(p.created_at.split('T')[0]):'—'}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
         <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
         <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
         ${p.estado==='borrador'?`<button class="btn-green" onclick="aprobarPpto('${p.id}')">✅ OK</button>`:''}
-        ${puedeAvanzar?`<button class="btn-edit" style="background:#1e3a5f;" onclick="abrirAvanzarEstado('${p.id}')">⏩</button>`:''}
+        ${puedeAvanzar?`<button class="btn-edit" style="background:#1e3a5f;" onclick="abrirModalAvanzarEstado('${p.id}','${flujo}','${p.numero}',${JSON.stringify(p.cliente_nombre||'')},${p.precio_total||0})">➡️</button>`:''}
         <button class="btn-danger" onclick="elimPpto('${p.id}')">🗑</button>
       </td>
     </tr>`;
@@ -4073,59 +4092,65 @@ async function elimPpto(id){
     showToast('Eliminado');await loadPresupuestos();}catch(e){showToast('Error',true);}
 }
 
-function abrirAvanzarEstado(id){
-  const p=presupuestos.find(x=>x.id===id);
-  if(!p) return;
-  const flujo=p.estado_flujo||'borrador';
-  const idx=ESTADOS_FLUJO.indexOf(flujo);
-  if(idx>=ESTADOS_FLUJO.length-1){showToast('Ya está en el estado final',true);return;}
-  const proximo=ESTADOS_FLUJO[idx+1];
-  document.getElementById('avanzarPptoId').value=id;
-  document.getElementById('avanzarEstadoActual').textContent=ESTADOS_FLUJO_LABEL[flujo];
-  document.getElementById('avanzarEstadoProximo').textContent=ESTADOS_FLUJO_LABEL[proximo];
-  document.getElementById('avanzarObservacion').value='';
-  document.getElementById('mAvanzarEstado').classList.add('open');
+const _etiquetasFlujoModal={
+  'borrador':'📝 Borrador','en_revision':'🔍 En revisión','enviado':'📤 Enviado al cliente',
+  'aprobado_cliente':'✅ Aprobado por cliente','en_ejecucion':'⚙️ En ejecución','finalizado':'🏁 Finalizado'
+};
+const _siguienteEstado={
+  'borrador':'en_revision','en_revision':'enviado','enviado':'aprobado_cliente',
+  'aprobado_cliente':'en_ejecucion','en_ejecucion':'finalizado'
+};
+
+function abrirModalAvanzarEstado(pId,estadoActual,numero,cliente,monto){
+  const siguiente=_siguienteEstado[estadoActual];
+  if(!siguiente){showToast('Ya está en el estado final',true);return;}
+  const ok=confirm(
+    'Avanzar Presupuesto #'+numero+'\n'+
+    'Cliente: '+cliente+'\n\n'+
+    'Estado actual: '+(_etiquetasFlujoModal[estadoActual]||estadoActual)+'\n'+
+    'Próximo estado: '+(_etiquetasFlujoModal[siguiente]||siguiente)+'\n\n'+
+    '¿Confirmar?'
+  );
+  if(ok) avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto);
 }
 
-async function confirmarAvanceEstado(){
-  const id=document.getElementById('avanzarPptoId').value;
-  const p=presupuestos.find(x=>x.id===id);
-  if(!p) return;
-  const flujoActual=p.estado_flujo||'borrador';
-  const idx=ESTADOS_FLUJO.indexOf(flujoActual);
-  const nuevoEstado=ESTADOS_FLUJO[idx+1];
-  const obs=document.getElementById('avanzarObservacion').value.trim();
-  const entrada={estado:nuevoEstado,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre};
-  if(obs) entrada.observacion=obs;
-  const historial=[...(p.historial_estados||[]),entrada];
+async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
+  const siguiente=_siguienteEstado[estadoActual];
+  if(!siguiente) return;
+  const ppto=presupuestos.find(x=>x.id===pId);
+  const historial=[...(ppto&&ppto.historial_estados||[])];
+  historial.push({estado:siguiente,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
   try{
-    await api('presupuestos?id=eq.'+id,{
+    await api('presupuestos?id=eq.'+pId,{
       method:'PATCH',
-      body:JSON.stringify({estado_flujo:nuevoEstado,historial_estados:historial}),
+      body:JSON.stringify({estado_flujo:siguiente,historial_estados:historial}),
       headers:{...H,'Prefer':'return=minimal'}
     });
-    // Crear notificación si aplica
-    if(nuevoEstado==='en_ejecucion'||nuevoEstado==='finalizado'){
-      const tipo=nuevoEstado==='en_ejecucion'?'50% inicial':'50% final';
-      const monto=p.precio_total?'$'+Number(p.precio_total/2).toLocaleString('es-AR'):'';
-      const msg=`💰 Facturar ${tipo} — Presupuesto #${p.numero} — ${p.cliente_nombre||'Cliente'}${monto?' — '+monto:''}`;
+    if(siguiente==='en_ejecucion'||siguiente==='finalizado'){
+      const tipoFactura=siguiente==='en_ejecucion'?'50% inicial':'50% final';
+      const montoFactura=Math.round((monto||0)*0.5);
       await api('notificaciones',{
         method:'POST',
-        body:JSON.stringify({mensaje:msg,tipo:'facturacion',leida:false,destinatario_jerarquia:'administrativo,supervisor_admin',creada_en:new Date().toISOString()}),
+        body:JSON.stringify({
+          mensaje:'💰 Facturar '+tipoFactura+' — Presupuesto #'+numero+' — '+cliente+' — $'+montoFactura.toLocaleString('es-AR'),
+          tipo:'facturacion',leida:false,destinatario_jerarquia:'administrativo'
+        }),
         headers:{...H,'Prefer':'return=minimal'}
       }).catch(()=>{});
     }
-    cerrar('mAvanzarEstado');
+    showToast('Estado actualizado ✓','success');
     await loadPresupuestos();
     await loadNotificaciones();
-    showToast('✅ Estado actualizado a: '+ESTADOS_FLUJO_LABEL[nuevoEstado],'success');
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
 async function loadNotificaciones(){
   try{
+    const jerarquia=usuarioActual&&usuarioActual.jerarquia;
+    if(!jerarquia||esTecnico()){notificaciones=[];renderBadgeNotif();return;}
     const todas=await api('notificaciones?leida=eq.false&order=creada_en.desc');
-    notificaciones=todas||[];
+    // Filtrar por jerarquía destinataria (campo puede contener múltiples valores separados por coma)
+    notificaciones=(todas||[]).filter(n=>!n.destinatario_jerarquia||n.destinatario_jerarquia.includes(jerarquia));
     renderBadgeNotif();
   }catch(e){notificaciones=[];}
 }
