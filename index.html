@@ -956,7 +956,7 @@ tbody tr:hover{background:#f8faff;}
         <!-- FOTOS -->
         <div class="form-group full">
           <label class="form-label">Fotos del equipo / trabajo</label>
-          <div class="foto-upload-area" onclick="document.getElementById('fotoServiceInput').click()">
+          <div class="foto-upload-area" onclick="abrirCamaraService('fotoServiceInput')">
             <input type="file" id="fotoServiceInput" accept="image/*" multiple onchange="previewFotos(this,'serviceFotoPreview','serviceFotosNuevas')"/>
             <div style="color:var(--text-dim);font-size:13px;">📷 Subir fotos</div>
           </div>
@@ -1924,8 +1924,49 @@ async function iniciarApp(){
     if(isAdmin){await loadUsuarios();await loadAprobaciones();}
     await loadNotificaciones();
     setStatus(true); calcAlertas();
+    restaurarEstadoService();
   }catch(e){setStatus(false);showToast('Error de conexión',true);}
   iniciarRealtime();
+}
+
+function abrirCamaraService(inputId){
+  // Guardar estado del service en localStorage antes de abrir la cámara
+  // En Android, abrir la cámara puede descartar el estado de la app
+  try{
+    const estadoService={
+      clienteId:serviceClienteActual,
+      planilla:servicePlanilla,
+      eqId:document.getElementById('serviceEqId')?.value||null,
+      timestamp:Date.now()
+    };
+    localStorage.setItem('serviceEstadoTemp',JSON.stringify(estadoService));
+  }catch(e){console.warn('[abrirCamaraService] No se pudo guardar estado:',e);}
+  document.getElementById(inputId).click();
+}
+
+function restaurarEstadoService(){
+  const guardado=localStorage.getItem('serviceEstadoTemp');
+  if(!guardado) return;
+  try{
+    const estado=JSON.parse(guardado);
+    // Solo restaurar si tiene menos de 10 minutos
+    if(Date.now()-estado.timestamp>600000){
+      localStorage.removeItem('serviceEstadoTemp');
+      return;
+    }
+    if(estado.clienteId){
+      serviceClienteActual=estado.clienteId;
+      servicePlanilla=estado.planilla||{};
+      const tabServiceBtn=document.getElementById('tabService');
+      if(tabServiceBtn) showTab('service',tabServiceBtn);
+      const cli=clientes.find(c=>c.id===estado.clienteId);
+      if(cli) abrirServiceCliente(estado.clienteId,true);
+      showToast('✅ Service restaurado — continuá desde donde estabas','success');
+    }
+    localStorage.removeItem('serviceEstadoTemp');
+  }catch(e){
+    localStorage.removeItem('serviceEstadoTemp');
+  }
 }
 
 // ── SUPABASE REALTIME ──
@@ -2969,8 +3010,9 @@ function renderServiceClientes(lista){
 function filtrarClienteService(q){
   renderServiceClientes(clisFiltrados().filter(c=>c.nombre.toLowerCase().includes(q.toLowerCase())));
 }
-function abrirServiceCliente(cliId){
-  serviceClienteActual=cliId;servicePlanilla={};
+function abrirServiceCliente(cliId,restaurando=false){
+  serviceClienteActual=cliId;
+  if(!restaurando) servicePlanilla={};
   const c=clientes.find(x=>x.id===cliId);
   const eqs=equipos.filter(e=>e.cliente_id===cliId);
   document.getElementById('serviceClienteNombre').textContent=c.nombre;
