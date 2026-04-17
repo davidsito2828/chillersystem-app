@@ -706,6 +706,7 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn" id="tabGaleria" onclick="showTab('galeria',this)">📷 Galería</button>
   <button class="nav-btn" id="tabTareas" onclick="showTab('tareas',this)">⚙️ Config. Tareas</button>
   <button class="nav-btn admin-only" id="tabAprobaciones" onclick="showTab('aprobaciones',this)">✅ Aprobaciones</button>
+  <button class="nav-btn" id="tabEstadisticas" onclick="showTab('estadisticas',this)">📊 Estadísticas</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -1340,6 +1341,16 @@ tbody tr:hover{background:#f8faff;}
   <div id="galeriaContenido" style="padding:16px;"></div>
 </div>
 
+<!-- ═══ ESTADÍSTICAS ═══ -->
+<div id="tab-estadisticas" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">📊 Estadísticas</div>
+    </div>
+  </div>
+  <div id="estadisticasContenido" style="padding:16px;"></div>
+</div>
+
 <!-- MODAL INFORME -->
 <div class="modal-overlay" id="mInforme">
   <div class="modal" style="max-width:700px;">
@@ -1879,6 +1890,7 @@ async function iniciarApp(){
   document.getElementById('tabUsers').classList.toggle('hidden',!isAdmin);
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
   document.getElementById('tabGaleria').style.display=puedeVerGaleria()?'':'none';
+  document.getElementById('tabEstadisticas').style.display=puedeVerEstadisticas()?'':'none';
   // Si técnico, ir directo a equipos
   if(!isAdmin){
     document.getElementById('tab-clientes').style.display='none';
@@ -3730,8 +3742,9 @@ function setFiltro(v,btn){
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
 function puedeVerGaleria(){return !esTecnico();}
+function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
@@ -3742,6 +3755,7 @@ function showTab(id,btn){
   if(id==='tareas'){renderConfigTareas();}
   if(id==='aprobaciones'){loadAprobaciones().then(renderAprobaciones);}
   if(id==='galeria'){renderGaleria();}
+  if(id==='estadisticas'){renderEstadisticas();}
 }
 
 async function renderGaleria(){
@@ -3795,7 +3809,11 @@ async function renderGaleria(){
 }
 
 function renderGaleriaGrid(fotos){
-  if(!fotos.length) return '<div style="text-align:center;padding:40px;color:var(--text-dim);">Sin fotos para mostrar</div>';
+  if(!fotos.length) return '<div style="text-align:center;padding:60px 20px;">'+
+    '<div style="font-size:48px;margin-bottom:16px;">📷</div>'+
+    '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">Sin fotos cargadas</div>'+
+    '<div style="font-size:13px;color:var(--text-dim);">Las fotos se cargan desde el módulo Service al registrar cada trabajo.</div>'+
+    '</div>';
   return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">'+
     fotos.map(f=>
       '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;" onclick="openLB(\''+f.url+'\')">'+
@@ -3822,6 +3840,117 @@ function filtrarGaleria(){
   document.getElementById('galeriaCount').textContent=fotos.length+' foto(s)';
   document.getElementById('galeriaGrid').innerHTML=renderGaleriaGrid(fotos);
 }
+async function renderEstadisticas(){
+  const contenedor=document.getElementById('estadisticasContenido');
+  contenedor.innerHTML='<div style="text-align:center;padding:20px;">Calculando...</div>';
+  const statsPorCliente=clientes.map(c=>{
+    const eqs=equipos.filter(e=>e.cliente_id===c.id);
+    const intervCliente=intervenciones.filter(i=>i.cliente_id===c.id||eqs.some(e=>e.id===i.equipo_id));
+    const preventivos=intervCliente.filter(i=>i.tipo==='Preventivo').length;
+    const correctivos=intervCliente.filter(i=>i.tipo==='Correctivo').length;
+    const ultima=[...intervCliente].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))[0];
+    const pptosCliente=presupuestos.filter(p=>p.cliente_id===c.id);
+    const pptosAprobados=pptosCliente.filter(p=>p.estado_flujo==='aprobado_cliente'||p.estado_flujo==='en_ejecucion'||p.estado_flujo==='finalizado').length;
+    const fallasPorEquipo={};
+    intervCliente.filter(i=>i.tipo==='Correctivo').forEach(i=>{if(i.equipo_id)fallasPorEquipo[i.equipo_id]=(fallasPorEquipo[i.equipo_id]||0)+1;});
+    const eqMasFallas=Object.entries(fallasPorEquipo).sort((a,b)=>b[1]-a[1])[0];
+    const nombreEqMasFallas=eqMasFallas?((equipos.find(e=>e.id===eqMasFallas[0])?.nombre||'—')+' ('+eqMasFallas[1]+' fallas)'):'—';
+    return{cliente:c,total:intervCliente.length,preventivos,correctivos,ultimaFecha:ultima?ultima.fecha:null,pptosTotal:pptosCliente.length,pptosAprobados,eqMasFallas:nombreEqMasFallas};
+  }).filter(s=>s.total>0).sort((a,b)=>b.total-a.total);
+
+  const hoy=new Date();
+  const meses=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const label=d.toLocaleDateString('es-AR',{month:'short',year:'numeric'});
+    const count=intervenciones.filter(iv=>iv.fecha&&iv.fecha.startsWith(key)).length;
+    meses.push({key,label,count});
+  }
+  const maxMes=Math.max(...meses.map(m=>m.count),1);
+
+  const totalInterv=intervenciones.length;
+  const totalCorrectivos=intervenciones.filter(i=>i.tipo==='Correctivo').length;
+  const totalPreventivos=intervenciones.filter(i=>i.tipo==='Preventivo').length;
+  const totalPptosAprobados=presupuestos.filter(p=>p.estado_flujo==='aprobado_cliente'||p.estado_flujo==='en_ejecucion'||p.estado_flujo==='finalizado').length;
+
+  let html='';
+
+  // Cards resumen
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;">';
+  [{icon:'🔧',valor:totalInterv,label:'Total trabajos',color:'#3b82f6'},{icon:'✅',valor:totalPreventivos,label:'Preventivos',color:'#059669'},{icon:'🔴',valor:totalCorrectivos,label:'Correctivos',color:'#dc2626'},{icon:'📋',valor:totalPptosAprobados,label:'Pptos aprobados',color:'#7c3aed'},{icon:'👥',valor:clientes.length,label:'Clientes activos',color:'#0891b2'}].forEach(c=>{
+    html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">';
+    html+='<div style="font-size:28px;">'+c.icon+'</div>';
+    html+='<div style="font-size:28px;font-weight:900;color:'+c.color+';">'+c.valor+'</div>';
+    html+='<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">'+c.label+'</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // Gráfico por mes
+  html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;">';
+  html+='<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;">📈 Trabajos por mes (últimos 6 meses)</div>';
+  html+='<div style="display:flex;align-items:flex-end;gap:8px;height:120px;">';
+  meses.forEach(m=>{
+    const altura=Math.round((m.count/maxMes)*100);
+    html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">';
+    html+='<div style="font-size:11px;font-weight:700;color:var(--text);">'+m.count+'</div>';
+    html+='<div style="width:100%;background:#3b82f6;border-radius:4px 4px 0 0;height:'+altura+'px;min-height:'+(m.count?4:0)+'px;"></div>';
+    html+='<div style="font-size:10px;color:var(--text-dim);text-align:center;">'+m.label+'</div>';
+    html+='</div>';
+  });
+  html+='</div></div>';
+
+  // Rankings
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">';
+  html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;">';
+  html+='<div style="font-size:13px;font-weight:700;margin-bottom:12px;">🏆 Ranking por trabajos</div>';
+  statsPorCliente.slice(0,5).forEach((s,i)=>{
+    const pct=Math.round((s.total/(statsPorCliente[0]?.total||1))*100);
+    html+='<div style="margin-bottom:10px;">';
+    html+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">';
+    html+='<span>'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':'  ')+' '+s.cliente.nombre+'</span>';
+    html+='<span style="font-weight:700;">'+s.total+'</span></div>';
+    html+='<div style="background:var(--border);border-radius:4px;height:6px;"><div style="background:#3b82f6;width:'+pct+'%;height:100%;border-radius:4px;"></div></div></div>';
+  });
+  html+='</div>';
+  const rankCorrectivos=[...statsPorCliente].sort((a,b)=>b.correctivos-a.correctivos).slice(0,5);
+  html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;">';
+  html+='<div style="font-size:13px;font-weight:700;margin-bottom:12px;">🔴 Más correctivos</div>';
+  rankCorrectivos.forEach((s)=>{
+    const pct=Math.round((s.correctivos/(rankCorrectivos[0]?.correctivos||1))*100);
+    html+='<div style="margin-bottom:10px;">';
+    html+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">';
+    html+='<span>'+s.cliente.nombre+'</span>';
+    html+='<span style="font-weight:700;color:#dc2626;">'+s.correctivos+' correctivos</span></div>';
+    html+='<div style="background:var(--border);border-radius:4px;height:6px;"><div style="background:#dc2626;width:'+pct+'%;height:100%;border-radius:4px;"></div></div></div>';
+  });
+  html+='</div></div>';
+
+  // Tabla detalle
+  html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;">';
+  html+='<div style="font-size:13px;font-weight:700;margin-bottom:12px;">📋 Detalle por cliente</div>';
+  html+='<div style="overflow-x:auto;"><table width="100%" style="border-collapse:collapse;font-size:12px;">';
+  html+='<thead><tr style="border-bottom:2px solid var(--border);">';
+  html+='<th style="padding:8px;text-align:left;">Cliente</th><th style="padding:8px;text-align:center;">Total</th><th style="padding:8px;text-align:center;">✅ Prev.</th><th style="padding:8px;text-align:center;">🔴 Corr.</th><th style="padding:8px;text-align:left;">Equipo con más fallas</th><th style="padding:8px;text-align:center;">Pptos aprobados</th><th style="padding:8px;text-align:center;">Último service</th>';
+  html+='</tr></thead><tbody>';
+  statsPorCliente.forEach((s,i)=>{
+    const bg=i%2===0?'':'background:rgba(255,255,255,0.02);';
+    html+='<tr style="border-bottom:1px solid var(--border);'+bg+'">';
+    html+='<td style="padding:8px;font-weight:700;">'+s.cliente.nombre+'</td>';
+    html+='<td style="padding:8px;text-align:center;font-weight:700;color:#3b82f6;">'+s.total+'</td>';
+    html+='<td style="padding:8px;text-align:center;color:#059669;">'+s.preventivos+'</td>';
+    html+='<td style="padding:8px;text-align:center;color:#dc2626;">'+s.correctivos+'</td>';
+    html+='<td style="padding:8px;font-size:11px;">'+s.eqMasFallas+'</td>';
+    html+='<td style="padding:8px;text-align:center;">'+s.pptosAprobados+'/'+s.pptosTotal+'</td>';
+    html+='<td style="padding:8px;text-align:center;font-size:11px;">'+(s.ultimaFecha?fmtF(s.ultimaFecha):'—')+'</td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  contenedor.innerHTML=html;
+}
+
 function cerrar(id){document.getElementById(id).classList.remove('open');}
 function calcProx(desde,dias){
   // Suma `dias` días hábiles (lun-sab) desde `desde`, saltando domingos
