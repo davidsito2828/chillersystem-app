@@ -956,9 +956,9 @@ tbody tr:hover{background:#f8faff;}
         <!-- FOTOS -->
         <div class="form-group full">
           <label class="form-label">Fotos del equipo / trabajo</label>
-          <div class="foto-upload-area" onclick="abrirCamaraService('fotoServiceInput')">
-            <input type="file" id="fotoServiceInput" accept="image/*" multiple onchange="previewFotos(this,'serviceFotoPreview','serviceFotosNuevas')"/>
-            <div style="color:var(--text-dim);font-size:13px;">📷 Subir fotos</div>
+          <input type="file" id="fotoServiceInput" accept="image/*" multiple style="display:none;" onchange="previewFotos(this,'serviceFotoPreview','serviceFotosNuevas')"/>
+          <div class="foto-upload-area" onclick="abrirCamaraIntegrada(function(fotos){serviceFotosNuevas=fotos;const prev=document.getElementById('serviceFotoPreview');if(prev)prev.innerHTML=fotos.map(f=>{const url=URL.createObjectURL(f);return'<div class=\'foto-preview\'><img src=\''+url+'\' style=\'width:80px;height:80px;object-fit:cover;border-radius:6px;\'/></div>';}).join('');})">
+            <div style="color:var(--text-dim);font-size:13px;">📷 Tomar foto</div>
           </div>
           <div class="foto-preview-grid" id="serviceFotoPreview"></div>
         </div>
@@ -1929,19 +1929,54 @@ async function iniciarApp(){
   iniciarRealtime();
 }
 
-function abrirCamaraService(inputId){
-  // Guardar estado del service en localStorage antes de abrir la cámara
-  // En Android, abrir la cámara puede descartar el estado de la app
+let camaraStream=null;
+let camaraCallback=null;
+let fotosCamaraCapturadas=[];
+
+async function abrirCamaraIntegrada(callback){
+  camaraCallback=callback;
+  fotosCamaraCapturadas=[];
+  document.getElementById('camaraFotosPreview').innerHTML='';
   try{
-    const estadoService={
-      clienteId:serviceClienteActual,
-      planilla:servicePlanilla,
-      eqId:document.getElementById('serviceEqId')?.value||null,
-      timestamp:Date.now()
-    };
-    localStorage.setItem('serviceEstadoTemp',JSON.stringify(estadoService));
-  }catch(e){console.warn('[abrirCamaraService] No se pudo guardar estado:',e);}
-  document.getElementById(inputId).click();
+    camaraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    document.getElementById('camaraVideo').srcObject=camaraStream;
+    document.getElementById('mCamara').classList.add('open');
+  }catch(e){
+    // Sin permisos o sin cámara → fallback al input file clásico
+    showToast('Usando selector de fotos...','');
+    document.getElementById('fotoServiceInput').click();
+  }
+}
+
+function capturarFoto(){
+  const video=document.getElementById('camaraVideo');
+  const canvas=document.getElementById('camaraCanvas');
+  canvas.width=video.videoWidth;
+  canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  canvas.toBlob(blob=>{
+    if(!blob) return;
+    const file=new File([blob],'foto_'+Date.now()+'.jpg',{type:'image/jpeg'});
+    fotosCamaraCapturadas.push(file);
+    const url=URL.createObjectURL(blob);
+    const prev=document.getElementById('camaraFotosPreview');
+    prev.innerHTML+='<div style="position:relative;">'+
+      '<img src="'+url+'" style="width:70px;height:70px;object-fit:cover;border-radius:6px;border:2px solid #3b82f6;"/>'+
+      '<div style="position:absolute;top:-4px;right:-4px;background:#059669;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;text-align:center;line-height:16px;">✓</div>'+
+      '</div>';
+    showToast('Foto capturada ✓','success');
+  },'image/jpeg',0.85);
+}
+
+function cerrarCamara(){
+  if(camaraStream){
+    camaraStream.getTracks().forEach(t=>t.stop());
+    camaraStream=null;
+  }
+  if(fotosCamaraCapturadas.length&&camaraCallback){
+    camaraCallback(fotosCamaraCapturadas);
+  }
+  cerrar('mCamara');
 }
 
 function restaurarEstadoService(){
@@ -5374,5 +5409,29 @@ window.addEventListener('appinstalled',()=>{
   deferredPrompt=null;
 });
 </script>
+
+<!-- MODAL CÁMARA INTEGRADA -->
+<div class="modal-overlay" id="mCamara" style="z-index:9999;">
+  <div class="modal" style="max-width:500px;padding:0;overflow:hidden;">
+    <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;background:var(--header);">
+      <div style="color:#fff;font-weight:700;">📷 Tomar foto</div>
+      <button onclick="cerrarCamara()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <video id="camaraVideo" autoplay playsinline
+      style="width:100%;max-height:60vh;object-fit:cover;display:block;background:#000;"></video>
+    <canvas id="camaraCanvas" style="display:none;"></canvas>
+    <div style="padding:16px;display:flex;gap:10px;justify-content:center;">
+      <button onclick="capturarFoto()"
+        style="padding:14px 32px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;">
+        📸 Capturar
+      </button>
+      <button onclick="cerrarCamara()"
+        style="padding:14px 20px;background:var(--border);color:var(--text);border:none;border-radius:10px;font-size:14px;cursor:pointer;">
+        Cancelar
+      </button>
+    </div>
+    <div id="camaraFotosPreview" style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+  </div>
+</div>
 </body>
 </html>
