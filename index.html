@@ -3996,45 +3996,38 @@ async function mostrarInformePublico(aprobacionId){
       return;
     }
     // Si no hay caché, generar en tiempo real
-    // Traer tareas e intervención en paralelo
-    const [resTareas,resInterv]=await Promise.all([
-      aprob.intervencion_id
-        ?fetch(BASE+'/tareas_realizadas?intervencion_id=eq.'+aprob.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
-        :Promise.resolve([]),
-      aprob.intervencion_id
-        ?fetch(BASE+'/intervenciones?id=eq.'+aprob.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
-        :Promise.resolve([])
-    ]);
-    const interv=resInterv[0]||{};
-    // Poblar globales mínimos para que generarHtmlInforme funcione
+    // Poblar globales mínimos
     if(!clientes.length) clientes=await fetch(BASE+'/clientes?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
     if(!equipos.length) equipos=await fetch(BASE+'/equipos?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
-    tareasRealizadas=resTareas||[];
-    if(!intervenciones.find(i=>i.id===aprob.intervencion_id)) intervenciones=[...intervenciones,interv];
-    // Si hay equipos_detalle (informe consolidado), traer todos los registros del grupo
-    let htmlInforme;
-    if(aprob.equipos_detalle&&Array.isArray(aprob.equipos_detalle)&&aprob.equipos_detalle.length>1){
-      const resGrupo=await fetch(BASE+'/preventivos_aprobacion?numero_ipd=eq.'+aprob.numero_ipd+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
-      const grupoIds=(resGrupo||[]).map(x=>x.id);
-      // Cargar intervenciones del grupo si faltan
-      for(const gItem of (resGrupo||[])){
-        if(gItem.intervencion_id&&!intervenciones.find(i=>i.id===gItem.intervencion_id)){
-          const ri=await fetch(BASE+'/intervenciones?id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
-          if(ri[0]) intervenciones=[...intervenciones,ri[0]];
-        }
+    // Buscar TODOS los registros del mismo cliente y fecha (el grupo completo)
+    const resGrupo=await fetch(
+      BASE+'/preventivos_aprobacion?cliente_id=eq.'+aprob.cliente_id+
+      '&fecha_servicio=eq.'+aprob.fecha_servicio+'&select=*',
+      {headers:H2}
+    ).then(r=>r.json()).catch(()=>[]);
+    console.log('[InformePublico] grupo encontrado:',resGrupo.length,'registros');
+    console.log('[InformePublico] ids:',resGrupo.map(x=>x.id));
+    const grupoIds=resGrupo.length?resGrupo.map(x=>x.id):[aprobacionId];
+    const grupoCompleto=resGrupo.length?resGrupo:[aprob];
+    // Cargar intervenciones y tareas de todo el grupo en paralelo
+    await Promise.all(grupoCompleto.map(async gItem=>{
+      if(!gItem.intervencion_id) return;
+      if(!intervenciones.find(i=>i.id===gItem.intervencion_id)){
+        const ri=await fetch(BASE+'/intervenciones?id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
+        if(ri[0]) intervenciones=[...intervenciones,ri[0]];
       }
-      // Cargar todas las tareas del grupo
-      const todasTareas=await Promise.all((resGrupo||[]).map(gItem=>
-        gItem.intervencion_id
-          ?fetch(BASE+'/tareas_realizadas?intervencion_id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
-          :Promise.resolve([])
-      ));
-      tareasRealizadas=[...tareasRealizadas,...todasTareas.flat()];
-      aprobaciones=[...aprobaciones,...(resGrupo||[])];
-      htmlInforme=generarHtmlInformeConsolidado(grupoIds,aprob);
-    } else {
-      htmlInforme=generarHtmlInforme(aprob);
-    }
+    }));
+    const todasTareas=await Promise.all(grupoCompleto.map(gItem=>
+      gItem.intervencion_id
+        ?fetch(BASE+'/tareas_realizadas?intervencion_id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
+        :Promise.resolve([])
+    ));
+    tareasRealizadas=[...todasTareas.flat()];
+    // Asegurar que los registros del grupo estén en el array global de aprobaciones
+    grupoCompleto.forEach(g=>{if(!aprobaciones.find(a=>a.id===g.id))aprobaciones=[...aprobaciones,g];});
+    // Siempre usar generarHtmlInformeConsolidado
+    let htmlInforme;
+    htmlInforme=generarHtmlInformeConsolidado(grupoIds,aprob);
     document.getElementById('informePublicoInner').innerHTML=
       '<div style="text-align:right;margin-bottom:12px;">'+
       '<button onclick="window.print()" style="padding:10px 24px;background:#1a2332;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>'+
