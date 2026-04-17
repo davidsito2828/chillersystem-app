@@ -956,11 +956,12 @@ tbody tr:hover{background:#f8faff;}
         <!-- FOTOS -->
         <div class="form-group full">
           <label class="form-label">Fotos del equipo / trabajo</label>
-          <input type="file" id="fotoServiceInput" accept="image/*" multiple style="display:none;" onchange="previewFotos(this,'serviceFotoPreview','serviceFotosNuevas')"/>
-          <div class="foto-upload-area" onclick="abrirCamaraIntegrada(function(fotos){serviceFotosNuevas=fotos;const prev=document.getElementById('serviceFotoPreview');if(prev)prev.innerHTML=fotos.map(f=>{const url=URL.createObjectURL(f);return'<div class=\'foto-preview\'><img src=\''+url+'\' style=\'width:80px;height:80px;object-fit:cover;border-radius:6px;\'/></div>';}).join('');})">
-            <div style="color:var(--text-dim);font-size:13px;">📷 Tomar foto</div>
+          <div class="foto-upload-area" onclick="document.getElementById('fotoServiceInput').click()" style="cursor:pointer;padding:20px;text-align:center;border:2px dashed var(--border);border-radius:10px;">
+            📁 Tocá para seleccionar fotos de la galería
+            <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Podés seleccionar varias fotos a la vez</div>
           </div>
-          <div class="foto-preview-grid" id="serviceFotoPreview"></div>
+          <input type="file" id="fotoServiceInput" accept="image/*" multiple style="display:none;" onchange="previewFotos(this,'serviceFotoPreview','serviceFotosNuevas')"/>
+          <div id="serviceFotoPreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
         </div>
       </div>
         <!-- REPUESTOS (solo preventivo) -->
