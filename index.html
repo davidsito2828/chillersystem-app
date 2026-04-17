@@ -2271,24 +2271,36 @@ function proxPrevHTML(eq){
 
 // ── FOTOS ──
 function previewFotos(input,previewId,varName){
-  const files=Array.from(input.files);
-  if(varName==='eqFotosNuevas') eqFotosNuevas=files;
-  else if(varName==='resFotosNuevas') resFotosNuevas=files;
-  else if(varName==='serviceFotosNuevas') serviceFotosNuevas=files;
-  else if(varName==='evtFotosNuevas') evtFotosNuevas=files;
-  else intervFotosNuevas=files;
+  const nuevas=Array.from(input.files);
+  // Acumular en el array correspondiente (no reemplazar)
+  if(varName==='eqFotosNuevas') eqFotosNuevas=[...eqFotosNuevas,...nuevas];
+  else if(varName==='resFotosNuevas') resFotosNuevas=[...resFotosNuevas,...nuevas];
+  else if(varName==='serviceFotosNuevas') serviceFotosNuevas=[...serviceFotosNuevas,...nuevas];
+  else if(varName==='evtFotosNuevas') evtFotosNuevas=[...evtFotosNuevas,...nuevas];
+  else intervFotosNuevas=[...intervFotosNuevas,...nuevas];
+  // Obtener el array actualizado para calcular índices correctos
+  const allFiles=varName==='eqFotosNuevas'?eqFotosNuevas
+    :varName==='resFotosNuevas'?resFotosNuevas
+    :varName==='serviceFotosNuevas'?serviceFotosNuevas
+    :varName==='evtFotosNuevas'?evtFotosNuevas
+    :intervFotosNuevas;
+  const offset=allFiles.length-nuevas.length;
   const prev=document.getElementById(previewId);
-  prev.innerHTML=files.map((f,i)=>{
+  // Acumular preview (+=) en lugar de reemplazar (=)
+  prev.innerHTML+=nuevas.map((f,i)=>{
     const url=URL.createObjectURL(f);
     const nombreArchivo=f.name||('foto_'+Date.now()+'.jpg');
+    const idx=offset+i;
     return `<div class="foto-preview" style="display:flex;flex-direction:column;align-items:center;gap:3px;">
       <div style="position:relative;width:68px;height:68px;">
         <img src="${url}" onclick="openLB('${url}')" style="width:68px;height:68px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer;"/>
-        <button class="foto-remove" onclick="removeFotoPreview(${i},'${previewId}','${varName}')">✕</button>
+        <button class="foto-remove" onclick="removeFotoPreview(${idx},'${previewId}','${varName}')">✕</button>
       </div>
       <a href="${url}" download="${nombreArchivo}" style="font-size:10px;color:#3b82f6;text-decoration:none;">⬇️ Guardar</a>
     </div>`;
   }).join('');
+  // Limpiar el input para permitir seleccionar los mismos archivos nuevamente
+  input.value='';
 }
 function removeFotoPreview(idx,previewId,varName){
   if(varName==='eqFotosNuevas') eqFotosNuevas.splice(idx,1);
@@ -2340,6 +2352,21 @@ async function subirFotos(files,carpeta){
   }
   return urls;
 }
+function verFotosInterv(intervId){
+  const interv=intervenciones.find(x=>x.id===intervId);
+  if(!interv||!interv.fotos||!interv.fotos.length) return;
+  const html='<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.remove()">'+
+    '<div style="max-width:600px;margin:0 auto;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'+
+    '<div style="color:#fff;font-weight:700;font-size:16px;">📷 Fotos del trabajo</div>'+
+    '<button onclick="this.closest(\'[style*=position]\').remove()" style="background:none;border:none;color:#fff;font-size:24px;cursor:pointer;">✕</button>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">'+
+    interv.fotos.map(url=>'<img src="'+url+'" onclick="openLB(\''+url+'\')" style="width:100%;height:150px;object-fit:cover;border-radius:8px;cursor:pointer;"/>').join('')+
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
 function fotosHTML(fotos){
   if(!fotos||!fotos.length)return '';
   return '<div style="margin-top:8px;">'+
@@ -2729,7 +2756,7 @@ function renderIntervItem(i){
       else html+=`<span class="badge-pendiente" style="font-size:10px;">⏳ Pendiente aprobación</span>`;
       html+='</div>';
     }
-    if(tieneFotos) html+=fotosHTML(i.fotos);
+    if(tieneFotos) html+='<div style="margin-top:8px;"><button onclick="verFotosInterv(\''+i.id+'\')" style="padding:6px 14px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid #3b82f6;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">📷 Ver fotos ('+i.fotos.length+')</button></div>';
     html+='</div>';
   }
 
@@ -3420,7 +3447,7 @@ function guardarServiceEq(){
     necesita_resolucion:tipo==='Correctivo'?necesitaResolucion:null,
     lecturas_operativas:lecturas,
     repuestos:document.getElementById('sRepuestos').value.trim()||null,
-    fotos_nuevas:serviceFotosNuevas,
+    fotos_nuevas:[...serviceFotosNuevas],
     fotos:[],
     tareas_realizadas:tareasChecked
   };
@@ -3491,17 +3518,19 @@ async function guardarSoloPreventivo(){
     }catch(e){
       console.warn('[tareas guardadas] Error:',e);
     }
-    // Guardar en preventivos_aprobacion siempre (con o sin firma)
-    if(intervId){
+    // Crear UN SOLO registro consolidado en preventivos_aprobacion
+    const aprobExistenteSP=await api('preventivos_aprobacion?cliente_id=eq.'+serviceClienteActual+'&fecha_servicio=eq.'+fecha+'&estado=eq.pendiente&select=id').catch(()=>null);
+    if(!aprobExistenteSP||!aprobExistenteSP.length){
       await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
-        intervencion_id:intervId,
+        intervencion_id:intervId||null,
         cliente_id:serviceClienteActual,
         equipo_id:null,
         tecnico:tecnico||firma,
         fecha_servicio:fecha,
         firma_cliente:firmaClienteSP.base64||null,
         firma_tipo:firmaClienteSP.tipo||null,
-        estado:'pendiente'
+        estado:'pendiente',
+        equipos_detalle:[]
       }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion insert]',e));
     }
     // Si hay correctivos marcados en planilla, guardarlos también
@@ -3537,6 +3566,7 @@ async function guardarPlanilla(){
     for(const eqId of Object.keys(servicePlanilla)){
       const p=servicePlanilla[eqId];
       let fotosUrls=[];
+      console.log('[Fotos] equipo:',eqId,'fotos:',p.fotos_nuevas?.length);
       if(p.fotos_nuevas&&p.fotos_nuevas.length) fotosUrls=await subirFotos(p.fotos_nuevas,'service');
       const descCorr=p.tipo==='Correctivo'
         ?([p.desc_correctivo,p.necesita_resolucion?'Necesita: '+p.necesita_resolucion:null].filter(Boolean).join(' — '))
@@ -3571,20 +3601,20 @@ async function guardarPlanilla(){
             }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
           }
         }
-        // Guardar aprobación pendiente siempre (con o sin firma)
-        if(intervId){
-          await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
-            intervencion_id:intervId,
-            cliente_id:serviceClienteActual,
-            equipo_id:eqId,
-            tecnico:tecnico||firma,
-            fecha_servicio:fecha,
-            firma_cliente:firmaClienteData.base64||null,
-            firma_tipo:firmaClienteData.tipo||null,
-            estado:'pendiente'
-          }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
-        }
       }
+    }
+    // Crear UN SOLO registro consolidado en preventivos_aprobacion para toda la visita
+    const equiposDetalle=Object.entries(servicePlanilla).map(([eqId,p])=>{
+      const eq=equipos.find(e=>e.id===eqId);
+      return{equipo_id:eqId,nombre_equipo:eq?eq.nombre:'—',tipo_equipo:eq?eq.tipo||'—':'—',trabajo:p.trabajo||null,lecturas:p.lecturas_operativas||{},tareas:p.tareas_realizadas||[],necesita_correctivo:p.tipo==='Correctivo',desc_correctivo:p.desc_correctivo||null};
+    });
+    const aprobExistente=await api('preventivos_aprobacion?cliente_id=eq.'+serviceClienteActual+'&fecha_servicio=eq.'+fecha+'&estado=eq.pendiente&select=id,equipos_detalle').catch(()=>null);
+    if(aprobExistente&&aprobExistente.length){
+      const existId=aprobExistente[0].id;
+      const detalleExistente=aprobExistente[0].equipos_detalle||[];
+      await api('preventivos_aprobacion?id=eq.'+existId,{method:'PATCH',body:JSON.stringify({equipos_detalle:[...detalleExistente,...equiposDetalle],firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null}),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+    }else{
+      await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({cliente_id:serviceClienteActual,equipo_id:null,tecnico:tecnico||firma,fecha_servicio:fecha,firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null,estado:'pendiente',equipos_detalle:equiposDetalle}),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
     }
     showToast('Planilla guardada ✓ — '+Object.keys(servicePlanilla).length+' equipo(s)','success');
     await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
