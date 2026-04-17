@@ -2089,32 +2089,52 @@ function calcAlertas(){
   const urgentesFilt=urgentes.filter(a=>!dismissedAlertas.has('u-'+a.eq.id));
   const avisosFilt=avisos.filter(a=>!dismissedAlertas.has('a-'+a.i.id));
 
-  seccion('secCritico',criticosFilt,criticosFilt.map(a=>{
-    const key='c-'+a.eq.id+(a.motivo==='fs'?'-fs':'');
-    const label=a.motivo==='fs'
-      ?'🔴 Fuera de servicio'
-      :`🔴 Vencido hace ${a.diasHab}dh`;
+  // Agrupar críticos por cliente
+  const criticosPorCliente={};
+  criticosFilt.forEach(a=>{
+    const cid=a.cli?a.cli.id:'_sin_cliente';
+    if(!criticosPorCliente[cid]) criticosPorCliente[cid]={cli:a.cli,items:[]};
+    criticosPorCliente[cid].items.push(a);
+  });
+  const criticosAgrupados=Object.values(criticosPorCliente);
+
+  // Agrupar urgentes por cliente
+  const urgentesPorCliente={};
+  urgentesFilt.forEach(a=>{
+    const cid=a.cli?a.cli.id:'_sin_cliente';
+    if(!urgentesPorCliente[cid]) urgentesPorCliente[cid]={cli:a.cli,items:[]};
+    urgentesPorCliente[cid].items.push(a);
+  });
+  const urgentesAgrupados=Object.values(urgentesPorCliente);
+
+  seccion('secCritico',criticosAgrupados,criticosAgrupados.map(g=>{
+    const key='c-cli-'+(g.cli?g.cli.id:'_sin_cliente');
+    const n=g.items.length;
+    const tieneFuera=g.items.some(a=>a.motivo==='fs');
+    const label=tieneFuera?'🔴 Fuera de servicio / vencido':`🔴 Vencido`;
+    const nombre=g.cli?g.cli.nombre:'Sin cliente';
     return `<div class="alerta-item">
       <span style="color:var(--red);font-weight:700;">${label}</span>
-      <span style="font-weight:700;color:var(--text);">${a.eq.nombre}</span>
-      <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
+      <span style="font-weight:700;color:var(--text);">${nombre}</span>
+      <span style="color:var(--text-dim);">· ${n} equipo(s) requieren preventivo</span>
       <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--red);border-color:var(--red);"
-        onclick="abrirModalInterv(null,'${a.eq.id}');document.getElementById('iTipo').value='Preventivo'">✓ Registrar preventivo</button>
+        onclick="abrirHistCliente('${g.cli?g.cli.id:''}')">Ver cliente</button>
       <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
     </div>`;
   }).join(''));
 
-  seccion('secUrgente',urgentesFilt,urgentesFilt.map(a=>{
-    const key='u-'+a.eq.id;
-    const label=a.motivo==='vencido_reciente'
-      ?`🟡 Vencido hace ${a.diasHab}dh`
-      :`🟡 Vence en ${a.diasHab}dh`;
+  seccion('secUrgente',urgentesAgrupados,urgentesAgrupados.map(g=>{
+    const key='u-cli-'+(g.cli?g.cli.id:'_sin_cliente');
+    const n=g.items.length;
+    const tieneVencido=g.items.some(a=>a.motivo==='vencido_reciente');
+    const label=tieneVencido?'🟡 Vencido / próximo a vencer':'🟡 Próximo a vencer';
+    const nombre=g.cli?g.cli.nombre:'Sin cliente';
     return `<div class="alerta-item">
       <span style="color:var(--yellow);font-weight:700;">${label}</span>
-      <span style="font-weight:700;color:var(--text);">${a.eq.nombre}</span>
-      <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
+      <span style="font-weight:700;color:var(--text);">${nombre}</span>
+      <span style="color:var(--text-dim);">· ${n} equipo(s) requieren preventivo</span>
       <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--yellow);border-color:var(--yellow);"
-        onclick="abrirModalInterv(null,'${a.eq.id}');document.getElementById('iTipo').value='Preventivo'">✓ Registrar preventivo</button>
+        onclick="abrirHistCliente('${g.cli?g.cli.id:''}')">Ver cliente</button>
       <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
     </div>`;
   }).join(''));
