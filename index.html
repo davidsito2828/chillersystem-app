@@ -2197,6 +2197,8 @@ function previewFotos(input,previewId,varName){
   const files=Array.from(input.files);
   if(varName==='eqFotosNuevas') eqFotosNuevas=files;
   else if(varName==='resFotosNuevas') resFotosNuevas=files;
+  else if(varName==='serviceFotosNuevas') serviceFotosNuevas=files;
+  else if(varName==='evtFotosNuevas') evtFotosNuevas=files;
   else intervFotosNuevas=files;
   const prev=document.getElementById(previewId);
   prev.innerHTML=files.map((f,i)=>{
@@ -3344,6 +3346,7 @@ function guardarServiceEq(){
     fotos:[],
     tareas_realizadas:tareasChecked
   };
+  serviceFotosNuevas=[];
   cerrar('mServiceEq');
   renderServiceEquipos(equipos.filter(e=>e.cliente_id===serviceClienteActual));
   showToast('Equipo confirmado ✓','success');
