@@ -3643,15 +3643,31 @@ async function loadAprobaciones(){
 function renderAprobaciones(){
   const filtro=document.getElementById('filtroAprobEstado')?.value||'';
   const lista=filtro?aprobaciones.filter(a=>a.estado===filtro):aprobaciones;
-  document.getElementById('aprobCount').textContent=lista.length+' registro(s)';
+  // Agrupar por cliente_id + fecha_servicio — una fila por visita
+  const aprobacionesAgrupadas=[];
+  const visto={};
+  lista.forEach(a=>{
+    const key=(a.cliente_id||'')+'_'+(a.fecha_servicio||'');
+    if(!visto[key]){
+      visto[key]=true;
+      const grupo=lista.filter(x=>x.cliente_id===a.cliente_id&&x.fecha_servicio===a.fecha_servicio);
+      const representante=grupo.find(x=>x.estado==='pendiente')||grupo[0];
+      representante._grupoIds=grupo.map(x=>x.id);
+      representante._grupoEquipos=grupo.map(x=>{
+        const eq=equipos.find(e=>e.id===x.equipo_id);
+        return eq?eq.nombre:null;
+      }).filter(Boolean);
+      aprobacionesAgrupadas.push(representante);
+    }
+  });
+  document.getElementById('aprobCount').textContent=aprobacionesAgrupadas.length+' visita(s)';
   const el=document.getElementById('aprobBody');
-  if(!lista.length){
+  if(!aprobacionesAgrupadas.length){
     el.innerHTML='<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Sin registros de aprobación</div><div class="empty-sub">Los preventivos con firma del cliente aparecerán aquí.</div></div>';
     return;
   }
-  const rows=lista.map(a=>{
+  const rows=aprobacionesAgrupadas.map(a=>{
     const cli=clientes.find(c=>c.id===a.cliente_id);
-    const eq=equipos.find(e=>e.id===a.equipo_id);
     const esPendiente=a.estado==='pendiente';
     const firmaHtml=a.firma_cliente==='click_confirmado'
       ?'<span style="color:var(--green);font-size:11px;">✅ Click</span>'
@@ -3659,16 +3675,20 @@ function renderAprobaciones(){
       ?`<img src="${a.firma_cliente}" class="aprob-firma-thumb" alt="firma"/>`
       :'—';
     const urlInforme=a.pdf_url||generarUrlInforme(a.id);
+    const equiposHtml=(a._grupoEquipos&&a._grupoEquipos.length)
+      ?a._grupoEquipos.map(n=>`<div style="font-size:11px;">${n}</div>`).join('')
+      :'—';
+    const grupoIdsJson=JSON.stringify(a._grupoIds||[a.id]);
     return `<tr>
       <td class="td-mono" style="font-size:11px;">${fmtF(a.fecha_servicio)}</td>
       <td style="font-weight:600;">${'Informe '+(a.numero_ipd||a.numero||'—')+' — '+(cli?cli.nombre:'—')}</td>
-      <td>${eq?eq.nombre:'—'}</td>
+      <td>${equiposHtml}</td>
       <td>${a.tecnico||'—'}</td>
       <td>${firmaHtml}${a.nombre_firmante?`<div style="font-size:10px;color:var(--text-dim);">${a.nombre_firmante}</div>`:''}</td>
       <td><span class="${esPendiente?'badge-pendiente':'badge-aprobado'}">${esPendiente?'⏳ Pendiente':'✅ Aprobado'}</span></td>
       <td style="white-space:nowrap;">
         ${esPendiente
-          ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarPreventivo('${a.id}')">✅ Aprobar</button>`
+          ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarGrupoPreventivos(${grupoIdsJson},'${a.id}')">✅ Aprobar</button>`
           :`<div style="display:flex;gap:5px;flex-wrap:wrap;">
               <a href="${urlInforme}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
               <button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="mostrarModalWhatsApp('${a.id}')">📲 WhatsApp</button>
@@ -3680,7 +3700,7 @@ function renderAprobaciones(){
   }).join('');
   el.innerHTML=`<div style="overflow-x:auto;"><table class="aprob-table">
     <thead><tr>
-      <th>Fecha</th><th>Informe / Cliente</th><th>Equipo</th><th>Técnico</th><th>Firma</th><th>Estado</th><th>Acciones</th>
+      <th>Fecha</th><th>Informe / Cliente</th><th>Equipos</th><th>Técnico</th><th>Firma</th><th>Estado</th><th>Acciones</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
@@ -3755,6 +3775,83 @@ ${a.nombre_firmante?`<div style="font-size:11px;color:#555;margin-top:4px;">Firm
 </body></html>`;
 }
 
+function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
+  const a=aprobacionPrincipal;
+  const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente'};
+  const fechaFmt=fmtF(a.fecha_servicio);
+  // Construir secciones por equipo
+  let seccionesEquipos='';
+  const grupoAprobaciones=grupoIds.map(gid=>aprobaciones.find(x=>x.id===gid)).filter(Boolean);
+  grupoAprobaciones.forEach((aprob,idx)=>{
+    const eq=equipos.find(e=>e.id===aprob.equipo_id)||{nombre:'Equipo '+(idx+1)};
+    const interv=intervenciones.find(i=>i.id===aprob.intervencion_id)||{};
+    const tareasDeEq=tareasRealizadas.filter(t=>t.intervencion_id===aprob.intervencion_id);
+    const trabajoRealizado=[interv.solucion,interv.descripcion].filter(Boolean).join('\n')||'';
+    let seccionTareas='';
+    if(tareasDeEq.length>0){
+      seccionTareas+='<table width="100%" style="border-collapse:collapse;font-size:11px;margin-top:8px;">';
+      seccionTareas+='<thead><tr style="background:#1a2332;color:#fff;">';
+      seccionTareas+='<th style="padding:5px 8px;text-align:left;width:60%;">Tarea</th>';
+      seccionTareas+='<th style="padding:5px 8px;text-align:center;width:20%;">Estado</th>';
+      seccionTareas+='<th style="padding:5px 8px;text-align:left;width:20%;">Observación</th>';
+      seccionTareas+='</tr></thead><tbody>';
+      tareasDeEq.forEach((t,i)=>{
+        const bg=i%2===0?'#fff':'#f9f9f9';
+        const estado=t.estado==='ok'?'✅ OK':t.estado==='no_aplica'?'— N/A':t.estado==='pendiente'?'⚠️ Pendiente':t.estado||'—';
+        seccionTareas+='<tr style="background:'+bg+';border-bottom:1px solid #eee;">';
+        seccionTareas+='<td style="padding:5px 8px;">'+(t.nombre_tarea||t.tarea||'—')+'</td>';
+        seccionTareas+='<td style="padding:5px 8px;text-align:center;">'+estado+'</td>';
+        seccionTareas+='<td style="padding:5px 8px;font-style:italic;color:#555;">'+(t.observacion||'')+'</td>';
+        seccionTareas+='</tr>';
+      });
+      seccionTareas+='</tbody></table>';
+    }
+    seccionesEquipos+=`
+    <div style="margin-bottom:24px;padding:16px;border:1px solid #ddd;border-radius:6px;page-break-inside:avoid;">
+      <div style="font-size:13px;font-weight:bold;text-transform:uppercase;border-left:4px solid #1a2332;padding-left:10px;margin-bottom:12px;">${eq.nombre}</div>
+      <table width="100%" style="border-collapse:collapse;margin-bottom:10px;">
+        <tr><th style="border:1px solid #bbb;padding:5px 9px;font-size:10px;text-transform:uppercase;background:#f0f0f0;text-align:left;width:30%;">Tipo / Marca</th>
+            <td style="border:1px solid #bbb;padding:5px 9px;font-size:11px;">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td></tr>
+      </table>
+      ${trabajoRealizado?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Trabajo realizado</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:11px;margin-bottom:10px;">${trabajoRealizado}</div>`:''}
+      ${seccionTareas?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;margin-top:8px;">✅ Checklist</div>${seccionTareas}`:''}
+      ${interv.notas?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Observaciones</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:11px;">${interv.notas}</div>`:''}
+      ${interv.repuestos?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Repuestos</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;font-size:11px;">${interv.repuestos}</div>`:''}
+    </div>`;
+  });
+  const firmaImg=a.firma_cliente==='click_confirmado'
+    ?'<div style="padding:8px;color:#059669;font-weight:700;border:1px solid #a7f3d0;border-radius:4px;background:#ecfdf5;">✅ Conformidad confirmada digitalmente</div>'
+    :a.firma_cliente
+    ?`<img src="${a.firma_cliente}" style="max-width:220px;max-height:90px;border:1px solid #ccc;border-radius:4px;display:block;margin-top:6px;"/>`
+    :'<div style="height:50px;border:1px dashed #ccc;border-radius:4px;margin-top:6px;"></div>';
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
+<style>body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
+h1{font-size:20px;font-weight:900;font-style:italic;margin:0;}
+h2{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#444;border-bottom:2px solid #111;padding-bottom:4px;margin:16px 0 10px;}
+table{width:100%;border-collapse:collapse;margin-bottom:12px;}
+td,th{border:1px solid #bbb;padding:5px 9px;font-size:11px;vertical-align:top;}
+th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
+.hdr td{border:none;vertical-align:middle;}
+.footer{margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center;}
+@media print{.no-print{display:none!important;}}</style></head><body>
+<table class="hdr" style="margin-bottom:20px;"><tr>
+  <td style="width:60%;"><h1>ChillerService S.A.</h1><div style="font-size:11px;color:#555;margin-top:2px;">Servicios e Instalaciones Termomecánicas</div></td>
+  <td style="text-align:right;line-height:1.8;font-size:12px;"><strong style="font-size:14px;">Informe de Preventivo</strong><br/>N° ${a.numero_ipd||a.numero||'—'}<br/>Fecha: ${fechaFmt}<br/>Técnico: ${a.tecnico||'—'}</td>
+</tr></table>
+<h2>Datos del servicio</h2>
+<table>
+  <tr><th>Cliente</th><td colspan="3">${cli.nombre}</td></tr>
+  <tr><th>Fecha</th><td>${fechaFmt}</td><th>Equipos</th><td>${grupoAprobaciones.length}</td></tr>
+</table>
+<h2>Detalle por equipo</h2>
+${seccionesEquipos}
+<h2>Conformidad del cliente</h2>
+${firmaImg}
+${a.nombre_firmante?`<div style="font-size:11px;color:#555;margin-top:4px;">Firmado por: <strong>${a.nombre_firmante}</strong></div>`:''}
+<div class="footer">ChillerService S.A. · Esmeralda 762 2°B Cap.Fed. · Tel.: 5032-4033<br/>${a.aprobado_por?'Aprobado por: '+a.aprobado_por+' — ':''} ${new Date().toLocaleDateString('es-AR')}</div>
+</body></html>`;
+}
+
 async function aprobarPreventivo(id){
   const aprobacion=aprobaciones.find(a=>a.id===id);
   if(!aprobacion) return;
@@ -3799,6 +3896,54 @@ async function aprobarPreventivo(id){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
+async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
+  const aprobacionPrincipal=aprobaciones.find(a=>a.id===idPrincipal);
+  if(!aprobacionPrincipal) return;
+  showToast('Aprobando...');
+  // Cargar tareas y generar informe consolidado
+  tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
+  const htmlInforme=generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal);
+  // Intentar subir a Storage (puede fallar, no importa)
+  let informeUrl=window.location.origin+'?aprobacion='+idPrincipal;
+  try{
+    const blob=new Blob([htmlInforme],{type:'text/html'});
+    const nombreArchivo=`preventivo-${idPrincipal}-${Date.now()}.html`;
+    const uploadRes=await fetch(`${SURL}/storage/v1/object/informes-preventivos/${nombreArchivo}`,{
+      method:'POST',
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'text/html','x-upsert':'true'},
+      body:blob
+    });
+    if(uploadRes.ok) informeUrl=`${SURL}/storage/v1/object/public/informes-preventivos/${nombreArchivo}`;
+  }catch(e){console.warn('Storage no disponible:',e.message);}
+  // Generar número IPD
+  const ultimos=await api('preventivos_aprobacion?select=numero_ipd&order=created_at.desc&limit=50');
+  const numerosIPD=(ultimos||[]).map(a=>a.numero_ipd).filter(n=>n&&n.includes('-IPD')).map(n=>parseInt(n.split('-')[0])||0);
+  const ultimoNum=numerosIPD.length?Math.max(...numerosIPD):0;
+  const numeroIPD=String(ultimoNum+1).padStart(4,'0')+'-IPD';
+  const urlPublica=window.location.origin+window.location.pathname+'?informe='+idPrincipal;
+  try{
+    for(const gid of grupoIds){
+      const isPrincipal=gid===idPrincipal;
+      await api('preventivos_aprobacion?id=eq.'+gid,{
+        method:'PATCH',
+        body:JSON.stringify({
+          estado:'aprobado',
+          numero_ipd:numeroIPD,
+          pdf_url:urlPublica,
+          aprobado_por:usuarioActual.nombre,
+          fecha_aprobacion:new Date().toISOString(),
+          ...(isPrincipal?{informe_html:htmlInforme}:{})
+        }),
+        headers:{...H,'Prefer':'return=minimal'}
+      });
+    }
+    await loadAprobaciones();
+    renderAprobaciones();
+    showToast('✅ Preventivo aprobado','success');
+    mostrarModalWhatsApp(idPrincipal);
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
 async function eliminarAprobacion(id){
   if(!confirm('¿Eliminar este informe de aprobación? Esta acción no se puede deshacer.')) return;
   try{
@@ -3821,6 +3966,15 @@ async function mostrarInformePublico(aprobacionId){
       return;
     }
     const aprob=dataAprob[0];
+    // Si tiene informe_html cacheado, usarlo directamente
+    if(aprob.informe_html){
+      document.getElementById('informePublicoInner').innerHTML=
+        '<div style="text-align:right;margin-bottom:12px;">'+
+        '<button onclick="window.print()" style="padding:10px 24px;background:#1a2332;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>'+
+        aprob.informe_html;
+      return;
+    }
+    // Si no hay caché, generar en tiempo real
     // Traer tareas e intervención en paralelo
     const [resTareas,resInterv]=await Promise.all([
       aprob.intervencion_id
@@ -3836,7 +3990,30 @@ async function mostrarInformePublico(aprobacionId){
     if(!equipos.length) equipos=await fetch(BASE+'/equipos?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
     tareasRealizadas=resTareas||[];
     if(!intervenciones.find(i=>i.id===aprob.intervencion_id)) intervenciones=[...intervenciones,interv];
-    const htmlInforme=generarHtmlInforme(aprob);
+    // Si hay equipos_detalle (informe consolidado), traer todos los registros del grupo
+    let htmlInforme;
+    if(aprob.equipos_detalle&&Array.isArray(aprob.equipos_detalle)&&aprob.equipos_detalle.length>1){
+      const resGrupo=await fetch(BASE+'/preventivos_aprobacion?numero_ipd=eq.'+aprob.numero_ipd+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
+      const grupoIds=(resGrupo||[]).map(x=>x.id);
+      // Cargar intervenciones del grupo si faltan
+      for(const gItem of (resGrupo||[])){
+        if(gItem.intervencion_id&&!intervenciones.find(i=>i.id===gItem.intervencion_id)){
+          const ri=await fetch(BASE+'/intervenciones?id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
+          if(ri[0]) intervenciones=[...intervenciones,ri[0]];
+        }
+      }
+      // Cargar todas las tareas del grupo
+      const todasTareas=await Promise.all((resGrupo||[]).map(gItem=>
+        gItem.intervencion_id
+          ?fetch(BASE+'/tareas_realizadas?intervencion_id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
+          :Promise.resolve([])
+      ));
+      tareasRealizadas=[...tareasRealizadas,...todasTareas.flat()];
+      aprobaciones=[...aprobaciones,...(resGrupo||[])];
+      htmlInforme=generarHtmlInformeConsolidado(grupoIds,aprob);
+    } else {
+      htmlInforme=generarHtmlInforme(aprob);
+    }
     document.getElementById('informePublicoInner').innerHTML=
       '<div style="text-align:right;margin-bottom:12px;">'+
       '<button onclick="window.print()" style="padding:10px 24px;background:#1a2332;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>'+
