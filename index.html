@@ -3724,17 +3724,14 @@ function generarHtmlInforme(a){
     seccionTareas+='✅ Checklist de tareas realizadas</div>';
     seccionTareas+='<table width="100%" style="border-collapse:collapse;font-size:11px;">';
     seccionTareas+='<thead><tr style="background:#1a2332;color:#fff;">';
-    seccionTareas+='<th style="padding:6px 8px;text-align:left;width:60%;">Tarea</th>';
-    seccionTareas+='<th style="padding:6px 8px;text-align:center;width:20%;">Estado</th>';
-    seccionTareas+='<th style="padding:6px 8px;text-align:left;width:20%;">Observación</th>';
+    seccionTareas+='<th style="padding:5px 8px;text-align:center;width:40px;">#</th>';
+    seccionTareas+='<th style="padding:5px 8px;text-align:left;">Tarea realizada</th>';
     seccionTareas+='</tr></thead><tbody>';
     tareasDeEstaInterv.forEach((t,idx)=>{
       const bg=idx%2===0?'#fff':'#f9f9f9';
-      const estado=t.estado==='ok'?'✅ OK':t.estado==='no_aplica'?'— N/A':t.estado==='pendiente'?'⚠️ Pendiente':t.estado||'—';
       seccionTareas+='<tr style="background:'+bg+';border-bottom:1px solid #eee;">';
+      seccionTareas+='<td style="padding:5px 8px;text-align:center;color:#059669;font-weight:700;">✓</td>';
       seccionTareas+='<td style="padding:5px 8px;">'+(t.nombre_tarea||t.tarea||'—')+'</td>';
-      seccionTareas+='<td style="padding:5px 8px;text-align:center;">'+estado+'</td>';
-      seccionTareas+='<td style="padding:5px 8px;font-style:italic;color:#555;">'+(t.observacion||'')+'</td>';
       seccionTareas+='</tr>';
     });
     seccionTareas+='</tbody></table></div>';
@@ -3744,7 +3741,8 @@ function generarHtmlInforme(a){
     :a.firma_cliente
     ?`<img src="${a.firma_cliente}" style="max-width:220px;max-height:90px;border:1px solid #ccc;border-radius:4px;display:block;margin-top:6px;"/>`
     :'<div style="height:50px;border:1px dashed #ccc;border-radius:4px;margin-top:6px;"></div>';
-  const trabajoRealizado=[interv.solucion,interv.descripcion].filter(Boolean).join('\n')||'';
+  const trabajoRealizado=interv.descripcion||interv.solucion||'';
+  const mostrarTrabajo=trabajoRealizado&&!trabajoRealizado.startsWith('Sin novedades');
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
 <style>body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
 h1{font-size:20px;font-weight:900;font-style:italic;margin:0;}
@@ -3764,7 +3762,7 @@ th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
   <tr><th>Cliente</th><td>${cli.nombre}</td><th>Equipo</th><td>${eq.nombre}</td></tr>
   <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Fecha</th><td>${fechaFmt}</td></tr>
 </table>
-${trabajoRealizado?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${trabajoRealizado}</div>`:''}
+${mostrarTrabajo?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${trabajoRealizado}</div>`:''}
 ${seccionTareas}
 ${interv.notas?`<h2>Observaciones</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${interv.notas}</div>`:''}
 ${interv.repuestos?`<h2>Repuestos utilizados</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;">${interv.repuestos}</div>`:''}
@@ -3786,22 +3784,44 @@ function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
     const eq=equipos.find(e=>e.id===aprob.equipo_id)||{nombre:'Equipo '+(idx+1)};
     const interv=intervenciones.find(i=>i.id===aprob.intervencion_id)||{};
     const tareasDeEq=tareasRealizadas.filter(t=>t.intervencion_id===aprob.intervencion_id);
-    const trabajoRealizado=[interv.solucion,interv.descripcion].filter(Boolean).join('\n')||'';
+    // FIX 3: solo descripcion, evitar duplicar solucion; ocultar texto genérico "Sin novedades"
+    const trabajoText=interv.descripcion||interv.solucion||'';
+    const mostrarTrabajo=trabajoText&&!trabajoText.startsWith('Sin novedades');
+    // FIX 1: lecturas operativas
+    const lec=interv.lecturas_operativas||{};
+    const filasLec=[
+      lec.temperatura_inyeccion!=null?['T° Inyección',lec.temperatura_inyeccion,'°C']:null,
+      lec.temperatura_retorno!=null?['T° Retorno',lec.temperatura_retorno,'°C']:null,
+      lec.presion_alta!=null?['Presión Alta',lec.presion_alta,'bar']:null,
+      lec.presion_baja!=null?['Presión Baja',lec.presion_baja,'bar']:null,
+      lec.corriente_compresor!=null?['Corriente Compresor',lec.corriente_compresor,'A']:null,
+      lec.carga_gas?['Carga de gas',lec.carga_gas,'']:null
+    ].filter(Boolean);
+    const tablaLecturas=filasLec.length>0
+      ?'<div style="margin:8px 0;">'
+        +'<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#1a2332;margin-bottom:5px;">📊 Lecturas operativas</div>'
+        +'<table width="100%" style="border-collapse:collapse;font-size:11px;">'
+        +'<thead><tr style="background:#f0f4f8;">'
+        +'<th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">Parámetro</th>'
+        +'<th style="padding:4px 8px;text-align:center;border:1px solid #ddd;">Valor</th>'
+        +'<th style="padding:4px 8px;text-align:center;border:1px solid #ddd;">Unidad</th>'
+        +'</tr></thead><tbody>'
+        +filasLec.map((f,i)=>'<tr style="background:'+(i%2===0?'#fff':'#f9fafb')+';"><td style="padding:4px 8px;border:1px solid #ddd;">'+f[0]+'</td><td style="padding:4px 8px;text-align:center;border:1px solid #ddd;font-weight:700;">'+f[1]+'</td><td style="padding:4px 8px;text-align:center;border:1px solid #ddd;">'+f[2]+'</td></tr>').join('')
+        +'</tbody></table></div>'
+      :'';
+    // FIX 2: checklist 2 columnas
     let seccionTareas='';
     if(tareasDeEq.length>0){
       seccionTareas+='<table width="100%" style="border-collapse:collapse;font-size:11px;margin-top:8px;">';
       seccionTareas+='<thead><tr style="background:#1a2332;color:#fff;">';
-      seccionTareas+='<th style="padding:5px 8px;text-align:left;width:60%;">Tarea</th>';
-      seccionTareas+='<th style="padding:5px 8px;text-align:center;width:20%;">Estado</th>';
-      seccionTareas+='<th style="padding:5px 8px;text-align:left;width:20%;">Observación</th>';
+      seccionTareas+='<th style="padding:5px 8px;text-align:center;width:40px;">#</th>';
+      seccionTareas+='<th style="padding:5px 8px;text-align:left;">Tarea realizada</th>';
       seccionTareas+='</tr></thead><tbody>';
       tareasDeEq.forEach((t,i)=>{
         const bg=i%2===0?'#fff':'#f9f9f9';
-        const estado=t.estado==='ok'?'✅ OK':t.estado==='no_aplica'?'— N/A':t.estado==='pendiente'?'⚠️ Pendiente':t.estado||'—';
         seccionTareas+='<tr style="background:'+bg+';border-bottom:1px solid #eee;">';
+        seccionTareas+='<td style="padding:5px 8px;text-align:center;color:#059669;font-weight:700;">✓</td>';
         seccionTareas+='<td style="padding:5px 8px;">'+(t.nombre_tarea||t.tarea||'—')+'</td>';
-        seccionTareas+='<td style="padding:5px 8px;text-align:center;">'+estado+'</td>';
-        seccionTareas+='<td style="padding:5px 8px;font-style:italic;color:#555;">'+(t.observacion||'')+'</td>';
         seccionTareas+='</tr>';
       });
       seccionTareas+='</tbody></table>';
@@ -3813,7 +3833,8 @@ function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
         <tr><th style="border:1px solid #bbb;padding:5px 9px;font-size:10px;text-transform:uppercase;background:#f0f0f0;text-align:left;width:30%;">Tipo / Marca</th>
             <td style="border:1px solid #bbb;padding:5px 9px;font-size:11px;">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td></tr>
       </table>
-      ${trabajoRealizado?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Trabajo realizado</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:11px;margin-bottom:10px;">${trabajoRealizado}</div>`:''}
+      ${tablaLecturas}
+      ${mostrarTrabajo?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Trabajo realizado</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:11px;margin-bottom:10px;">${trabajoText}</div>`:''}
       ${seccionTareas?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;margin-top:8px;">✅ Checklist</div>${seccionTareas}`:''}
       ${interv.notas?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Observaciones</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:11px;">${interv.notas}</div>`:''}
       ${interv.repuestos?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Repuestos</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;font-size:11px;">${interv.repuestos}</div>`:''}
