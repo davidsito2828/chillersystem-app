@@ -1494,7 +1494,7 @@ tbody tr:hover{background:#f8faff;}
       </div>
       <div class="form-group"><label class="form-label">Estado</label>
         <select class="form-select" id="eEst">
-          <option>Operativo</option><option>En revisión</option><option>Fuera de servicio</option><option>En mantenimiento preventivo</option>
+          <option>Operativo</option><option>En revisión</option><option>Fuera de servicio</option><option>En mantenimiento preventivo</option><option>Inactivo</option>
         </select>
       </div>
       <div class="form-group"><label class="form-label">Marca</label><input class="form-input" id="eMarca" placeholder="York, Carrier..."/></div>
@@ -1703,6 +1703,27 @@ const _TAREAS_GENERICAS={
 function dismissAlerta(key){
   dismissedAlertas.add(key);
   calcAlertas();
+}
+
+async function descartarAlarma(eqId){
+  if(!confirm('¿Silenciar alarma para este equipo?\n\nNo volverá a aparecer hasta el próximo registro de preventivo.')) return;
+  try{
+    await api('equipos?id=eq.'+eqId,{method:'PATCH',body:JSON.stringify({ignorar_alarma:true}),headers:{...H,'Prefer':'return=minimal'}});
+    await loadEquipos();
+    calcAlertas();
+    showToast('Alarma silenciada ✓','success');
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function descartarAlarmaGrupo(eqIds){
+  const n=eqIds.length;
+  if(!confirm('¿Silenciar alarma para '+n+' equipo(s) de este cliente?\n\nNo volverán a aparecer hasta el próximo registro de preventivo.')) return;
+  try{
+    await Promise.all(eqIds.map(id=>api('equipos?id=eq.'+id,{method:'PATCH',body:JSON.stringify({ignorar_alarma:true}),headers:{...H,'Prefer':'return=minimal'}})));
+    await loadEquipos();
+    calcAlertas();
+    showToast('Alarma silenciada para '+n+' equipo(s) ✓','success');
+  }catch(e){showToast('Error: '+e.message,true);}
 }
 
 // ══════════════════════════════════════════
@@ -2037,6 +2058,8 @@ function calcAlertas(){
 
   // Preventivos
   equipos.forEach(eq=>{
+    if(eq.estado==='Inactivo') return;
+    if(eq.ignorar_alarma) return;
     const cli=clientes.find(c=>c.id===eq.cliente_id);
     // Fuera de servicio → siempre crítico
     if(eq.estado==='Fuera de servicio'){
@@ -2113,13 +2136,14 @@ function calcAlertas(){
     const tieneFuera=g.items.some(a=>a.motivo==='fs');
     const label=tieneFuera?'🔴 Fuera de servicio / vencido':`🔴 Vencido`;
     const nombre=g.cli?g.cli.nombre:'Sin cliente';
+    const eqIds=g.items.map(a=>a.eq.id);
     return `<div class="alerta-item">
       <span style="color:var(--red);font-weight:700;">${label}</span>
       <span style="font-weight:700;color:var(--text);">${nombre}</span>
       <span style="color:var(--text-dim);">· ${n} equipo(s) requieren preventivo</span>
       <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--red);border-color:var(--red);"
         onclick="abrirHistCliente('${g.cli?g.cli.id:''}')">Ver cliente</button>
-      <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
+      <button onclick="descartarAlarmaGrupo(${JSON.stringify(eqIds)})" title="Silenciar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
     </div>`;
   }).join(''));
 
@@ -2129,13 +2153,14 @@ function calcAlertas(){
     const tieneVencido=g.items.some(a=>a.motivo==='vencido_reciente');
     const label=tieneVencido?'🟡 Vencido / próximo a vencer':'🟡 Próximo a vencer';
     const nombre=g.cli?g.cli.nombre:'Sin cliente';
+    const eqIds=g.items.map(a=>a.eq.id);
     return `<div class="alerta-item">
       <span style="color:var(--yellow);font-weight:700;">${label}</span>
       <span style="font-weight:700;color:var(--text);">${nombre}</span>
       <span style="color:var(--text-dim);">· ${n} equipo(s) requieren preventivo</span>
       <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--yellow);border-color:var(--yellow);"
         onclick="abrirHistCliente('${g.cli?g.cli.id:''}')">Ver cliente</button>
-      <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
+      <button onclick="descartarAlarmaGrupo(${JSON.stringify(eqIds)})" title="Silenciar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
     </div>`;
   }).join(''));
 
@@ -2767,7 +2792,7 @@ async function guardarInterv(){
     if(tipo==='Preventivo'){
       const eq=equipos.find(e=>e.id===eqId);
       const frec=eq?eq.frecuencia_dias||30:30;
-      await api('equipos?id=eq.'+eqId,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
+      await api('equipos?id=eq.'+eqId,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec),ignorar_alarma:false}),headers:{...H,'Prefer':'return=minimal'}});
     }
     showToast('Intervención guardada ✓','success');
     cerrar('mInterv');intervFotosNuevas=[];
