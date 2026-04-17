@@ -2201,7 +2201,14 @@ function previewFotos(input,previewId,varName){
   const prev=document.getElementById(previewId);
   prev.innerHTML=files.map((f,i)=>{
     const url=URL.createObjectURL(f);
-    return `<div class="foto-preview"><img src="${url}" onclick="openLB('${url}')"/><button class="foto-remove" onclick="removeFotoPreview(${i},'${previewId}','${varName}')">✕</button></div>`;
+    const nombreArchivo=f.name||('foto_'+Date.now()+'.jpg');
+    return `<div class="foto-preview" style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div style="position:relative;width:68px;height:68px;">
+        <img src="${url}" onclick="openLB('${url}')" style="width:68px;height:68px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer;"/>
+        <button class="foto-remove" onclick="removeFotoPreview(${i},'${previewId}','${varName}')">✕</button>
+      </div>
+      <a href="${url}" download="${nombreArchivo}" style="font-size:10px;color:#3b82f6;text-decoration:none;">⬇️ Guardar</a>
+    </div>`;
   }).join('');
 }
 function removeFotoPreview(idx,previewId,varName){
