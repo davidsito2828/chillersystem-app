@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -1800,6 +1800,9 @@ tbody tr:hover{background:#f8faff;}
 <script>
 const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
+const AUTH_DOMAIN='chillersystem.app';
+// ══ SESIÓN JWT ══ La anon key es pública por diseño; las políticas RLS la protegen.
+let _authToken=null; let _refreshToken=null; let _tokenExpiry=null;
 const H={'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY};
 
 let clientes=[],equipos=[],intervenciones=[],usuarios=[],expandidos=new Set();
@@ -2072,10 +2075,25 @@ function getTareasEquipo(tipo, ultimoPreventivo){
   return {tareas_hoy,badge_estacional,badge_trimestral};
 }
 
+// Devuelve headers con el JWT correcto siempre
+function _getAuthHeaders(extra={}){
+  const token=_authToken||SKEY;
+  return {'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+token,...extra};
+}
+
 async function api(path, opts={}) {
-  const r = await fetch(SURL+'/rest/v1/'+path, {headers:H, ...opts});
+  // Forzar JWT en Authorization (sobreescribe cualquier header viejo con anon key)
+  const headers=_getAuthHeaders(opts.headers||{});
+  headers['Authorization']='Bearer '+(_authToken||SKEY); // siempre el JWT más reciente
+  const r = await fetch(SURL+'/rest/v1/'+path, {...opts, headers});
   if (!r.ok) {
-    const e = await r.json().catch(()=>({message:'Error'}));
+    // Token expirado → intentar renovar automáticamente
+    if(r.status===401&&_refreshToken){
+      const ok=await refreshAuthToken();
+      if(ok) return api(path,opts); // reintentar
+      doLogout(); return null;
+    }
+    const e = await r.json().catch(()=>({message:'Error '+r.status}));
     throw new Error(e.message||'Error');
   }
   if (r.status === 204 || r.headers.get('content-length')==='0') return null;
@@ -2084,26 +2102,120 @@ async function api(path, opts={}) {
   return JSON.parse(text);
 }
 
-// ── LOGIN ──
+// ══ AUTH CON SUPABASE ══
+
+// Guarda la sesión completa en localStorage
+function _saveSession(session, username){
+  _authToken=session.access_token;
+  _refreshToken=session.refresh_token;
+  _tokenExpiry=Date.now()+(session.expires_in*1000);
+  localStorage.setItem('cs_session',JSON.stringify({
+    access_token:_authToken, refresh_token:_refreshToken,
+    expiry:_tokenExpiry, username
+  }));
+  // Renovar automáticamente 10 min antes de vencer
+  const msUntilRefresh=Math.max((session.expires_in-600)*1000,60000);
+  setTimeout(refreshAuthToken,msUntilRefresh);
+}
+
+// Renueva el JWT usando el refresh_token
+async function refreshAuthToken(){
+  if(!_refreshToken) return false;
+  try{
+    const res=await fetch(SURL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST',
+      headers:{'apikey':SKEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:_refreshToken})
+    });
+    if(!res.ok){doLogout();return false;}
+    const session=await res.json();
+    const saved=JSON.parse(localStorage.getItem('cs_session')||'{}');
+    _saveSession(session,saved.username||'');
+    return true;
+  }catch(e){console.warn('[auth] Error renovando token:',e);return false;}
+}
+
+// LOGIN con Supabase Auth → fallback al método legacy si el usuario no existe en Auth aún
 async function doLogin(){
   const u=document.getElementById('loginUser').value.trim();
   const p=document.getElementById('loginPass').value;
+  if(!u||!p){document.getElementById('loginErr').style.display='block';return;}
+  document.getElementById('loginErr').style.display='none';
   try{
-    const res=await api(`usuarios?usuario=eq.${encodeURIComponent(u)}&activo=eq.true&select=*`);
-    if(!res||!res.length||res[0].password!==p){document.getElementById('loginErr').style.display='block';return;}
-    usuarioActual=res[0];
-    document.getElementById('loginErr').style.display='none';
-    iniciarApp();
-  }catch(e){showToast('Error de conexión',true);}
+    // ─ Intento 1: Supabase Auth ─
+    const authRes=await fetch(SURL+'/auth/v1/token?grant_type=password',{
+      method:'POST',
+      headers:{'apikey':SKEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email:u+'@'+AUTH_DOMAIN,password:p})
+    });
+    if(authRes.ok){
+      const session=await authRes.json();
+      _saveSession(session,u);
+      // Cargar perfil desde tabla usuarios
+      const perfil=await api('usuarios?usuario=eq.'+encodeURIComponent(u)+'&activo=eq.true&select=*');
+      if(!perfil||!perfil.length){document.getElementById('loginErr').style.display='block';_authToken=null;return;}
+      usuarioActual=perfil[0];
+      iniciarApp(); return;
+    }
+    // ─ Intento 2 (fallback legacy): comparación directa mientras se migra ─
+    // NOTA: Este bloque se elimina una vez que todos los usuarios estén en Supabase Auth
+    const legacyRes=await fetch(SURL+'/rest/v1/usuarios?usuario=eq.'+encodeURIComponent(u)+'&activo=eq.true&select=*',
+      {headers:H});
+    if(legacyRes.ok){
+      const legacy=await legacyRes.json();
+      if(legacy&&legacy.length&&legacy[0].password===p){
+        usuarioActual=legacy[0];
+        // Sin JWT por ahora — llamadas usan anon key hasta que el usuario exista en Auth
+        iniciarApp(); return;
+      }
+    }
+    document.getElementById('loginErr').style.display='block';
+  }catch(e){showToast('Error de conexión',true);console.error('[login]',e);}
 }
+
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginScreen').style.display!=='none')doLogin();});
 
-function doLogout(){
+// LOGOUT: invalida el token en Supabase y limpia sesión local
+async function doLogout(){
+  if(_authToken){
+    fetch(SURL+'/auth/v1/logout',{
+      method:'POST',
+      headers:{'apikey':SKEY,'Authorization':'Bearer '+_authToken}
+    }).catch(()=>{});
+  }
+  _authToken=null; _refreshToken=null; _tokenExpiry=null;
+  localStorage.removeItem('cs_session');
   usuarioActual=null;
   document.getElementById('appScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('loginUser').value='';
   document.getElementById('loginPass').value='';
+}
+
+// RESTAURAR sesión guardada al abrir la app
+async function intentarRestaurarSesion(){
+  const saved=localStorage.getItem('cs_session');
+  if(!saved) return false;
+  try{
+    const s=JSON.parse(saved);
+    if(!s.access_token||!s.username) return false;
+    // Si el token está por vencer, renovarlo primero
+    if(Date.now()>s.expiry-300000){
+      _refreshToken=s.refresh_token;
+      const ok=await refreshAuthToken();
+      if(!ok){localStorage.removeItem('cs_session');return false;}
+    } else {
+      _authToken=s.access_token; _refreshToken=s.refresh_token; _tokenExpiry=s.expiry;
+      // Programar renovación automática
+      const msLeft=Math.max(s.expiry-Date.now()-600000,30000);
+      setTimeout(refreshAuthToken,msLeft);
+    }
+    // Cargar perfil
+    const perfil=await api('usuarios?usuario=eq.'+encodeURIComponent(s.username)+'&activo=eq.true&select=*');
+    if(!perfil||!perfil.length){localStorage.removeItem('cs_session');_authToken=null;return false;}
+    usuarioActual=perfil[0];
+    iniciarApp(); return true;
+  }catch(e){localStorage.removeItem('cs_session');_authToken=null;return false;}
 }
 
 async function iniciarApp(){
@@ -2553,7 +2665,7 @@ async function subirFotos(files,carpeta){
       const nombre=carpeta+'/'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.jpg';
       const r=await fetch(SURL+'/storage/v1/object/fotos/'+nombre,{
         method:'POST',
-        headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'image/jpeg','x-upsert':'true'},
+        headers:{'apikey':SKEY,'Authorization':'Bearer '+(_authToken||SKEY),'Content-Type':'image/jpeg','x-upsert':'true'},
         body:comprimida
       });
       if(r.ok){
@@ -6234,7 +6346,16 @@ async function guardarFrecuenciaTarea(id, dias){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
+// \u2550\u2550 INICIO: intentar restaurar sesi\u00f3n guardada \u2550\u2550
+// Si hay una sesi\u00f3n guardada, el usuario no tiene que volver a loguearse
+document.addEventListener('DOMContentLoaded', async ()=>{
+  const restaurada = await intentarRestaurarSesion();
+  // Si no se restaur\u00f3, se muestra el login normalmente (ya est\u00e1 visible por defecto)
+  if(!restaurada) console.log('[auth] Sin sesi\u00f3n guardada. Mostrando login.');
+});
+
 </script>
+
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
