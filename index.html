@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -2460,20 +2460,30 @@ function removeFotoPreview(idx,previewId,varName){
   if(items[idx]) items[idx].remove();
 }
 async function comprimirFoto(file){
+  // iOS/Safari: HEIC or blob from camera may fail canvas — catch and fallback
   return new Promise(resolve=>{
+    // If file type is HEIC/HEIF (common on iOS), skip compression
+    const name=(file.name||'').toLowerCase();
+    const type=(file.type||'').toLowerCase();
+    if(type.includes('heic')||type.includes('heif')||name.endsWith('.heic')||name.endsWith('.heif')){
+      resolve(file); return;
+    }
     const img=new Image();
     const url=URL.createObjectURL(file);
+    const timer=setTimeout(()=>{URL.revokeObjectURL(url);resolve(file);},8000);
     img.onload=()=>{
-      const MAX=1200;
-      let w=img.width,h=img.height;
-      if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
-      const canvas=document.createElement('canvas');
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      canvas.toBlob(blob=>resolve(blob||file),'image/jpeg',0.75);
-      URL.revokeObjectURL(url);
+      clearTimeout(timer);
+      try{
+        const MAX=1280;
+        let w=img.width||MAX,h=img.height||MAX;
+        if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+        const canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        canvas.toBlob(blob=>{URL.revokeObjectURL(url);resolve(blob||file);},'image/jpeg',0.80);
+      }catch(e){URL.revokeObjectURL(url);resolve(file);}
     };
-    img.onerror=()=>resolve(file);
+    img.onerror=()=>{clearTimeout(timer);URL.revokeObjectURL(url);resolve(file);};
     img.src=url;
   });
 }
@@ -3614,34 +3624,86 @@ async function guardarSoloPreventivo(){
   if(!fecha){showToast('Ingresá la fecha del service',true);return;}
   const eqs=equipos.filter(e=>e.cliente_id===serviceClienteActual);
   if(!eqs.length){showToast('Sin equipos para registrar',true);return;}
-  // Capturar firma del cliente del panel global
   const firmaClienteSP=getFirmaData();
   const nombreFirmanteSP=document.getElementById('sNombreFirmante')?.value.trim()||null;
   showToast('Guardando preventivo...');
   document.getElementById('btnGuardarPreventivo').disabled=true;
   try{
+    const cli=clientes.find(c=>c.id===serviceClienteActual);
+    const notasGlobal=document.getElementById('firmaObservaciones').value.trim()||null;
+    const equiposDetalle=[];
+    // ─── Guardar por-equipo si hay datos en servicePlanilla ───
     for(const eq of eqs){
-      if(!servicePlanilla[eq.id]){
-        const frec=eq.frecuencia_dias||30;
+      const p=servicePlanilla[eq.id];
+      const frec=eq.frecuencia_dias||30;
+      if(p){
+        // Subir fotos si hay
+        let fotosUrls=[];
+        if(p.fotos_nuevas&&p.fotos_nuevas.length){
+          try{ fotosUrls=await subirFotos(p.fotos_nuevas,'service'); }catch(e){console.warn('[fotos eq]',e);}
+        }
+        // Guardar intervención individual por equipo (con lecturas y fotos)
+        const eqData={
+          equipo_id:eq.id, tipo:p.tipo||'Preventivo', fecha,
+          tecnico:tecnico||firma,
+          descripcion:p.tipo==='Correctivo'?(p.desc_correctivo||p.trabajo||null):(p.trabajo||null),
+          solucion:p.tipo==='Correctivo'?null:(p.trabajo||null),
+          repuestos:p.repuestos||null,
+          notas:notasGlobal,
+          fotos:fotosUrls,
+          necesita_correctivo:p.tipo==='Correctivo',
+          correctivo_resuelto:p.tipo==='Correctivo'?false:null,
+          lecturas_operativas:p.lecturas_operativas||null,
+          firma:firma, es_planilla:true
+        };
+        const eqRes=await api('intervenciones',{method:'POST',body:JSON.stringify(eqData),headers:{...H,'Prefer':'return=representation'}});
+        const eqIntervId=Array.isArray(eqRes)?eqRes[0]?.id:eqRes?.id;
+        // Actualizar preventivo del equipo
+        if(p.tipo!=='Correctivo'){
+          await api('equipos?id=eq.'+eq.id,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec),ignorar_alarma:false}),headers:{...H,'Prefer':'return=minimal'}});
+          // Guardar tareas del checklist por equipo
+          if(p.tareas_realizadas&&p.tareas_realizadas.length){
+            for(const t of p.tareas_realizadas){
+              if(!t.tarea_id&&!t.nombre) continue;
+              await api('tareas_realizadas',{method:'POST',body:JSON.stringify({
+                equipo_id:eq.id, tarea_id:t.tarea_id||null,
+                nombre_tarea:t.nombre, fecha_realizada:fecha,
+                tecnico:tecnico||firma, intervencion_id:eqIntervId||null
+              }),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+            }
+          }
+        }
+        equiposDetalle.push({
+          equipo_id:eq.id, nombre_equipo:eq.nombre, tipo_equipo:eq.tipo||'—',
+          trabajo:p.trabajo||null,
+          lecturas:p.lecturas_operativas||{},
+          tareas:p.tareas_realizadas||[],
+          necesita_correctivo:p.tipo==='Correctivo',
+          desc_correctivo:p.desc_correctivo||null
+        });
+      } else {
+        // Sin datos en planilla → solo actualizar preventivo
         await api('equipos?id=eq.'+eq.id,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec)}),headers:{...H,'Prefer':'return=minimal'}});
+        equiposDetalle.push({
+          equipo_id:eq.id, nombre_equipo:eq.nombre, tipo_equipo:eq.tipo||'—',
+          trabajo:'Sin novedades', lecturas:{}, tareas:[], necesita_correctivo:false
+        });
       }
     }
-    // Guardar intervención general con return=representation para obtener id
-    const cli=clientes.find(c=>c.id===serviceClienteActual);
+    // ─── Intervención general de resumen (sin equipo) ───
     const data={
       cliente_id:serviceClienteActual,
       equipo_id:null, tipo:'Preventivo', fecha,
       tecnico:tecnico||firma,
       descripcion:'✅ Preventivo — '+cli.nombre,
-      solucion:'Sin novedades — equipos operativos en su totalidad ('+eqs.length+' equipo(s))',
-      firma:firma,
-      notas:document.getElementById('firmaObservaciones').value.trim()||null,
+      solucion:'Equipos operativos — '+eqs.length+' equipo(s) revisados',
+      firma:firma, notas:notasGlobal,
       es_planilla:true, necesita_correctivo:false, fotos:[]
     };
     const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
     const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
-    console.log('[guardarSoloPreventivo] intervId:',intervId,'firma:',firmaClienteSP.base64?'sí':'no');
-    // Guardar tareas del checklist marcadas
+    console.log('[guardarSoloPreventivo] intervId:',intervId);
+    // Guardar tareas del checklist global (si se usó el panel global)
     try{
       const filasTareas=document.querySelectorAll('#sTareasList .checklist-row');
       for(const fila of filasTareas){
@@ -3652,24 +3714,25 @@ async function guardarSoloPreventivo(){
         if(!tareaId) continue;
         await api('tareas_realizadas',{
           method:'POST',
-          body:JSON.stringify({
-            equipo_id:null,
-            tarea_id:tareaId,
-            nombre_tarea:tareaNombre||tareaId,
-            fecha_realizada:fecha,
-            tecnico:tecnico||firma,
-            intervencion_id:intervId
-          }),
+          body:JSON.stringify({equipo_id:null,tarea_id:tareaId,
+            nombre_tarea:tareaNombre||tareaId,fecha_realizada:fecha,
+            tecnico:tecnico||firma,intervencion_id:intervId}),
           headers:{...H,'Prefer':'return=minimal'}
-        });
+        }).catch(()=>{});
       }
-      console.log('[tareas guardadas] OK');
-    }catch(e){
-      console.warn('[tareas guardadas] Error:',e);
-    }
-    // Crear UN SOLO registro consolidado en preventivos_aprobacion
-    const aprobExistenteSP=await api('preventivos_aprobacion?cliente_id=eq.'+serviceClienteActual+'&fecha_servicio=eq.'+fecha+'&estado=eq.pendiente&select=id').catch(()=>null);
-    if(!aprobExistenteSP||!aprobExistenteSP.length){
+    }catch(e){console.warn('[tareas checklist global]',e);}
+    // ─── Crear registro en preventivos_aprobacion con equipos_detalle completo ───
+    const aprobExistenteSP=await api('preventivos_aprobacion?cliente_id=eq.'+serviceClienteActual+'&fecha_servicio=eq.'+fecha+'&estado=eq.pendiente&select=id,equipos_detalle').catch(()=>null);
+    if(aprobExistenteSP&&aprobExistenteSP.length){
+      const existId=aprobExistenteSP[0].id;
+      const detalleExistente=aprobExistenteSP[0].equipos_detalle||[];
+      await api('preventivos_aprobacion?id=eq.'+existId,{method:'PATCH',body:JSON.stringify({
+        equipos_detalle:[...detalleExistente,...equiposDetalle],
+        firma_cliente:firmaClienteSP.base64||null,
+        firma_tipo:firmaClienteSP.tipo||null,
+        nombre_firmante:nombreFirmanteSP||null
+      }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion patch]',e));
+    } else {
       await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
         intervencion_id:intervId||null,
         cliente_id:serviceClienteActual,
@@ -3678,22 +3741,13 @@ async function guardarSoloPreventivo(){
         fecha_servicio:fecha,
         firma_cliente:firmaClienteSP.base64||null,
         firma_tipo:firmaClienteSP.tipo||null,
+        nombre_firmante:nombreFirmanteSP||null,
         estado:'pendiente',
-        equipos_detalle:[]
+        equipos_detalle:equiposDetalle
       }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion insert]',e));
     }
-    // Si hay correctivos marcados en planilla, guardarlos también
-    for(const eqId of Object.keys(servicePlanilla)){
-      const p=servicePlanilla[eqId];
-      if(p.necesita_correctivo){
-        const d={equipo_id:eqId,tipo:'Correctivo',fecha,tecnico:tecnico||firma,
-          descripcion:p.trabajo,solucion:p.desc_correctivo||null,
-          firma:firma,fotos:[],es_planilla:true,necesita_correctivo:true};
-        await api('intervenciones',{method:'POST',body:JSON.stringify(d),headers:{...H,'Prefer':'return=minimal'}});
-      }
-    }
     showToast('Preventivo guardado ✓','success');
-    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadAprobaciones()]);
+    await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
     calcAlertas(); volverListaService();
   }catch(e){showToast('Error: '+e.message,true);}
   finally{document.getElementById('btnGuardarPreventivo').disabled=false;}
@@ -3928,7 +3982,59 @@ function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
   const fechaFmt=fmtF(a.fecha_servicio);
   // Construir secciones por equipo
   let seccionesEquipos='';
-  const grupoAprobaciones=grupoIds.map(gid=>aprobaciones.find(x=>x.id===gid)).filter(Boolean);
+  // Primero intentar con grupoIds, si no hay usar equipos_detalle de la aprobación
+  let grupoAprobaciones=grupoIds.map(gid=>aprobaciones.find(x=>x.id===gid)).filter(Boolean);
+  const equiposDetalleFallback=(a.equipos_detalle||[]);
+  // Si solo hay una aprobación (la general sin equipo) pero hay equipos_detalle, usar esos
+  const usarDetalle=grupoAprobaciones.length===1&&!grupoAprobaciones[0].equipo_id&&equiposDetalleFallback.length>0;
+  if(usarDetalle){
+    // Renderizar desde equipos_detalle directamente
+    equiposDetalleFallback.forEach((det,idx)=>{
+      const eq=equipos.find(e=>e.id===det.equipo_id)||{nombre:det.nombre_equipo||('Equipo '+(idx+1)),tipo:det.tipo_equipo||''};
+      const lec=det.lecturas||{};
+      const trabajoText=det.trabajo||'';
+      const mostrarTrabajo=trabajoText&&!trabajoText.startsWith('Sin novedades');
+      const filasLec=[
+        lec.temperatura_inyeccion!=null?['T° Inyección',lec.temperatura_inyeccion,'°C']:null,
+        lec.temperatura_retorno!=null?['T° Retorno',lec.temperatura_retorno,'°C']:null,
+        lec.presion_alta!=null?['Presión Alta',lec.presion_alta,'bar']:null,
+        lec.presion_baja!=null?['Presión Baja',lec.presion_baja,'bar']:null,
+        lec.corriente_compresor!=null?['Corriente Compresor',lec.corriente_compresor,'A']:null,
+        lec.carga_gas?['Carga de gas',lec.carga_gas,'']:null
+      ].filter(Boolean);
+      const tablaLecturas=filasLec.length>0
+        ?'<div style="margin:8px 0;">'
+          +'<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:#1a2332;margin-bottom:5px;">📊 Lecturas operativas</div>'
+          +'<table width="100%" style="border-collapse:collapse;font-size:11px;">'
+          +'<thead><tr style="background:#f0f4f8;">'
+          +'<th style="padding:4px 8px;text-align:left;border:1px solid #ddd;">Parámetro</th>'
+          +'<th style="padding:4px 8px;text-align:center;border:1px solid #ddd;">Valor</th>'
+          +'<th style="padding:4px 8px;text-align:center;border:1px solid #ddd;">Unidad</th>'
+          +'</tr></thead><tbody>'
+          +filasLec.map((f,i)=>'<tr style="background:'+(i%2===0?'#fff':'#f9fafb')+';"><td style="padding:4px 8px;border:1px solid #ddd;">'+f[0]+'</td><td style="padding:4px 8px;text-align:center;border:1px solid #ddd;font-weight:700;">'+f[1]+'</td><td style="padding:4px 8px;text-align:center;border:1px solid #ddd;">'+f[2]+'</td></tr>').join('')
+          +'</tbody></table></div>'
+        :'';
+      const tareasDetalle=det.tareas||[];
+      let seccionTareas='';
+      if(tareasDetalle.length>0){
+        seccionTareas='<table width="100%" style="border-collapse:collapse;font-size:11px;margin-top:8px;">'
+          +'<thead><tr style="background:#1a2332;color:#fff;"><th style="padding:5px 8px;text-align:center;width:40px;">#</th><th style="padding:5px 8px;text-align:left;">Tarea realizada</th></tr></thead><tbody>'
+          +tareasDetalle.map((t,i)=>'<tr style="background:'+(i%2===0?'#fff':'#f9f9f9')+';border-bottom:1px solid #eee;"><td style="padding:5px 8px;text-align:center;color:#059669;font-weight:700;">✓</td><td style="padding:5px 8px;">'+(t.nombre||t.nombre_tarea||'—')+'</td></tr>').join('')
+          +'</tbody></table>';
+      }
+      seccionesEquipos+=`
+      <div style="margin-bottom:24px;padding:16px;border:1px solid #ddd;border-radius:6px;page-break-inside:avoid;">
+        <div style="font-size:13px;font-weight:bold;text-transform:uppercase;border-left:4px solid #1a2332;padding-left:10px;margin-bottom:12px;">${eq.nombre}</div>
+        <table width="100%" style="border-collapse:collapse;margin-bottom:10px;">
+          <tr><th style="border:1px solid #bbb;padding:5px 9px;font-size:10px;text-transform:uppercase;background:#f0f0f0;text-align:left;width:30%;">Tipo / Marca</th>
+              <td style="border:1px solid #bbb;padding:5px 9px;font-size:11px;">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td></tr>
+        </table>
+        ${tablaLecturas}
+        ${mostrarTrabajo?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Trabajo realizado</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:11px;margin-bottom:10px;">${trabajoText}</div>`:''}
+        ${seccionTareas?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;margin-top:8px;">✅ Checklist</div>${seccionTareas}`:''}
+      </div>`;
+    });
+  } else {
   grupoAprobaciones.forEach((aprob,idx)=>{
     const eq=equipos.find(e=>e.id===aprob.equipo_id)||{nombre:'Equipo '+(idx+1)};
     const interv=intervenciones.find(i=>i.id===aprob.intervencion_id)||{};
@@ -3936,8 +4042,9 @@ function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
     // FIX 3: solo descripcion, evitar duplicar solucion; ocultar texto genérico "Sin novedades"
     const trabajoText=interv.descripcion||interv.solucion||'';
     const mostrarTrabajo=trabajoText&&!trabajoText.startsWith('Sin novedades');
-    // FIX 1: lecturas operativas
-    const lec=interv.lecturas_operativas||{};
+    // FIX 1: lecturas operativas — fallback a equipos_detalle si no hay en interv
+    const detEquipo=(equiposDetalleFallback||[]).find(d=>d.equipo_id===aprob.equipo_id)||{};
+    const lec=((interv.lecturas_operativas&&Object.keys(interv.lecturas_operativas).length)?interv.lecturas_operativas:(detEquipo.lecturas||{}));
     const filasLec=[
       lec.temperatura_inyeccion!=null?['T° Inyección',lec.temperatura_inyeccion,'°C']:null,
       lec.temperatura_retorno!=null?['T° Retorno',lec.temperatura_retorno,'°C']:null,
@@ -3989,6 +4096,7 @@ function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
       ${interv.repuestos?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-top:10px;margin-bottom:4px;">Repuestos</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;font-size:11px;">${interv.repuestos}</div>`:''}
     </div>`;
   });
+  } // end else (render por aprobaciones individuales)
   const firmaImg=a.firma_cliente==='click_confirmado'
     ?'<div style="padding:8px;color:#059669;font-weight:700;border:1px solid #a7f3d0;border-radius:4px;background:#ecfdf5;">✅ Conformidad confirmada digitalmente</div>'
     :a.firma_cliente
@@ -4237,6 +4345,68 @@ async function guardarResolucionCorrectivo(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
+async function renderGaleria(){
+  const contenedor=document.getElementById('galeriaContenido');
+  contenedor.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);">Cargando fotos...</div>';
+  if(!intervenciones.length) await loadIntervenciones();
+  if(!equipos.length) await loadEquipos();
+  const todasLasFotos=[];
+
+  // 1. Fotos de intervenciones
+  intervenciones.forEach(i=>{
+    if(!i.fotos||!i.fotos.length) return;
+    let eq=equipos.find(e=>e.id===i.equipo_id)||null;
+    // Si tiene cliente_id directo (registro general de cliente)
+    let cli=null;
+    if(i.cliente_id) cli=clientes.find(c=>c.id===i.cliente_id)||null;
+    if(!cli&&eq) cli=clientes.find(c=>c.id===eq.cliente_id)||null;
+    i.fotos.forEach(url=>{
+      if(typeof url!=='string'||!url.startsWith('http')) return;
+      todasLasFotos.push({
+        url, fecha:i.fecha, tecnico:i.tecnico||'—',
+        cliente:cli?cli.nombre:'—', equipo:eq?eq.nombre:'General',
+        tipo:i.tipo||'—', intervencion_id:i.id
+      });
+    });
+  });
+
+  // 2. Fotos de equipos (cargadas al registrar el equipo)
+  equipos.forEach(eq=>{
+    if(!eq.fotos||!eq.fotos.length) return;
+    const cli=clientes.find(c=>c.id===eq.cliente_id)||null;
+    eq.fotos.forEach(url=>{
+      if(typeof url!=='string'||!url.startsWith('http')) return;
+      todasLasFotos.push({
+        url, fecha:eq.ultimo_preventivo||null, tecnico:'—',
+        cliente:cli?cli.nombre:'—', equipo:eq.nombre,
+        tipo:'Equipo', intervencion_id:null
+      });
+    });
+  });
+
+  // Ordenar por fecha desc
+  todasLasFotos.sort((a,b)=>new Date(b.fecha||0)-new Date(a.fecha||0));
+
+  const clientesConFotos=[...new Set(todasLasFotos.map(f=>f.cliente))].sort();
+  let html='';
+  html+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">';
+  html+='<select id="filtroGaleriaCliente" onchange="filtrarGaleria()" class="search-box" style="width:auto;min-width:200px;">'+
+    '<option value="">— Todos los clientes —</option>'+
+    clientesConFotos.map(c=>'<option value="'+c+'">'+c+'</option>').join('')+
+    '</select>';
+  html+='<select id="filtroGaleriaTipo" onchange="filtrarGaleria()" class="search-box" style="width:auto;">'+
+    '<option value="">— Todos los tipos —</option>'+
+    '<option value="Preventivo">Preventivo</option>'+
+    '<option value="Correctivo">Correctivo</option>'+
+    '<option value="Equipo">Equipo</option>'+
+    '</select>';
+  html+='<span id="galeriaCount" style="font-size:12px;color:var(--text-dim);">'+todasLasFotos.length+' foto(s)</span>';
+  html+='</div>';
+  html+='<div id="galeriaGrid">'+renderGaleriaGrid(todasLasFotos)+'</div>';
+  contenedor.innerHTML=html;
+  window._todasLasFotos=todasLasFotos;
+}
+
 function setFiltro(v,btn){
   filtroEmp=v;
   document.querySelectorAll('.empresa-pill').forEach(b=>b.classList.remove('active'));
@@ -4262,55 +4432,6 @@ function showTab(id,btn){
   if(id==='estadisticas'){renderEstadisticas();}
 }
 
-async function renderGaleria(){
-  const contenedor=document.getElementById('galeriaContenido');
-  contenedor.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);">Cargando fotos...</div>';
-  // Recargar si el array está vacío (puede pasar si se abre la tab antes del init completo)
-  if(!intervenciones.length) await loadIntervenciones();
-  console.log('[Galería] Total intervenciones:',intervenciones.length);
-  console.log('[Galería] Intervenciones con fotos:',intervenciones.filter(i=>i.fotos&&i.fotos.length).length);
-  console.log('[Galería] Ejemplo fotos:',intervenciones.find(i=>i.fotos&&i.fotos.length)?.fotos);
-  const primeraInterv=intervenciones[0];
-  console.log('[Galería] Estructura intervención:',JSON.stringify(primeraInterv));
-  intervenciones.forEach(i=>{
-    const campos=Object.keys(i);
-    const conFotos=campos.filter(c=>{
-      const val=i[c];
-      return val&&((Array.isArray(val)&&val.length>0)||(typeof val==='string'&&val.includes('http')));
-    });
-    if(conFotos.length) console.log('[Galería] Campos con datos en interv:',i.id,conFotos,conFotos.map(c=>i[c]));
-  });
-  const todasLasFotos=[];
-  intervenciones.forEach(i=>{
-    if(i.fotos&&i.fotos.length){
-      const eq=equipos.find(e=>e.id===i.equipo_id);
-      // intervenciones no tienen cliente_id propio — buscamos via equipo
-      const cli=eq?clientes.find(c=>c.id===eq.cliente_id):null;
-      i.fotos.forEach(url=>{
-        // Ignorar entradas que no sean string URL válida
-        if(typeof url!=='string'||!url.startsWith('http')) return;
-        todasLasFotos.push({url,fecha:i.fecha,tecnico:i.tecnico||'—',cliente:cli?cli.nombre:'—',equipo:eq?eq.nombre:'—',tipo:i.tipo||'—',intervencion_id:i.id});
-      });
-    }
-  });
-  const clientesConFotos=[...new Set(todasLasFotos.map(f=>f.cliente))].sort();
-  let html='';
-  html+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">';
-  html+='<select id="filtroGaleriaCliente" onchange="filtrarGaleria()" class="search-box" style="width:auto;min-width:200px;">'+
-    '<option value="">— Todos los clientes —</option>'+
-    clientesConFotos.map(c=>'<option value="'+c+'">'+c+'</option>').join('')+
-    '</select>';
-  html+='<select id="filtroGaleriaTipo" onchange="filtrarGaleria()" class="search-box" style="width:auto;">'+
-    '<option value="">— Todos los tipos —</option>'+
-    '<option value="Preventivo">Preventivo</option>'+
-    '<option value="Correctivo">Correctivo</option>'+
-    '</select>';
-  html+='<span id="galeriaCount" style="font-size:12px;color:var(--text-dim);">'+todasLasFotos.length+' foto(s)</span>';
-  html+='</div>';
-  html+='<div id="galeriaGrid">'+renderGaleriaGrid(todasLasFotos)+'</div>';
-  contenedor.innerHTML=html;
-  window._todasLasFotos=todasLasFotos;
-}
 
 function renderGaleriaGrid(fotos){
   if(!fotos.length) return '<div style="text-align:center;padding:60px 20px;">'+
