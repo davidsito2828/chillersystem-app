@@ -931,6 +931,32 @@ tbody tr:hover{background:#f8faff;}
     <div><div class="panel-title">👥 Gestión de Usuarios</div><div class="panel-count" id="usersCount">—</div></div>
     <button class="btn-primary" onclick="abrirModalUser()">＋ Nuevo usuario</button>
   </div>
+
+  <!-- PANEL DE MIGRACIÓN DE SEGURIDAD -->
+  <div id="panelMigracion" style="margin:16px;padding:20px;background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(59,130,246,0.08));border:1px solid rgba(139,92,246,0.3);border-radius:12px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="font-size:20px;">🔐</span>
+      <div>
+        <div style="font-weight:800;font-size:14px;color:var(--text);">Migración de Seguridad — Supabase Auth</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Crea cuentas seguras para todos los usuarios. Solo se hace una vez.</div>
+      </div>
+      <button onclick="document.getElementById('panelMigracion').style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px;">✕</button>
+    </div>
+    <div id="migracionEstado" style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">
+      Hacé clic en el botón para crear las cuentas seguras de todos los usuarios activos.
+      Después de esto, el login usará JWT protegido en lugar de contraseñas en texto plano.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button id="btnMigrar" class="btn-primary" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);" onclick="ejecutarMigracionAuth()">
+        🚀 Crear cuentas seguras ahora
+      </button>
+      <button class="btn-secondary" onclick="verificarEstadoAuth()" style="font-size:12px;">
+        🔍 Verificar estado actual
+      </button>
+    </div>
+    <div id="migracionResultados" style="margin-top:12px;"></div>
+  </div>
+
   <div class="table-wrap">
     <table>
       <thead><tr><th>Nombre</th><th>Usuario</th><th>Contraseña</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
@@ -938,6 +964,8 @@ tbody tr:hover{background:#f8faff;}
     </table>
   </div>
 </div>
+
+
 
 
 <!-- ═══ SERVICE ═══ -->
@@ -3464,6 +3492,113 @@ function abrirModalUser(id=null){
     document.getElementById('uActivo').value=String(u.activo);
   }else document.getElementById('tUser').textContent='Nuevo Usuario';
   document.getElementById('mUser').classList.add('open');
+}
+
+// ══════════════════════════════════════════════════════
+//  MIGRACIÓN DE SEGURIDAD: Crear usuarios en Supabase Auth
+// ══════════════════════════════════════════════════════
+
+async function ejecutarMigracionAuth(){
+  const btn=document.getElementById('btnMigrar');
+  const res=document.getElementById('migracionResultados');
+  const estado=document.getElementById('migracionEstado');
+  if(btn) btn.disabled=true;
+  estado.innerHTML='<span style="color:var(--accent);">⏳ Creando cuentas... por favor esperá.</span>';
+  res.innerHTML='';
+
+  const usuariosActivos=usuarios.filter(u=>u.activo);
+  if(!usuariosActivos.length){
+    estado.innerHTML='<span style="color:var(--red);">No se encontraron usuarios activos.</span>';
+    if(btn) btn.disabled=false; return;
+  }
+
+  let htmlRes='<div style="display:flex;flex-direction:column;gap:6px;">';
+  let exitosos=0, fallados=0;
+
+  for(const u of usuariosActivos){
+    const email=(u.usuario||u.nombre||'user').toLowerCase().replace(/\s+/g,'')+'@'+AUTH_DOMAIN;
+    const password=u.password||'chiller2024';
+    try{
+      const r=await fetch(SURL+'/auth/v1/signup',{
+        method:'POST',
+        headers:{'apikey':SKEY,'Content-Type':'application/json'},
+        body:JSON.stringify({email, password})
+      });
+      const data=await r.json();
+      // Supabase devuelve user.id si se creó, o mensaje de error si ya existe
+      if(r.ok && (data.user?.id || data.id)){
+        htmlRes+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(5,150,105,0.1);border-radius:6px;font-size:12px;">
+          <span style="color:#10b981;font-weight:700;">✓</span>
+          <span style="color:var(--text);font-weight:600;">${u.nombre}</span>
+          <span style="color:var(--text-dim);">(${email})</span>
+          <span style="margin-left:auto;color:#10b981;font-size:11px;">Cuenta creada</span>
+        </div>`;
+        exitosos++;
+        // Actualizar email en tabla usuarios
+        await api('usuarios?id=eq.'+u.id,{method:'PATCH',
+          body:JSON.stringify({email}),
+          headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+      } else if(data.code==='user_already_exists'||data.msg?.includes('registered')||(data.error_description||'').includes('registered')){
+        htmlRes+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(245,158,11,0.1);border-radius:6px;font-size:12px;">
+          <span style="color:#f59e0b;font-weight:700;">↩</span>
+          <span style="color:var(--text);font-weight:600;">${u.nombre}</span>
+          <span style="color:var(--text-dim);">(${email})</span>
+          <span style="margin-left:auto;color:#f59e0b;font-size:11px;">Ya existía</span>
+        </div>`;
+        exitosos++;
+      } else {
+        htmlRes+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:6px;font-size:12px;">
+          <span style="color:#ef4444;font-weight:700;">✗</span>
+          <span style="color:var(--text);font-weight:600;">${u.nombre}</span>
+          <span style="color:var(--text-dim);">(${email})</span>
+          <span style="margin-left:auto;color:#ef4444;font-size:11px;">${data.msg||data.error_description||'Error'}</span>
+        </div>`;
+        fallados++;
+      }
+    }catch(e){
+      htmlRes+=`<div style="padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:6px;font-size:12px;color:#ef4444;">✗ ${u.nombre} — ${e.message}</div>`;
+      fallados++;
+    }
+    res.innerHTML=htmlRes+'</div>';
+  }
+  htmlRes+='</div>';
+  res.innerHTML=htmlRes;
+
+  if(exitosos===usuariosActivos.length){
+    estado.innerHTML=`<span style="color:#10b981;font-weight:700;">✅ ¡Migración completa! ${exitosos}/${usuariosActivos.length} cuentas listas.</span>
+      <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">
+        El próximo paso es activar el RLS en Supabase desde el SQL Editor para completar la seguridad.
+        <br>Podés copiar el SQL del archivo <code>supabase-security.sql</code> en el repositorio.
+      </div>`;
+    if(btn) btn.textContent='✅ Migración completada';
+  } else {
+    estado.innerHTML=`<span style="color:#f59e0b;">⚠️ ${exitosos} ok, ${fallados} con problemas. Revisá los errores arriba.</span>`;
+    if(btn) btn.disabled=false;
+  }
+}
+
+async function verificarEstadoAuth(){
+  const estado=document.getElementById('migracionEstado');
+  estado.innerHTML='<span style="color:var(--accent);">🔍 Verificando...</span>';
+  try{
+    // Intentar login de prueba con el admin
+    const r=await fetch(SURL+'/auth/v1/token?grant_type=password',{
+      method:'POST',
+      headers:{'apikey':SKEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email:'admin@'+AUTH_DOMAIN,password:''})
+    });
+    const data=await r.json();
+    // Si el error es "Invalid login credentials", significa que el usuario SÍ existe (contraseña incorrecta es distinto a "no existe")
+    if(data.error==='invalid_grant'||data.error_code==='invalid_credentials'){
+      estado.innerHTML='<span style="color:#10b981;font-weight:700;">✅ Supabase Auth activo.</span> El usuario admin ya tiene cuenta. Podés probar el login seguro.';
+    } else if(data.error==='invalid_grant'&&data.error_description?.includes('not registered')){
+      estado.innerHTML='<span style="color:#ef4444;">❌ Los usuarios aún no están en Supabase Auth.</span> Hacé clic en "Crear cuentas seguras".';
+    } else {
+      estado.innerHTML='<span style="color:var(--text-dim);">Estado: '+JSON.stringify(data).slice(0,100)+'</span>';
+    }
+  }catch(e){
+    estado.innerHTML='<span style="color:#ef4444;">Error de verificación: '+e.message+'</span>';
+  }
 }
 
 // SERVICE
