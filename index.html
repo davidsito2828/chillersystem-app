@@ -613,6 +613,151 @@ tbody tr:hover{background:#f8faff;}
 .ot-tbl th{background:#f0f0f0;font-weight:700;font-size:9px;text-transform:uppercase;}
 .ot-firma-box{border:1px solid #ccc;border-radius:4px;padding:10px 14px;min-height:50px;margin-top:4px;}
 .ot-footer{margin-top:16px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#888;text-align:center;}
+
+/* ══════════════════════════════════════════
+   DASHBOARD KPIs
+══════════════════════════════════════════ */
+@keyframes fadeSlideUp{
+  from{opacity:0;transform:translateY(14px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@keyframes growBar{
+  from{width:0;}
+}
+@keyframes countUp{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+.dash-wrap{padding:20px;display:flex;flex-direction:column;gap:20px;}
+.dash-section-title{
+  font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;
+  color:var(--text-dim);margin-bottom:12px;display:flex;align-items:center;gap:8px;
+}
+.dash-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* KPI Cards Grid */
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:12px;
+}
+.kpi-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r-lg);padding:16px 18px;
+  border-top:3px solid transparent;
+  box-shadow:var(--shadow);transition:box-shadow 0.2s,transform 0.2s;
+  animation:fadeSlideUp 0.4s ease both;
+  position:relative;overflow:hidden;
+}
+.kpi-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.kpi-card::after{
+  content:'';position:absolute;right:-20px;top:-20px;
+  width:80px;height:80px;border-radius:50%;
+  background:currentColor;opacity:0.04;
+}
+.kpi-icon{font-size:22px;margin-bottom:8px;display:block;}
+.kpi-num{
+  font-size:32px;font-weight:900;line-height:1;
+  font-family:'IBM Plex Mono',monospace;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-1px;
+}
+.kpi-label{font-size:10px;color:var(--text-dim);margin-top:6px;letter-spacing:0.5px;font-weight:600;text-transform:uppercase;}
+.kpi-sub{font-size:11px;margin-top:4px;font-weight:600;}
+.kpi-blue{border-top-color:var(--accent);color:var(--accent);}
+.kpi-green{border-top-color:var(--green);color:var(--green);}
+.kpi-red{border-top-color:var(--red);color:var(--red);}
+.kpi-yellow{border-top-color:var(--yellow);color:var(--yellow);}
+.kpi-purple{border-top-color:#7c3aed;color:#7c3aed;}
+.kpi-teal{border-top-color:#0891b2;color:#0891b2;}
+
+/* Charts */
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.chart-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);
+  animation:fadeSlideUp 0.5s ease both;
+}
+.chart-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:14px;}
+.bar-chart{display:flex;flex-direction:column;gap:8px;}
+.bar-row{display:flex;align-items:center;gap:10px;}
+.bar-label{font-size:11px;color:var(--text-dim);min-width:28px;text-align:right;font-weight:600;}
+.bar-label-left{font-size:11px;color:var(--text-dim);min-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-track{flex:1;background:var(--bg4);border-radius:20px;height:10px;overflow:hidden;}
+.bar-fill{
+  height:100%;border-radius:20px;
+  animation:growBar 0.8s ease both;
+  transition:width 0.5s ease;
+}
+.bar-val{font-size:11px;font-weight:700;min-width:24px;font-family:'IBM Plex Mono',monospace;}
+
+/* Vertical bar chart (monthly) */
+.vbar-chart{display:flex;align-items:flex-end;gap:6px;height:100px;}
+.vbar-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;}
+.vbar-fill{
+  width:100%;border-radius:4px 4px 0 0;
+  background:var(--accent);min-height:4px;
+  animation:fadeSlideUp 0.6s ease both;
+  transition:height 0.5s ease;
+}
+.vbar-fill.prev-color{background:#60a5fa;}
+.vbar-fill.corr-color{background:var(--red);}
+.vbar-label-x{font-size:9px;color:var(--text-dim);font-weight:600;}
+.vbar-num{font-size:9px;font-weight:700;color:var(--text-dim);}
+
+/* Donut style using conic-gradient */
+.donut-wrap{display:flex;align-items:center;gap:16px;}
+.donut-chart{
+  width:100px;height:100px;border-radius:50%;
+  flex-shrink:0;position:relative;
+}
+.donut-legend{display:flex;flex-direction:column;gap:6px;}
+.donut-leg-item{display:flex;align-items:center;gap:7px;font-size:11px;}
+.donut-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+/* Alert table inside dashboard */
+.dash-alert-table{width:100%;border-collapse:collapse;font-size:12px;}
+.dash-alert-table th{
+  padding:8px 12px;text-align:left;font-size:9px;letter-spacing:1.5px;
+  text-transform:uppercase;font-weight:700;color:var(--text-dim);
+  background:var(--bg3);border-bottom:1px solid var(--border);
+}
+.dash-alert-table td{padding:9px 12px;border-bottom:1px solid var(--border-dim);vertical-align:middle;}
+.dash-alert-table tr:last-child td{border-bottom:none;}
+.dash-alert-table tr:hover td{background:#f8faff;}
+
+/* Top ranking */
+.ranking-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;border-bottom:1px solid var(--border-dim);
+}
+.ranking-item:last-child{border-bottom:none;}
+.rank-num{
+  width:22px;height:22px;border-radius:50%;
+  background:var(--bg4);color:var(--text-dim);
+  font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.rank-num.gold{background:#fef3c7;color:#92400e;}
+.rank-num.silver{background:#f3f4f6;color:#374151;}
+.rank-num.bronze{background:#fef0e7;color:#92400e;}
+.rank-name{flex:1;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-bar-mini{width:80px;}
+.refresh-btn{
+  background:none;border:1px solid var(--border);border-radius:var(--r);
+  padding:4px 10px;font-size:11px;color:var(--text-dim);
+  cursor:pointer;font-family:inherit;transition:all 0.15s;
+}
+.refresh-btn:hover{background:var(--bg4);color:var(--text);border-color:#d1d5db;}
+@media(max-width:700px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .chart-row{grid-template-columns:1fr;}
+  .bar-label-left{min-width:70px;}
+}
+@media(max-width:400px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .kpi-num{font-size:24px;}
+}
 </style>
 </head>
 <body>
@@ -1342,14 +1487,18 @@ tbody tr:hover{background:#f8faff;}
   <div id="galeriaContenido" style="padding:16px;"></div>
 </div>
 
-<!-- ═══ ESTADÍSTICAS ═══ -->
+<!-- ═══ ESTADÍSTICAS / DASHBOARD ═══ -->
 <div id="tab-estadisticas" class="panel" style="display:none;">
   <div class="panel-header">
     <div>
-      <div class="panel-title">📊 Estadísticas</div>
+      <div class="panel-title">📊 Dashboard Ejecutivo</div>
+      <div class="panel-count" id="dashLastUpdate">—</div>
     </div>
+    <button class="refresh-btn" onclick="renderEstadisticas()" title="Actualizar">
+      ↻ Actualizar
+    </button>
   </div>
-  <div id="estadisticasContenido" style="padding:16px;"></div>
+  <div id="estadisticasContenido" class="dash-wrap"></div>
 </div>
 
 <!-- MODAL INFORME -->
@@ -5482,6 +5631,241 @@ function showToast(msg,type=''){
   clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),3000);
 }
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+
+// ══════════════════════════════════════════
+//  DASHBOARD EJECUTIVO — renderEstadisticas
+// ══════════════════════════════════════════
+function renderEstadisticas(){
+  const el=document.getElementById('estadisticasContenido');
+  if(!el) return;
+
+  // ── Calcular métricas ──────────────────
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const mesActual=hoy.getMonth(), anioActual=hoy.getFullYear();
+
+  // KPIs base
+  const totalClientes=clientes.length;
+  const totalCS=clientes.filter(c=>c.empresa==='ChillerSystem').length;
+  const totalCV=clientes.filter(c=>c.empresa==='ChillerService').length;
+  const totalEquipos=equipos.length;
+  const eqOperativos=equipos.filter(e=>e.estado==='Operativo').length;
+  const eqFS=equipos.filter(e=>e.estado==='Fuera de servicio').length;
+  const eqRev=equipos.filter(e=>e.estado==='En revisión'||e.estado==='En mantenimiento preventivo').length;
+
+  // Intervenciones del mes actual
+  const intervMes=intervenciones.filter(i=>{
+    const d=new Date(i.fecha); return d.getMonth()===mesActual&&d.getFullYear()===anioActual;
+  });
+  const prevMes=intervMes.filter(i=>i.tipo==='Preventivo').length;
+  const corrMes=intervMes.filter(i=>i.tipo==='Correctivo').length;
+
+  // Correctivos pendientes sin resolver
+  const corrPendientes=intervenciones.filter(i=>i.tipo==='Correctivo'&&!i.correctivo_resuelto).length;
+
+  // Equipos con preventivo vencido (>días frecuencia)
+  const eqVencidos=equipos.filter(e=>{
+    if(!e.ultimo_preventivo||e.ignorar_alarma) return false;
+    const dias=Math.floor((hoy-new Date(e.ultimo_preventivo))/(1000*60*60*24));
+    return dias>(e.frecuencia_preventivo||30);
+  });
+  const eqProximos=equipos.filter(e=>{
+    if(!e.ultimo_preventivo||e.ignorar_alarma) return false;
+    const dias=Math.floor((hoy-new Date(e.ultimo_preventivo))/(1000*60*60*24));
+    const frec=e.frecuencia_preventivo||30;
+    return dias>=frec*0.8&&dias<=frec;
+  });
+
+  // Presupuestos activos
+  const pptoActivos=(presupuestos||[]).filter(p=>p.estado_flujo==='en_ejecucion').length;
+  const pptoTotal=(presupuestos||[]).filter(p=>['aprobado_cliente','en_ejecucion'].includes(p.estado_flujo))
+    .reduce((s,p)=>s+(p.precio_total||0),0);
+
+  // Intervenciones por mes — últimos 6 meses
+  const meses=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(anioActual,mesActual-i,1);
+    const m=d.getMonth(), a=d.getFullYear();
+    const nombM=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m];
+    const intervsDelMes=intervenciones.filter(iv=>{
+      const fd=new Date(iv.fecha); return fd.getMonth()===m&&fd.getFullYear()===a;
+    });
+    meses.push({label:nombM,prev:intervsDelMes.filter(iv=>iv.tipo==='Preventivo').length,
+      corr:intervsDelMes.filter(iv=>iv.tipo==='Correctivo').length});
+  }
+  const maxBar=Math.max(1,...meses.map(m=>m.prev+m.corr));
+
+  // Top 5 clientes con más intervenciones totales
+  const cliIntervCount={};
+  intervenciones.forEach(iv=>{
+    const eq=equipos.find(e=>e.id===iv.equipo_id);
+    if(!eq) return;
+    cliIntervCount[eq.cliente_id]=(cliIntervCount[eq.cliente_id]||0)+1;
+  });
+  const top5=Object.entries(cliIntervCount)
+    .sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([cid,cnt])=>({cli:clientes.find(c=>c.id===cid)||{nombre:'—'},cnt}));
+  const maxTop=Math.max(1,...top5.map(t=>t.cnt));
+
+  // ── Render ────────────────────────────
+  const delay=i=>`animation-delay:${i*0.07}s`;
+
+  let html='';
+
+  // — 1. KPI Cards —
+  html+=`<div>
+    <div class="dash-section-title">📌 Resumen General</div>
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-blue" style="${delay(0)}">
+        <span class="kpi-icon">🏢</span>
+        <div class="kpi-num" style="color:var(--accent)">${totalClientes}</div>
+        <div class="kpi-label">Clientes</div>
+        <div class="kpi-sub" style="color:var(--text-dim)">${totalCS} CS · ${totalCV} CV</div>
+      </div>
+      <div class="kpi-card kpi-teal" style="${delay(1)}">
+        <span class="kpi-icon">⚙️</span>
+        <div class="kpi-num" style="color:#0891b2">${totalEquipos}</div>
+        <div class="kpi-label">Equipos</div>
+        <div class="kpi-sub" style="color:var(--green)">${eqOperativos} operativos</div>
+      </div>
+      <div class="kpi-card kpi-green" style="${delay(2)}">
+        <span class="kpi-icon">✅</span>
+        <div class="kpi-num" style="color:var(--green)">${prevMes}</div>
+        <div class="kpi-label">Preventivos este mes</div>
+        <div class="kpi-sub" style="color:var(--text-dim)">${intervMes.length} intervenciones totales</div>
+      </div>
+      <div class="kpi-card kpi-red" style="${delay(3)}">
+        <span class="kpi-icon">🔴</span>
+        <div class="kpi-num" style="color:var(--red)">${corrPendientes}</div>
+        <div class="kpi-label">Correctivos pendientes</div>
+        <div class="kpi-sub" style="color:${corrMes?'var(--red)':'var(--text-dim)'}">${corrMes} registrados este mes</div>
+      </div>
+      <div class="kpi-card kpi-yellow" style="${delay(4)}">
+        <span class="kpi-icon">⚠️</span>
+        <div class="kpi-num" style="color:var(--yellow)">${eqVencidos.length}</div>
+        <div class="kpi-label">Preventivos vencidos</div>
+        <div class="kpi-sub" style="color:var(--yellow)">${eqProximos.length} próximos a vencer</div>
+      </div>
+      <div class="kpi-card kpi-purple" style="${delay(5)}">
+        <span class="kpi-icon">💼</span>
+        <div class="kpi-num" style="color:#7c3aed">${pptoActivos}</div>
+        <div class="kpi-label">Ptos. en ejecución</div>
+        <div class="kpi-sub" style="color:#7c3aed">${pptoTotal?'$'+pptoTotal.toLocaleString('es-AR'):'-'}</div>
+      </div>
+    </div>
+  </div>`;
+
+  // — 2. Gráficos —
+  html+=`<div>
+    <div class="dash-section-title">📈 Actividad</div>
+    <div class="chart-row">
+      <!-- Intervenciones por mes -->
+      <div class="chart-card">
+        <div class="chart-title">Intervenciones · últimos 6 meses</div>
+        <div class="vbar-chart">
+          ${meses.map((m,i)=>{
+            const total=m.prev+m.corr;
+            const h=Math.max(4,Math.round((total/maxBar)*90));
+            const hp=Math.max(2,Math.round((m.prev/Math.max(1,total))*h));
+            const hc=h-hp;
+            return `<div class="vbar-col" style="animation-delay:${i*0.1}s">
+              <div class="vbar-num">${total||''}</div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:1px;width:100%;">
+                ${m.corr?`<div class="vbar-fill corr-color" style="height:${hc}px"></div>`:''}
+                ${m.prev?`<div class="vbar-fill prev-color" style="height:${hp}px"></div>`:''}
+                ${!total?`<div style="height:4px;width:100%;background:var(--bg4);border-radius:4px 4px 0 0;"></div>`:''}
+              </div>
+              <div class="vbar-label-x">${m.label}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:12px;margin-top:10px;">
+          <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim);"><span style="width:10px;height:10px;border-radius:2px;background:#60a5fa;display:inline-block;"></span>Preventivo</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-dim);"><span style="width:10px;height:10px;border-radius:2px;background:var(--red);display:inline-block;"></span>Correctivo</span>
+        </div>
+      </div>
+      <!-- Estado de equipos -->
+      <div class="chart-card">
+        <div class="chart-title">Estado de equipos</div>
+        ${totalEquipos?`
+        <div class="donut-wrap">
+          <div class="donut-chart" style="background:conic-gradient(
+            var(--green) 0% ${Math.round((eqOperativos/totalEquipos)*100)}%,
+            var(--yellow) ${Math.round((eqOperativos/totalEquipos)*100)}% ${Math.round(((eqOperativos+eqRev)/totalEquipos)*100)}%,
+            var(--red) ${Math.round(((eqOperativos+eqRev)/totalEquipos)*100)}% 100%
+          );border-radius:50%;"></div>
+          <div class="donut-legend">
+            <div class="donut-leg-item"><div class="donut-leg-dot" style="background:var(--green);"></div><span>${eqOperativos} Operativos</span></div>
+            <div class="donut-leg-item"><div class="donut-leg-dot" style="background:var(--yellow);"></div><span>${eqRev} En revisión</span></div>
+            <div class="donut-leg-item"><div class="donut-leg-dot" style="background:var(--red);"></div><span>${eqFS} Fuera de servicio</span></div>
+          </div>
+        </div>`:`<div class="empty-state"><div class="empty-icon">⚙️</div><div style="font-size:12px;">Sin equipos registrados</div></div>`}
+      </div>
+    </div>
+  </div>`;
+
+  // — 3. Alertas críticas —
+  if(eqVencidos.length||corrPendientes){
+    const corrAbiertos=intervenciones.filter(i=>i.tipo==='Correctivo'&&!i.correctivo_resuelto);
+    html+=`<div>
+      <div class="dash-section-title">🚨 Alertas que requieren atención</div>
+      <div class="chart-card" style="padding:0;overflow:hidden;">
+        <table class="dash-alert-table">
+          <thead><tr><th>Tipo</th><th>Equipo / Descripción</th><th>Cliente</th><th>Días</th></tr></thead>
+          <tbody>
+            ${eqVencidos.slice(0,8).map(eq=>{
+              const cli=clientes.find(c=>c.id===eq.cliente_id)||{nombre:'—'};
+              const dias=Math.floor((hoy-new Date(eq.ultimo_preventivo))/(1000*60*60*24));
+              return `<tr>
+                <td><span class="badge b-fs">VENCIDO</span></td>
+                <td style="font-weight:600">${eq.nombre}</td>
+                <td style="color:var(--text-dim)">${cli.nombre}</td>
+                <td style="font-family:IBM Plex Mono,monospace;color:var(--red);font-weight:700">${dias}d</td>
+              </tr>`;
+            }).join('')}
+            ${corrAbiertos.slice(0,5).map(iv=>{
+              const eq=equipos.find(e=>e.id===iv.equipo_id)||{nombre:'—'};
+              const cli=clientes.find(c=>c.id===eq.cliente_id)||{nombre:'—'};
+              const dias=Math.floor((hoy-new Date(iv.fecha))/(1000*60*60*24));
+              return `<tr>
+                <td><span class="badge b-correctivo">CORRECTIVO</span></td>
+                <td style="font-weight:600">${iv.descripcion?iv.descripcion.substring(0,50)+'…':eq.nombre}</td>
+                <td style="color:var(--text-dim)">${cli.nombre}</td>
+                <td style="font-family:IBM Plex Mono,monospace;color:var(--yellow);font-weight:700">${dias}d</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  // — 4. Top clientes —
+  if(top5.length){
+    html+=`<div>
+      <div class="dash-section-title">🏆 Top clientes por actividad</div>
+      <div class="chart-card">
+        ${top5.map((t,i)=>{
+          const rankClass=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+          const pct=Math.round((t.cnt/maxTop)*100);
+          return `<div class="ranking-item" style="animation-delay:${i*0.08}s">
+            <div class="rank-num ${rankClass}">${i+1}</div>
+            <div class="rank-name" title="${t.cli.nombre}">${t.cli.nombre}</div>
+            <div class="rank-bar-mini">
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${pct}%;background:${i===0?'var(--accent)':i===1?'#60a5fa':'#93c5fd'};"></div>
+              </div>
+            </div>
+            <div class="bar-val" style="color:var(--accent)">${t.cnt}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML=html;
+  document.getElementById('dashLastUpdate').textContent=
+    'Actualizado: '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
 
 // ── CONFIG. TAREAS (admin) ──
 const _catColor={mensual:'var(--accent)',trimestral:'var(--yellow)',estacional:'#b45309',anual:'var(--red)'};
