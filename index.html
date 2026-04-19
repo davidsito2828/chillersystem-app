@@ -1399,6 +1399,64 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- ══ MODAL COMPLETAR DATOS DE INTERVENCIÓN ══ -->
+<div class="modal-overlay" id="mCompletarDatos">
+  <div class="modal" style="max-width:520px;padding:0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:700;color:#fde68a;">📊 Completar datos de intervención</div>
+      <button class="btn-secondary" onclick="cerrar('mCompletarDatos')" style="padding:4px 10px;">✕</button>
+    </div>
+    <div style="padding:16px;overflow-y:auto;max-height:75vh;">
+      <input type="hidden" id="completarId"/>
+      <!-- Info de la intervención -->
+      <div id="completarInfoInterv" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text-dim);"></div>
+
+      <!-- Lecturas operativas -->
+      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:10px;">📊 Lecturas operativas</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">T° Inyección (°C)</label>
+          <input id="cTempIny" type="number" step="0.1" class="inp" placeholder="ej: 7.5"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">T° Retorno (°C)</label>
+          <input id="cTempRet" type="number" step="0.1" class="inp" placeholder="ej: 12.2"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Presión Alta (bar)</label>
+          <input id="cPresAlta" type="number" step="0.1" class="inp" placeholder="ej: 18.5"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Presión Baja (bar)</label>
+          <input id="cPresBaja" type="number" step="0.1" class="inp" placeholder="ej: 4.2"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Corriente Compresor (A)</label>
+          <input id="cCorriente" type="number" step="0.1" class="inp" placeholder="ej: 14.8"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:4px;">Carga de Gas</label>
+          <input id="cCargaGas" type="text" class="inp" placeholder="ej: OK / Cargado"/>
+        </div>
+      </div>
+
+      <!-- Fotos -->
+      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:8px;">📷 Fotos</div>
+      <input type="file" id="completarFotoInput" accept="image/*,image/heic,image/heif" multiple capture="environment" style="display:none" onchange="agregarCompletarFotos(this.files)"/>
+      <button onclick="document.getElementById('completarFotoInput').click()" class="btn-secondary" style="width:100%;margin-bottom:10px;">📷 Agregar fotos desde galería / cámara</button>
+      <div id="completarFotoPreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+      <!-- Notas -->
+      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:6px;">📝 Notas adicionales</div>
+      <textarea id="cNotasExtra" class="inp" style="height:70px;resize:vertical;" placeholder="Observaciones adicionales..."></textarea>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn-secondary" onclick="cerrar('mCompletarDatos')">Cancelar</button>
+      <button class="btn-primary" id="btnGuardarCompletar" onclick="guardarCompletarDatos()">💾 Guardar datos</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- ═══ INFORMES ═══ -->
 <div id="tab-informes" class="panel" style="display:none;">
@@ -2889,6 +2947,10 @@ function renderIntervItem(i){
   if(i.firma) html+='<span style="font-size:10px;color:var(--green);">✍️ '+i.firma+'</span>';
   html+='<span style="margin-left:auto;display:flex;gap:4px;">';
   if(puedeEditar) html+='<button class="btn-edit" onclick="event.stopPropagation();abrirModalInterv(\''+i.id+'\')">✏️</button>';
+  // Botón Completar datos: aparece cuando faltan lecturas o fotos
+  const _sinLecturas=!i.lecturas_operativas||!Object.values(i.lecturas_operativas).some(v=>v!==null&&v!==undefined&&v!=='');
+  const _sinFotos=!i.fotos||!i.fotos.length;
+  if(puedeEditar&&(_sinLecturas||_sinFotos)) html+='<button style="padding:3px 7px;border:1px solid #d97706;background:rgba(217,119,6,0.12);color:#d97706;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;" onclick="event.stopPropagation();abrirCompletarDatos(\''+i.id+'\')" title="Faltan lecturas o fotos — completar">📊</button>';
   if(puedeEliminar) html+='<button class="btn-danger" onclick="event.stopPropagation();elimInterv(\''+i.id+'\')">🗑</button>';
   html+='</span>';
   html+='</div>';
@@ -3072,6 +3134,116 @@ async function guardarInterv(){
     if(histClienteActual) renderHistDetalle();
   }catch(e){showToast('Error: '+e.message,true);}
 }
+// ══════════════════════════════════════════════
+//  COMPLETAR DATOS FALTANTES EN INTERVENCI\u00d3N
+// ══════════════════════════════════════════════
+let completarFotosNuevas=[];
+
+function abrirCompletarDatos(intervId){
+  const i=intervenciones.find(x=>x.id===intervId);
+  if(!i){showToast('Intervenci\u00f3n no encontrada',true);return;}
+  document.getElementById('completarId').value=intervId;
+  // Info de la intervenci\u00f3n
+  const eq=equipos.find(e=>e.id===i.equipo_id);
+  const cli=eq?clientes.find(c=>c.id===eq.cliente_id):(i.cliente_id?clientes.find(c=>c.id===i.cliente_id):null);
+  document.getElementById('completarInfoInterv').innerHTML=
+    '<div style="font-weight:700;color:var(--text);margin-bottom:4px;">'+(eq?eq.nombre:'Registro general')+'</div>'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;">'+
+    (cli?'<span>\ud83c\udfe2 '+cli.nombre+'</span>':'')+
+    '<span>\ud83d\uddd3 '+fmtF(i.fecha)+'</span>'+
+    '<span>\ud83d\udd27 '+i.tipo+'</span>'+
+    (i.tecnico?'<span>\ud83d\udc77 '+i.tecnico+'</span>':'')+
+    '</div>';
+  // Pre-rellenar lecturas existentes
+  const lec=i.lecturas_operativas||{};
+  document.getElementById('cTempIny').value=lec.temperatura_inyeccion!=null?lec.temperatura_inyeccion:'';
+  document.getElementById('cTempRet').value=lec.temperatura_retorno!=null?lec.temperatura_retorno:'';
+  document.getElementById('cPresAlta').value=lec.presion_alta!=null?lec.presion_alta:'';
+  document.getElementById('cPresBaja').value=lec.presion_baja!=null?lec.presion_baja:'';
+  document.getElementById('cCorriente').value=lec.corriente_compresor!=null?lec.corriente_compresor:'';
+  document.getElementById('cCargaGas').value=lec.carga_gas||'';
+  document.getElementById('cNotasExtra').value='';
+  completarFotosNuevas=[];
+  // Mostrar fotos existentes
+  const prev=document.getElementById('completarFotoPreview');
+  if(i.fotos&&i.fotos.length){
+    prev.innerHTML='<div style="font-size:10px;color:var(--text-dim);width:100%;margin-bottom:4px;">\u2705 Fotos ya guardadas ('+i.fotos.length+'):</div>'+
+      i.fotos.map(u=>'<div class="foto-preview"><img src="'+u+'" onclick="openLB(\''+u+'\')" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:pointer;"/></div>').join('');
+  } else {
+    prev.innerHTML='<div style="font-size:11px;color:var(--text-dim);font-style:italic;">Sin fotos guardadas a\u00fan</div>';
+  }
+  document.getElementById('mCompletarDatos').classList.add('open');
+}
+
+function agregarCompletarFotos(files){
+  Array.from(files).forEach(f=>{
+    completarFotosNuevas.push(f);
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const prev=document.getElementById('completarFotoPreview');
+      // Remover mensaje "Sin fotos" si existe
+      const vacio=prev.querySelector('div[style*="font-style:italic"]');
+      if(vacio) vacio.remove();
+      const div=document.createElement('div');
+      div.className='foto-preview';
+      div.style.cssText='position:relative;display:inline-block;';
+      div.innerHTML='<img src="'+e.target.result+'" style="width:64px;height:64px;object-fit:cover;border-radius:6px;"/>'+
+      div.innerHTML='<img src="'+e.target.result+'" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:2px solid #3b82f6;"/>';
+      prev.appendChild(div);
+    };
+    reader.readAsDataURL(f);
+  });
+  document.getElementById('completarFotoInput').value='';
+}
+
+async function guardarCompletarDatos(){
+  const id=document.getElementById('completarId').value;
+  const i=intervenciones.find(x=>x.id===id);
+  if(!id||!i){showToast('Error: intervenci\u00f3n no encontrada',true);return;}
+  const btn=document.getElementById('btnGuardarCompletar');
+  if(btn) btn.disabled=true;
+  showToast('Guardando...');
+  try{
+    // 1. Subir fotos nuevas y combinar con existentes
+    let fotosUrls=[...(i.fotos||[])];
+    if(completarFotosNuevas.length){
+      const nuevas=await subirFotos(completarFotosNuevas,'service');
+      fotosUrls=[...fotosUrls,...nuevas];
+    }
+    // 2. Construir objeto lecturas
+    const lec={
+      temperatura_inyeccion:parseFloat(document.getElementById('cTempIny').value)||null,
+      temperatura_retorno:parseFloat(document.getElementById('cTempRet').value)||null,
+      presion_alta:parseFloat(document.getElementById('cPresAlta').value)||null,
+      presion_baja:parseFloat(document.getElementById('cPresBaja').value)||null,
+      corriente_compresor:parseFloat(document.getElementById('cCorriente').value)||null,
+      carga_gas:document.getElementById('cCargaGas').value.trim()||null
+    };
+    const tieneAlgunaLectura=Object.values(lec).some(v=>v!==null);
+    const notasExtra=document.getElementById('cNotasExtra').value.trim();
+    // 3. Patch intervenci\u00f3n
+    const patch={fotos:fotosUrls};
+    if(tieneAlgunaLectura) patch.lecturas_operativas=lec;
+    if(notasExtra) patch.notas=[(i.notas||''),notasExtra].filter(Boolean).join('\n').trim();
+    await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch),headers:{...H,'Prefer':'return=minimal'}});
+    // 4. Tambi\u00e9n actualizar equipos_detalle en aprobaci\u00f3n si existe (para reflejar en informe)
+    const eq=equipos.find(e=>e.id===i.equipo_id);
+    if(eq&&tieneAlgunaLectura){
+      const aprob=aprobaciones.find(a=>a.intervencion_id===id||(a.cliente_id===i.cliente_id&&a.fecha_servicio===i.fecha&&(a.equipos_detalle||[]).some(d=>d.equipo_id===i.equipo_id)));
+      if(aprob&&aprob.equipos_detalle){
+        const det=aprob.equipos_detalle.map(d=>d.equipo_id===i.equipo_id?{...d,lecturas:lec}:d);
+        await api('preventivos_aprobacion?id=eq.'+aprob.id,{method:'PATCH',body:JSON.stringify({equipos_detalle:det}),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+      }
+    }
+    showToast('Datos completados \u2713','success');
+    cerrar('mCompletarDatos');
+    completarFotosNuevas=[];
+    await Promise.all([loadIntervenciones(),loadAprobaciones()]);
+    if(histClienteActual) renderHistDetalle();
+  }catch(e){showToast('Error: '+e.message,true);}
+  finally{if(btn) btn.disabled=false;}
+}
+
 async function elimInterv(id){
   if(!confirm('¿Eliminar esta intervención? Esta acción no se puede deshacer.'))return;
   try{
