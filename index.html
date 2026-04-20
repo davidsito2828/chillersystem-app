@@ -2163,14 +2163,17 @@ async function refreshAuthToken(){
   }catch(e){console.warn('[auth] Error renovando token:',e);return false;}
 }
 
-// LOGIN con Supabase Auth → fallback al método legacy si el usuario no existe en Auth aún
+// LOGIN con Supabase Auth → fallback via RPC segura si el usuario no está en Auth aún
 async function doLogin(){
   const u=document.getElementById('loginUser').value.trim();
   const p=document.getElementById('loginPass').value;
   if(!u||!p){document.getElementById('loginErr').style.display='block';return;}
   document.getElementById('loginErr').style.display='none';
+  // Deshabilitar botón mientras procesa
+  const btn=document.querySelector('.btn-login');
+  if(btn){btn.textContent='Iniciando...';btn.disabled=true;}
   try{
-    // ─ Intento 1: Supabase Auth ─
+    // ─ Intento 1: Supabase Auth (JWT) ─
     const authRes=await fetch(SURL+'/auth/v1/token?grant_type=password',{
       method:'POST',
       headers:{'apikey':SKEY,'Content-Type':'application/json'},
@@ -2181,24 +2184,28 @@ async function doLogin(){
       _saveSession(session,u);
       // Cargar perfil desde tabla usuarios
       const perfil=await api('usuarios?usuario=eq.'+encodeURIComponent(u)+'&activo=eq.true&select=*');
-      if(!perfil||!perfil.length){document.getElementById('loginErr').style.display='block';_authToken=null;return;}
+      if(!perfil||!perfil.length){document.getElementById('loginErr').style.display='block';_authToken=null;if(btn){btn.textContent='Ingresar →';btn.disabled=false;}return;}
       usuarioActual=perfil[0];
       iniciarApp(); return;
     }
-    // ─ Intento 2 (fallback legacy): comparación directa mientras se migra ─
-    // NOTA: Este bloque se elimina una vez que todos los usuarios estén en Supabase Auth
-    const legacyRes=await fetch(SURL+'/rest/v1/usuarios?usuario=eq.'+encodeURIComponent(u)+'&activo=eq.true&select=*',
-      {headers:H});
-    if(legacyRes.ok){
-      const legacy=await legacyRes.json();
-      if(legacy&&legacy.length&&legacy[0].password===p){
-        usuarioActual=legacy[0];
+    // ─ Intento 2 (fallback legacy via RPC): para usuarios no migrados a Auth aún ─
+    // Llama a la función SQL login_usuario() que tiene SECURITY DEFINER (bypassa RLS)
+    const rpcRes=await fetch(SURL+'/rest/v1/rpc/login_usuario',{
+      method:'POST',
+      headers:{'apikey':SKEY,'Content-Type':'application/json'},
+      body:JSON.stringify({p_usuario:u,p_password:p})
+    });
+    if(rpcRes.ok){
+      const perfil=await rpcRes.json();
+      if(perfil&&perfil.length){
+        usuarioActual=perfil[0];
         // Sin JWT por ahora — llamadas usan anon key hasta que el usuario exista en Auth
         iniciarApp(); return;
       }
     }
     document.getElementById('loginErr').style.display='block';
   }catch(e){showToast('Error de conexión',true);console.error('[login]',e);}
+  finally{if(btn){btn.textContent='Ingresar →';btn.disabled=false;}}
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginScreen').style.display!=='none')doLogin();});

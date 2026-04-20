@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v1';
+const CACHE_NAME = 'chillersystem-v5'; // bumped: fix login RPC fallback
 const ASSETS = [
   '/',
   '/index.html',
