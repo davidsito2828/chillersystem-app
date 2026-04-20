@@ -2414,23 +2414,30 @@ async function toggleJornada(){
   
   showToast('Guardando ficha de '+tipoStr+'...');
   
-  let validAuthId = usuarioActual.auth_user_id || usuarioActual.id;
+  let validAuthId = null;
   try { if(_authToken) validAuthId = JSON.parse(atob(_authToken.split('.')[1])).sub; } catch(e){}
+  
+  if(!validAuthId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validAuthId)){
+    console.error('Error UUID (Formato inválido):', validAuthId);
+    showToast('❌ Error de seguridad: ID de sesión inválido. Volvé a salir e ingresar a tu cuenta.', true);
+    btn.disabled=false;
+    return;
+  }
 
   const objetoEnvio = {
     usuario_id: validAuthId,
     tipo: tipoStr,
-    latitud: coords.lat,
-    longitud: coords.lng,
-    precision_metros: coords.acc || 0
+    latitud: Number(coords.lat),
+    longitud: Number(coords.lng),
+    precision_metros: coords.acc ? Math.min(Number(coords.acc), 9999.99) : 0
   };
   
-  console.log('Datos enviados:', objetoEnvio);
+  console.log('Datos enviados a Supabase:', objetoEnvio);
   
   try{
     await api('jornadas_tecnicos',{
       method:'POST',
-      headers:{...H,'Prefer':'return=minimal'},
+      headers:{...H, 'Authorization': 'Bearer ' + _authToken, 'Prefer':'return=minimal'},
       body:JSON.stringify(objetoEnvio)
     });
     

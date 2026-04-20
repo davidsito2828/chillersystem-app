@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v10'; // bumped: exact token uuid implementation
+const CACHE_NAME = 'chillersystem-v11'; // bumped: fix numeric overflow and uuid schema validation
 const ASSETS = [
   '/',
   '/index.html',
