@@ -2389,7 +2389,7 @@ function obtenerGPS(){
       resolve(null);
     }else{
       navigator.geolocation.getCurrentPosition(
-        pos=>resolve({lat:pos.coords.latitude,lng:pos.coords.longitude}),
+        pos=>resolve({lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy}),
         err=>resolve(null),
         {enableHighAccuracy:true,timeout:7000}
       );
@@ -2413,17 +2413,25 @@ async function toggleJornada(){
   }
   
   showToast('Guardando ficha de '+tipoStr+'...');
+  
+  let validAuthId = usuarioActual.auth_user_id || usuarioActual.id;
+  try { if(_authToken) validAuthId = JSON.parse(atob(_authToken.split('.')[1])).sub; } catch(e){}
+
+  const objetoEnvio = {
+    usuario_id: validAuthId,
+    tipo: tipoStr,
+    latitud: coords.lat,
+    longitud: coords.lng,
+    precision_metros: coords.acc || 0
+  };
+  
+  console.log('Datos enviados:', objetoEnvio);
+  
   try{
     await api('jornadas_tecnicos',{
       method:'POST',
       headers:{...H,'Prefer':'return=minimal'},
-      body:JSON.stringify({
-        usuario_id:usuarioActual.auth_user_id || usuarioActual.id,
-        usuario_nombre:usuarioActual.nombre,
-        tipo:tipoStr,
-        latitud:coords.lat,
-        longitud:coords.lng
-      })
+      body:JSON.stringify(objetoEnvio)
     });
     
     jornadaActiva=nuevoEstado;

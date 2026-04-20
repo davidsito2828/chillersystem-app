@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v9'; // bumped: fix uuid RLS violation
+const CACHE_NAME = 'chillersystem-v10'; // bumped: exact token uuid implementation
 const ASSETS = [
   '/',
   '/index.html',
