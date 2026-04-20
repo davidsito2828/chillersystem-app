@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v5'; // bumped: fix login RPC fallback
+const CACHE_NAME = 'chillersystem-v6'; // bumped: hotfix syntax error
 const ASSETS = [
   '/',
   '/index.html',
