@@ -130,7 +130,14 @@ body{
 .header-title{font-size:14px;font-weight:700;color:#fff;letter-spacing:-0.2px;}
 .header-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:1px;display:flex;gap:5px;align-items:center;}
 .header-sub span{font-weight:600;color:rgba(255,255,255,0.65);}
-.user-info{display:flex;align-items:center;gap:8px;}
+.user-info{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.btn-jornada {
+  display:none; color:#fff; border:none; border-radius:var(--r);
+  padding:6px 12px; font-size:12px; font-weight:700;
+  cursor:pointer; white-space:nowrap; box-shadow:var(--shadow); transition:0.2s all;
+}
+.btn-iniciar { background:#10b981; }
+.btn-finalizar { background:#dc2626; }
 .user-badge{
   background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
   border-radius:6px;padding:4px 11px;font-size:12px;font-weight:600;color:#fff;
@@ -544,7 +551,9 @@ tbody tr:hover{background:#f8faff;}
 
 /* ── RESPONSIVE ── */
 @media(max-width:700px){
-  .header{padding:0 12px;height:50px;}
+  .header{padding:5px 12px;height:auto;min-height:50px;flex-wrap:wrap;}
+  .user-info{gap:4px;flex-wrap:wrap;justify-content:center;width:100%;}
+  .btn-jornada{padding:4px 8px; font-size:10px; margin-top:2px;}
   .header-sub{display:none;}
   .empresa-filter,.nav{padding-left:10px;padding-right:10px;}
   .panel{margin-left:8px;margin-right:8px;border-radius:0 var(--r) var(--r) var(--r);}
@@ -810,7 +819,7 @@ tbody tr:hover{background:#f8faff;}
       <span id="notifBadge" style="display:none;position:absolute;top:0;right:0;background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center;">0</span>
     </button>
     <div id="sDot" style="width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div>
-    <button id="btnJornada" onclick="toggleJornada()" style="display:none;background:#10b981;color:#fff;border:none;border-radius:var(--r);padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;margin-right:8px;box-shadow:var(--shadow);">▶ Iniciar Jornada</button>
+    <button id="btnJornada" class="btn-jornada btn-iniciar">▶ Iniciar Jornada</button>
     <div class="user-badge"><span id="userNombre" style="color:rgba(255,255,255,0.9);">—</span> <span style="color:rgba(255,255,255,0.3);margin:0 2px;">|</span> <span id="userRolBadge" class="rol-admin">—</span></div>
     <button class="btn-logout" onclick="doLogout()">Salir</button>
   </div>
@@ -2302,17 +2311,20 @@ async function iniciarApp(){
       return;
     }
     document.getElementById('btnJornada').style.display='block';
+    const btn=document.getElementById('btnJornada');
+    
+    btn.removeEventListener('click', toggleJornada);
+    btn.addEventListener('click', toggleJornada);
+    
     // Restaurar estado visual del botón desde localStorage
     if(localStorage.getItem('jornada_activa')==='true'){
       jornadaActiva=true;
-      const btn=document.getElementById('btnJornada');
       btn.textContent='⏹ Finalizar Jornada';
-      btn.style.background='#dc2626';
+      btn.className='btn-jornada btn-finalizar';
     }else{
       jornadaActiva=false;
-      const btn=document.getElementById('btnJornada');
       btn.textContent='▶ Iniciar Jornada';
-      btn.style.background='#10b981';
+      btn.className='btn-jornada btn-iniciar';
     }
   }else{
     // Admin puede eludir la regla ("saltearse")
@@ -2446,11 +2458,11 @@ async function toggleJornada(){
     
     if(jornadaActiva){
       btn.textContent='⏹ Finalizar Jornada';
-      btn.style.background='#dc2626';
+      btn.className='btn-jornada btn-finalizar';
       showToast('✔️ Jornada INICIADA');
     }else{
       btn.textContent='▶ Iniciar Jornada';
-      btn.style.background='#10b981';
+      btn.className='btn-jornada btn-iniciar';
       showToast('✔️ Jornada FINALIZADA');
     }
   }catch(e){

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v11'; // bumped: fix numeric overflow and uuid schema validation
+const CACHE_NAME = 'chillersystem-v12'; // bumped: mobile responsiveness and refactoring event listeners for fichajes button
 const ASSETS = [
   '/',
   '/index.html',
