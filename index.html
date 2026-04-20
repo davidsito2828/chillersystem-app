@@ -2447,19 +2447,19 @@ async function toggleJornada(){
   }
 
   const objetoEnvio = {
-    usuario_id: targetUserId,
-    tipo: tipoStr,
-    latitud: Number(coords.lat),
-    longitud: Number(coords.lng),
-    precision_metros: coords.acc ? Math.min(Number(coords.acc), 9999.99) : 0
+    p_usuario_id: targetUserId,
+    p_tipo: tipoStr,
+    p_lat: Number(coords.lat),
+    p_lon: Number(coords.lng),
+    p_prec: coords.acc ? Math.min(Number(coords.acc), 9999.99) : 0
   };
   
-  console.log('Datos enviados a Supabase:', objetoEnvio);
+  console.log('Datos enviados a Supabase (RPC):', objetoEnvio);
   
   try{
-    await api('jornadas_tecnicos',{
+    await api('rpc/registrar_jornada',{
       method:'POST',
-      headers:{...H, 'Authorization': 'Bearer ' + _authToken, 'Prefer':'return=minimal'},
+      headers:{...H},
       body:JSON.stringify(objetoEnvio)
     });
     

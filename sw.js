@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v15'; // fix uuid foreign key mapping
+const CACHE_NAME = 'chillersystem-v16'; // migrate to secure RPC proxy override
 const ASSETS = [
   '/',
   '/index.html',
