@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v17'; // dashboard roles, timezone dates logic
+const CACHE_NAME = 'chillersystem-v18'; // fix postgrest timestamp bounds formatting
 const ASSETS = [
   '/',
   '/index.html',

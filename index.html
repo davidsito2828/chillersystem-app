@@ -2508,19 +2508,24 @@ async function loadFichajes(){
     // 1. Asegurar catálogo de usuarios
     if(!usuarios || !usuarios.length) await loadUsuarios();
 
-    // Fix Timezone (-03:00 Argentina para asegurar precisión diaria en Supabase UTC)
-    let urlJ = 'jornadas_tecnicos?timestamp=gte.'+f+'T00:00:00-03:00&timestamp=lte.'+f+'T23:59:59-03:00&select=*';
+    // Fix Timezone: convertimos el rango local a estricto UTC en formato ISO nativo que Postgres no puede malinterpretar
+    const fInicio = new Date(f + 'T00:00:00-03:00').toISOString();
+    const fFin = new Date(f + 'T23:59:59-03:00').toISOString();
+
+    let urlJ = `jornadas_tecnicos?timestamp=gte.${fInicio}&timestamp=lte.${fFin}&select=*`;
     const jData = await api(urlJ) || [];
+    console.log('Jornadas obtenidas de Supabase:', jData);
     
-    let urlI = 'intervenciones?created_at=gte.'+f+'T00:00:00-03:00&created_at=lte.'+f+'T23:59:59-03:00&latitud=not.is.null&select=*,equipos(nombre),clientes(nombre)';
+    let urlI = `intervenciones?created_at=gte.${fInicio}&created_at=lte.${fFin}&latitud=not.is.null&select=*,equipos(nombre),clientes(nombre)`;
     const iData = await api(urlI) || [];
     
     fichajesGlobal = [];
     
     jData.forEach(j => {
       let nombreCruzado = j.usuario_nombre;
+      // Extraemos (o mapeamos) desde el JWT/UUID real si usuario_nombre no existiera o fuera nulo
       if (!nombreCruzado || nombreCruzado === 'null' || nombreCruzado === undefined) {
-         const usr = usuarios.find(u => u.id === j.usuario_id);
+         const usr = usuarios.find(u => u.id === j.usuario_id || u.auth_user_id === j.usuario_id);
          nombreCruzado = usr ? (usr.nombre || usr.usuario) : 'Desconocido';
       }
       fichajesGlobal.push({
