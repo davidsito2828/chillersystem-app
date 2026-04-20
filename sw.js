@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v7'; // bumped: geolocalizacion jornadas
+const CACHE_NAME = 'chillersystem-v8'; // bumped: admin map dashboard
 const ASSETS = [
   '/',
   '/index.html',

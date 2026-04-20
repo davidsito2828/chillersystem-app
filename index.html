@@ -853,6 +853,7 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn" id="tabTareas" onclick="showTab('tareas',this)">⚙️ Config. Tareas</button>
   <button class="nav-btn admin-only" id="tabAprobaciones" onclick="showTab('aprobaciones',this)">✅ Aprobaciones</button>
   <button class="nav-btn" id="tabEstadisticas" onclick="showTab('estadisticas',this)">📊 Estadísticas</button>
+  <button class="nav-btn admin-only" id="tabFichajes" onclick="showTab('fichajes',this)">📍 Tiempos/Rutas</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -1586,6 +1587,24 @@ tbody tr:hover{background:#f8faff;}
     </button>
   </div>
   <div id="estadisticasContenido" class="dash-wrap"></div>
+</div>
+
+<!-- ═══ FichaJES / AUDITORIA DE RUTAS ═══ -->
+<div id="tab-fichajes" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">📍 Auditoría de Rutas y Fichajes</div>
+      <div class="panel-count" id="fichajesCount">Seguimiento de técnicos por GPS</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <select id="fFiltroTecnico" class="search-box" style="width:140px;height:32px;" onchange="renderFichajes()">
+        <option value="">(Todos los técnicos)</option>
+      </select>
+      <input type="date" id="fFiltroFecha" class="search-box" style="width:130px;height:32px;" onchange="loadFichajes()"/>
+      <button class="refresh-btn" onclick="loadFichajes()" title="Actualizar">↻</button>
+    </div>
+  </div>
+  <div id="fichajesBody" style="padding:16px;"></div>
 </div>
 
 <!-- MODAL INFORME -->
@@ -2399,7 +2418,8 @@ async function toggleJornada(){
       method:'POST',
       headers:{...H,'Prefer':'return=minimal'},
       body:JSON.stringify({
-        tecnico:usuarioActual.nombre,
+        usuario_id:usuarioActual.id,
+        usuario_nombre:usuarioActual.nombre,
         tipo:tipoStr,
         latitud:coords.lat,
         longitud:coords.lng
@@ -2422,6 +2442,122 @@ async function toggleJornada(){
     showToast('Error al registrar jornada: '+e.message,true);
   }
   btn.disabled=false;
+}
+
+// LÓGICA DASHBOARD FICHAJES
+let fichajesGlobal = [];
+
+async function loadFichajes(){
+  if(usuarioActual.rol !== 'admin') return;
+  const fechaInput = document.getElementById('fFiltroFecha');
+  let f = fechaInput.value;
+  if(!f) {
+    f = new Date().toISOString().split('T')[0];
+    fechaInput.value = f;
+  }
+  
+  document.getElementById('fichajesBody').innerHTML = '<div style="text-align:center;padding:20px;">Cargando...</div>';
+  
+  try {
+    // 1. Fetch jornadas
+    let urlJ = 'jornadas_tecnicos?timestamp=gte.'+f+'T00:00:00&timestamp=lte.'+f+'T23:59:59&select=*';
+    const jData = await api(urlJ) || [];
+    
+    // 2. Fetch intervenciones con latitud
+    let urlI = 'intervenciones?created_at=gte.'+f+'T00:00:00&created_at=lte.'+f+'T23:59:59&latitud=not.is.null&select=*,equipos(nombre),clientes(nombre)';
+    const iData = await api(urlI) || [];
+    
+    // 3. Unificar array
+    fichajesGlobal = [];
+    
+    jData.forEach(j => {
+      fichajesGlobal.push({
+        tipo_registro: 'ficha',
+        tec: j.usuario_nombre || 'Desconocido',
+        fecha_obj: new Date(j.timestamp),
+        tipo: j.tipo,
+        lat: j.latitud,
+        lng: j.longitud
+      });
+    });
+    
+    iData.forEach(i => {
+      fichajesGlobal.push({
+        tipo_registro: 'interv',
+        tec: i.tecnico || 'Desconocido',
+        fecha_obj: new Date(i.created_at || i.fecha),
+        tipo: i.tipo,
+        lat: i.latitud,
+        lng: i.longitud,
+        cli_nombre: i.clientes ? i.clientes.nombre : 'Cliente Desconocido'
+      });
+    });
+    
+    // Ordenar descendente por fecha_obj
+    fichajesGlobal.sort((a,b) => b.fecha_obj - a.fecha_obj);
+    
+    // Rellenar select de tecnicos
+    const selectTec = document.getElementById('fFiltroTecnico');
+    const valorAnterior = selectTec.value;
+    const tecSet = new Set(fichajesGlobal.map(x => x.tec));
+    selectTec.innerHTML = '<option value="">(Todos los técnicos)</option>';
+    tecSet.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
+      selectTec.appendChild(opt);
+    });
+    if(tecSet.has(valorAnterior)) selectTec.value = valorAnterior;
+    
+    renderFichajes();
+    
+  } catch(err) {
+    document.getElementById('fichajesBody').innerHTML = '<div style="color:var(--red);text-align:center;">Error consultando rutas: '+err.message+'</div>';
+  }
+}
+
+function renderFichajes(){
+  const tec = document.getElementById('fFiltroTecnico').value;
+  const list = tec ? fichajesGlobal.filter(x => x.tec === tec) : fichajesGlobal;
+  
+  if(!list.length) {
+    document.getElementById('fichajesBody').innerHTML = '<div class="empty-state"><div class="empty-icon">📍</div><div class="empty-title">Sin registros GPS para esta fecha</div></div>';
+    return;
+  }
+  
+  const formatter = new Intl.DateTimeFormat('es-AR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  
+  document.getElementById('fichajesBody').innerHTML = list.map(item => {
+    const hora = formatter.format(item.fecha_obj);
+    let icon, desc, colorBorder, colorBg;
+    
+    if(item.tipo_registro === 'ficha') {
+      if(item.tipo === 'entrada') { icon='🟢'; desc='Inició jornada laboral'; colorBorder='#34d399'; colorBg='#ecfdf5'; }
+      else { icon='🔴'; desc='Finalizó jornada laboral'; colorBorder='#f87171'; colorBg='#fef2f2'; }
+    } else {
+      icon='🔵'; desc='Registró '+item.tipo+' en '+item.cli_nombre; colorBorder='#60a5fa'; colorBg='#eff6ff';
+    }
+    
+    const mapsLink = `https://www.google.com/maps?q=${item.lat},${item.lng}`;
+    
+    return `
+      <div style="display:flex; gap:12px; margin-bottom:12px; background:${colorBg}; border-left:4px solid ${colorBorder}; padding:10px 14px; border-radius:4px; box-shadow:0 1px 2px rgba(0,0,0,0.05); align-items:center;">
+        <div style="font-size:20px; flex-shrink:0;">${icon}</div>
+        <div style="flex-grow:1;">
+          <div style="font-size:12px; color:var(--text-dim); margin-bottom:2px;">
+            <strong>${hora}</strong> — Técnico: <span style="color:var(--text);font-weight:600;">${item.tec}</span>
+          </div>
+          <div style="font-size:13px; font-weight:500;">
+            ${desc}
+          </div>
+        </div>
+        <div>
+          <a href="${mapsLink}" target="_blank" style="padding:6px 12px; background:#1e40af; color:#fff; text-decoration:none; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; white-space:nowrap; box-shadow:0 2px 4px rgba(30,64,175,0.2);">
+            🗺️ Ver Mapa
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function restaurarEstadoService(){
@@ -4981,7 +5117,7 @@ function setFiltro(v,btn){
 function puedeVerGaleria(){return !esTecnico();}
 function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
