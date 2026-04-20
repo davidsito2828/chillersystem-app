@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v6'; // bumped: hotfix syntax error
+const CACHE_NAME = 'chillersystem-v7'; // bumped: geolocalizacion jornadas
 const ASSETS = [
   '/',
   '/index.html',

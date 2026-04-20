@@ -810,6 +810,7 @@ tbody tr:hover{background:#f8faff;}
       <span id="notifBadge" style="display:none;position:absolute;top:0;right:0;background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center;">0</span>
     </button>
     <div id="sDot" style="width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div>
+    <button id="btnJornada" onclick="toggleJornada()" style="display:none;background:#10b981;color:#fff;border:none;border-radius:var(--r);padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;margin-right:8px;box-shadow:var(--shadow);">▶ Iniciar Jornada</button>
     <div class="user-badge"><span id="userNombre" style="color:rgba(255,255,255,0.9);">—</span> <span style="color:rgba(255,255,255,0.3);margin:0 2px;">|</span> <span id="userRolBadge" class="rol-admin">—</span></div>
     <button class="btn-logout" onclick="doLogout()">Salir</button>
   </div>
@@ -2273,6 +2274,30 @@ async function iniciarApp(){
     document.getElementById('tab-equipos').style.display='block';
     document.getElementById('tabEq').classList.add('active');
     document.getElementById('tabCli').classList.remove('active');
+    
+    // EXIGIR GPS PARA TÉCNICOS
+    const coord=await obtenerGPS();
+    if(!coord){
+      showToast('❌ Debes permitir y encender el GPS para ingresar a la app.',true);
+      doLogout();
+      return;
+    }
+    document.getElementById('btnJornada').style.display='block';
+    // Restaurar estado visual del botón desde localStorage
+    if(localStorage.getItem('jornada_activa')==='true'){
+      jornadaActiva=true;
+      const btn=document.getElementById('btnJornada');
+      btn.textContent='⏹ Finalizar Jornada';
+      btn.style.background='#dc2626';
+    }else{
+      jornadaActiva=false;
+      const btn=document.getElementById('btnJornada');
+      btn.textContent='▶ Iniciar Jornada';
+      btn.style.background='#10b981';
+    }
+  }else{
+    // Admin puede eludir la regla ("saltearse")
+    jornadaActiva=true; 
   }
   try{
     await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos(),loadInformes(),loadTareasConfig()]);
@@ -2332,6 +2357,71 @@ function cerrarCamara(){
     camaraCallback(fotosCamaraCapturadas);
   }
   cerrar('mCamara');
+}
+
+// ══════════════════════════════════════════════
+//  GEOLOCALIZACIÓN Y JORNADAS DE TRABAJO
+// ══════════════════════════════════════════════
+let jornadaActiva = false;
+
+function obtenerGPS(){
+  return new Promise((resolve)=>{
+    if(!navigator.geolocation){
+      resolve(null);
+    }else{
+      navigator.geolocation.getCurrentPosition(
+        pos=>resolve({lat:pos.coords.latitude,lng:pos.coords.longitude}),
+        err=>resolve(null),
+        {enableHighAccuracy:true,timeout:7000}
+      );
+    }
+  });
+}
+
+async function toggleJornada(){
+  const btn=document.getElementById('btnJornada');
+  btn.disabled=true;
+  const nuevoEstado=!jornadaActiva;
+  const tipoStr=nuevoEstado?'entrada':'salida';
+  
+  showToast('Obteniendo ubicación GPS...');
+  const coords=await obtenerGPS();
+  
+  if(!coords){
+    showToast('❌ No se pudo obtener la ubicación. Revisá el GPS celular.',true);
+    btn.disabled=false;
+    return;
+  }
+  
+  showToast('Guardando ficha de '+tipoStr+'...');
+  try{
+    await api('jornadas_tecnicos',{
+      method:'POST',
+      headers:{...H,'Prefer':'return=minimal'},
+      body:JSON.stringify({
+        tecnico:usuarioActual.nombre,
+        tipo:tipoStr,
+        latitud:coords.lat,
+        longitud:coords.lng
+      })
+    });
+    
+    jornadaActiva=nuevoEstado;
+    localStorage.setItem('jornada_activa',jornadaActiva?'true':'false');
+    
+    if(jornadaActiva){
+      btn.textContent='⏹ Finalizar Jornada';
+      btn.style.background='#dc2626';
+      showToast('✔️ Jornada INICIADA');
+    }else{
+      btn.textContent='▶ Iniciar Jornada';
+      btn.style.background='#10b981';
+      showToast('✔️ Jornada FINALIZADA');
+    }
+  }catch(e){
+    showToast('Error al registrar jornada: '+e.message,true);
+  }
+  btn.disabled=false;
 }
 
 function restaurarEstadoService(){
@@ -3249,6 +3339,14 @@ async function loadIntervenciones(){
 }
 
 async function guardarInterv(){
+  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  let _lat=null,_lng=null;
+  if(usuarioActual&&usuarioActual.rol!=='admin'){
+    showToast('Ubicando GPS...',false);
+    const c=await obtenerGPS();
+    if(!c){showToast('❌ GPS celular no disponible',true);return;}
+    _lat=c.lat;_lng=c.lng;
+  }
   const id=document.getElementById('intervId').value;
   const eqId=document.getElementById('iEqId').value;
   const fecha=document.getElementById('iFecha').value;
@@ -3266,7 +3364,9 @@ async function guardarInterv(){
     repuestos:document.getElementById('iRep').value.trim()||null,
     horas_trabajo:parseFloat(document.getElementById('iHoras').value)||null,
     notas:document.getElementById('iNotas').value.trim()||null,
-    fotos:[...existentes,...fotosUrls]};
+    fotos:[...existentes,...fotosUrls],
+    latitud:_lat, longitud:_lng
+  };
   try{
     if(id) await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
     else    await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
@@ -3343,6 +3443,14 @@ function agregarCompletarFotos(files){
 }
 
 async function guardarCompletarDatos(){
+  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  let _lat=null,_lng=null;
+  if(usuarioActual&&usuarioActual.rol!=='admin'){
+    showToast('Ubicando GPS...',false);
+    const c=await obtenerGPS();
+    if(!c){showToast('❌ GPS celular no disponible',true);return;}
+    _lat=c.lat;_lng=c.lng;
+  }
   const id=document.getElementById('completarId').value;
   const i=intervenciones.find(x=>x.id===id);
   if(!id||!i){showToast('Error: intervenci\u00f3n no encontrada',true);return;}
@@ -3369,6 +3477,8 @@ async function guardarCompletarDatos(){
     const notasExtra=document.getElementById('cNotasExtra').value.trim();
     // 3. Patch intervenci\u00f3n
     const patch={fotos:fotosUrls};
+    if(_lat) patch.latitud=_lat;
+    if(_lng) patch.longitud=_lng;
     if(tieneAlgunaLectura) patch.lecturas_operativas=lec;
     if(notasExtra) patch.notas=[(i.notas||''),notasExtra].filter(Boolean).join('\n').trim();
     await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch),headers:{...H,'Prefer':'return=minimal'}});
@@ -4042,6 +4152,14 @@ function guardarServiceEq(){
   guardarServiceEq._running=false;
 }
 async function guardarSoloPreventivo(){
+  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  let _lat=null,_lng=null;
+  if(usuarioActual&&usuarioActual.rol!=='admin'){
+    showToast('Ubicando GPS...',false);
+    const c=await obtenerGPS();
+    if(!c){showToast('❌ GPS celular no disponible',true);return;}
+    _lat=c.lat;_lng=c.lng;
+  }
   const firma=document.getElementById('firmaDigital').value.trim();
   const tecnico=document.getElementById('firmaTecnico').value.trim();
   const fecha=document.getElementById('firmaFecha').value;
@@ -4079,6 +4197,7 @@ async function guardarSoloPreventivo(){
           necesita_correctivo:p.tipo==='Correctivo',
           correctivo_resuelto:p.tipo==='Correctivo'?false:null,
           lecturas_operativas:p.lecturas_operativas||null,
+          latitud:_lat, longitud:_lng,
           firma:firma, es_planilla:true
         };
         const eqRes=await api('intervenciones',{method:'POST',body:JSON.stringify(eqData),headers:{...H,'Prefer':'return=representation'}});
@@ -4123,6 +4242,7 @@ async function guardarSoloPreventivo(){
       descripcion:'✅ Preventivo — '+cli.nombre,
       solucion:'Equipos operativos — '+eqs.length+' equipo(s) revisados',
       firma:firma, notas:notasGlobal,
+      latitud:_lat, longitud:_lng,
       es_planilla:true, necesita_correctivo:false, fotos:[]
     };
     const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
@@ -4179,6 +4299,14 @@ async function guardarSoloPreventivo(){
 }
 
 async function guardarPlanilla(){
+  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  let _lat=null,_lng=null;
+  if(usuarioActual&&usuarioActual.rol!=='admin'){
+    showToast('Ubicando GPS...',false);
+    const c=await obtenerGPS();
+    if(!c){showToast('❌ GPS celular no disponible',true);return;}
+    _lat=c.lat;_lng=c.lng;
+  }
   const firma=document.getElementById('firmaDigital').value.trim();
   const tecnico=document.getElementById('firmaTecnico').value.trim();
   const fecha=document.getElementById('firmaFecha').value;
@@ -4208,6 +4336,7 @@ async function guardarPlanilla(){
         necesita_correctivo:p.tipo==='Correctivo',
         correctivo_resuelto:p.tipo==='Correctivo'?false:null,
         lecturas_operativas:p.lecturas_operativas||null,
+        latitud:_lat, longitud:_lng,
         firma:firma,es_planilla:true};
       const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
       const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
@@ -4732,6 +4861,14 @@ function abrirResolverCorrectivo(id){
 }
 
 async function guardarResolucionCorrectivo(){
+  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  let _lat=null,_lng=null;
+  if(usuarioActual&&usuarioActual.rol!=='admin'){
+    showToast('Ubicando GPS...',false);
+    const c=await obtenerGPS();
+    if(!c){showToast('❌ GPS celular no disponible',true);return;}
+    _lat=c.lat;_lng=c.lng;
+  }
   const id=document.getElementById('resCorrectivoId').value;
   const fecha=document.getElementById('resFecha').value;
   const tecnico=document.getElementById('resTecnico').value.trim();
@@ -4749,6 +4886,7 @@ async function guardarResolucionCorrectivo(){
       descripcion:'Resolución de correctivo: '+descripcion,
       solucion:descripcion,
       notas:null,
+      latitud:_lat, longitud:_lng,
       fotos:fotosUrls,
       necesita_correctivo:false,
       correctivo_resuelto:true,
@@ -5145,6 +5283,14 @@ function abrirTrabajoEvt(cliId){
 }
 
 async function guardarTrabajoEvt(){
+  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  let _lat=null,_lng=null;
+  if(usuarioActual&&usuarioActual.rol!=='admin'){
+    showToast('Ubicando GPS...',false);
+    const c=await obtenerGPS();
+    if(!c){showToast('❌ GPS celular no disponible',true);return;}
+    _lat=c.lat;_lng=c.lng;
+  }
   const cliId=document.getElementById('trabajoClienteEvtId').value;
   const fecha=document.getElementById('tTrabajoFecha').value;
   const tipo=document.getElementById('tTrabajoTipo').value;
@@ -5165,6 +5311,7 @@ async function guardarTrabajoEvt(){
     repuestos:document.getElementById('tTrabajoRep').value.trim()||null,
     horas_trabajo:parseFloat(document.getElementById('tTrabajoHoras').value)||null,
     fotos:fotosUrls,
+    latitud:_lat, longitud:_lng,
     es_planilla:false,necesita_correctivo:false
   };
   try{
