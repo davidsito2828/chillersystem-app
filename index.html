@@ -2288,8 +2288,10 @@ async function iniciarApp(){
   document.getElementById('appScreen').style.display='block';
   document.getElementById('userNombre').textContent=usuarioActual.nombre;
   const isAdmin=usuarioActual.rol==='admin';
-  document.getElementById('userRolBadge').textContent=isAdmin?'Admin':'Técnico';
-  document.getElementById('userRolBadge').className=isAdmin?'rol-admin':'rol-tecnico';
+  const esJefatura=['admin','gerencia'].includes(usuarioActual.rol);
+  
+  document.getElementById('userRolBadge').textContent=isAdmin?'Admin':(esJefatura?'Gerencia':'Técnico');
+  document.getElementById('userRolBadge').className=esJefatura?'rol-admin':'rol-tecnico';
   // Mostrar/ocultar según rol
   document.getElementById('empresaFilter').style.display=isAdmin?'flex':'none';
   document.getElementById('tabCli').style.display=isAdmin?'':'none';
@@ -2297,37 +2299,42 @@ async function iniciarApp(){
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
   document.getElementById('tabGaleria').style.display=puedeVerGaleria()?'':'none';
   document.getElementById('tabEstadisticas').style.display=puedeVerEstadisticas()?'':'none';
-  // Si técnico, ir directo a equipos
-  if(!isAdmin){
+  
+  // Excepción exclusiva: Fichajes sí lo ve gerencia
+  const tabFichajes = document.getElementById('tabFichajes');
+  if(tabFichajes) tabFichajes.style.display = esJefatura ? '' : 'none';
+
+  // EXIGIR GPS PARA TÉCNICOS (Admin/Gerencia se lo saltan)
+  if(!esJefatura){
     document.getElementById('tab-clientes').style.display='none';
     document.getElementById('tab-equipos').style.display='block';
     document.getElementById('tabEq').classList.add('active');
     document.getElementById('tabCli').classList.remove('active');
     
-    // EXIGIR GPS PARA TÉCNICOS
+    // Test GPS obligatorio
     const coord=await obtenerGPS();
     if(!coord){
       showToast('❌ Debes permitir y encender el GPS para ingresar a la app.',true);
       doLogout();
       return;
     }
-    document.getElementById('btnJornada').style.display='block';
-    const btn=document.getElementById('btnJornada');
-    if(btn){
-      // Restaurar estado visual del botón desde localStorage
-      if(localStorage.getItem('jornada_activa')==='true'){
-        jornadaActiva=true;
-        btn.textContent='⏹ Finalizar Jornada';
-        btn.className='btn-jornada btn-finalizar';
-      }else{
-        jornadaActiva=false;
-        btn.textContent='▶ Iniciar Jornada';
-        btn.className='btn-jornada btn-iniciar';
-      }
+  } else {
+    jornadaActiva=true; // Jefatura inicia con jornada virtual activa para no bloquear flujos de sistema
+  }
+
+  // EL BOTÓN DE FICHAR SE MUESTRA PARA TODOS
+  document.getElementById('btnJornada').style.display='block';
+  const btn = document.getElementById('btnJornada');
+  if(btn){
+    if(localStorage.getItem('jornada_activa')==='true'){
+      jornadaActiva=true;
+      btn.textContent='⏹ Finalizar Jornada';
+      btn.className='btn-jornada btn-finalizar';
+    }else{
+      if(!esJefatura) jornadaActiva=false;
+      btn.textContent='▶ Iniciar Jornada';
+      btn.className='btn-jornada btn-iniciar';
     }
-  }else{
-    // Admin puede eludir la regla ("saltearse")
-    jornadaActiva=true; 
   }
   try{
     await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos(),loadInformes(),loadTareasConfig()]);
@@ -2485,7 +2492,9 @@ async function toggleJornada(){
 let fichajesGlobal = [];
 
 async function loadFichajes(){
-  if(usuarioActual.rol !== 'admin') return;
+  const esJefatura = ['admin','gerencia'].includes(usuarioActual.rol);
+  if(!esJefatura) return;
+  
   const fechaInput = document.getElementById('fFiltroFecha');
   let f = fechaInput.value;
   if(!f) {
@@ -2496,21 +2505,27 @@ async function loadFichajes(){
   document.getElementById('fichajesBody').innerHTML = '<div style="text-align:center;padding:20px;">Cargando...</div>';
   
   try {
-    // 1. Fetch jornadas
-    let urlJ = 'jornadas_tecnicos?timestamp=gte.'+f+'T00:00:00&timestamp=lte.'+f+'T23:59:59&select=*';
+    // 1. Asegurar catálogo de usuarios
+    if(!usuarios || !usuarios.length) await loadUsuarios();
+
+    // Fix Timezone (-03:00 Argentina para asegurar precisión diaria en Supabase UTC)
+    let urlJ = 'jornadas_tecnicos?timestamp=gte.'+f+'T00:00:00-03:00&timestamp=lte.'+f+'T23:59:59-03:00&select=*';
     const jData = await api(urlJ) || [];
     
-    // 2. Fetch intervenciones con latitud
-    let urlI = 'intervenciones?created_at=gte.'+f+'T00:00:00&created_at=lte.'+f+'T23:59:59&latitud=not.is.null&select=*,equipos(nombre),clientes(nombre)';
+    let urlI = 'intervenciones?created_at=gte.'+f+'T00:00:00-03:00&created_at=lte.'+f+'T23:59:59-03:00&latitud=not.is.null&select=*,equipos(nombre),clientes(nombre)';
     const iData = await api(urlI) || [];
     
-    // 3. Unificar array
     fichajesGlobal = [];
     
     jData.forEach(j => {
+      let nombreCruzado = j.usuario_nombre;
+      if (!nombreCruzado || nombreCruzado === 'null' || nombreCruzado === undefined) {
+         const usr = usuarios.find(u => u.id === j.usuario_id);
+         nombreCruzado = usr ? (usr.nombre || usr.usuario) : 'Desconocido';
+      }
       fichajesGlobal.push({
         tipo_registro: 'ficha',
-        tec: j.usuario_nombre || 'Desconocido',
+        tec: nombreCruzado,
         fecha_obj: new Date(j.timestamp),
         tipo: j.tipo,
         lat: j.latitud,
@@ -2532,6 +2547,7 @@ async function loadFichajes(){
     
     // Ordenar descendente por fecha_obj
     fichajesGlobal.sort((a,b) => b.fecha_obj - a.fecha_obj);
+    console.log('Jornadas cruzadas con usuarios:', fichajesGlobal);
     
     // Rellenar select de tecnicos
     const selectTec = document.getElementById('fFiltroTecnico');

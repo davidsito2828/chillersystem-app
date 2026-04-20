@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v16'; // migrate to secure RPC proxy override
+const CACHE_NAME = 'chillersystem-v17'; // dashboard roles, timezone dates logic
 const ASSETS = [
   '/',
   '/index.html',
