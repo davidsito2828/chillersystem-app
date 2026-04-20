@@ -2418,7 +2418,7 @@ async function toggleJornada(){
       method:'POST',
       headers:{...H,'Prefer':'return=minimal'},
       body:JSON.stringify({
-        usuario_id:usuarioActual.id,
+        usuario_id:usuarioActual.auth_user_id || usuarioActual.id,
         usuario_nombre:usuarioActual.nombre,
         tipo:tipoStr,
         latitud:coords.lat,

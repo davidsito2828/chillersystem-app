@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v8'; // bumped: admin map dashboard
+const CACHE_NAME = 'chillersystem-v9'; // bumped: fix uuid RLS violation
 const ASSETS = [
   '/',
   '/index.html',
