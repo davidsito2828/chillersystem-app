@@ -1855,6 +1855,7 @@ tbody tr:hover{background:#f8faff;}
 <div id="ordenPdfContainer"></div>
 
 <script>
+console.log("App cargada en versión v14");
 const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
 const AUTH_DOMAIN='chillersystem.app';
@@ -6797,12 +6798,11 @@ async function guardarFrecuenciaTarea(id, dias){
 
 // \u2550\u2550 INICIO: intentar restaurar sesi\u00f3n guardada \u2550\u2550
 // Si hay una sesi\u00f3n guardada, el usuario no tiene que volver a loguearse
-document.addEventListener('DOMContentLoaded', async ()=>{
+window.addEventListener('load', async ()=>{
   const btn = document.getElementById('btnJornada');
   if (btn) btn.addEventListener('click', toggleJornada);
   
   const restaurada = await intentarRestaurarSesion();
-  // Si no se restauró, se muestra el login normalmente (ya está visible por defecto)
   if(!restaurada) console.log('[auth] Sin sesión guardada. Mostrando login.');
 });
 
@@ -6814,6 +6814,11 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js')
       .then(()=>console.log('SW registrado'))
       .catch(e=>console.log('SW error:',e));
+      
+    // Forzar actualización de pantalla inmediata si el Service Worker cambia (busta la caché vieja pegada)
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
   });
 }
 // WhatsApp envío modal

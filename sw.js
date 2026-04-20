@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v13'; // force client eviction
+const CACHE_NAME = 'chillersystem-v14'; // force client eviction via controllerchange
 const ASSETS = [
   '/',
   '/index.html',
