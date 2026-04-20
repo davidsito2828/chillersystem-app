@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v14'; // force client eviction via controllerchange
+const CACHE_NAME = 'chillersystem-v15'; // fix uuid foreign key mapping
 const ASSETS = [
   '/',
   '/index.html',

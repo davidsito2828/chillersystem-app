@@ -2425,18 +2425,29 @@ async function toggleJornada(){
   
   showToast('Guardando ficha de '+tipoStr+'...');
   
-  let validAuthId = null;
-  try { if(_authToken) validAuthId = JSON.parse(atob(_authToken.split('.')[1])).sub; } catch(e){}
+  let targetUserId = usuarioActual.id;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   
-  if(!validAuthId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validAuthId)){
-    console.error('Error UUID (Formato inválido):', validAuthId);
-    showToast('❌ Error de seguridad: ID de sesión inválido. Volvé a salir e ingresar a tu cuenta.', true);
-    btn.disabled=false;
-    return;
+  if(!targetUserId || !uuidRegex.test(targetUserId)){
+    // Fallback: Si el id local no es un UUID válido, hacemos un fetch rápido a la DB pública para encontrar su ID real
+    try {
+      const res = await api(`usuarios?usuario=eq.${encodeURIComponent(usuarioActual.usuario || usuarioActual.nombre)}&select=id`);
+      if (res && res.length > 0 && uuidRegex.test(res[0].id)) {
+        targetUserId = res[0].id;
+        usuarioActual.id = targetUserId; // actualizar caché en memoria
+      } else {
+        throw new Error("No se encontró UUID válido");
+      }
+    } catch (e) {
+      console.error('Error resolviendo UUID_FK:', e);
+      showToast('❌ Error de datos: Fallo verificando el ID en DB pública.', true);
+      btn.disabled = false;
+      return;
+    }
   }
 
   const objetoEnvio = {
-    usuario_id: validAuthId,
+    usuario_id: targetUserId,
     tipo: tipoStr,
     latitud: Number(coords.lat),
     longitud: Number(coords.lng),
