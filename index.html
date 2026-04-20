@@ -2312,19 +2312,17 @@ async function iniciarApp(){
     }
     document.getElementById('btnJornada').style.display='block';
     const btn=document.getElementById('btnJornada');
-    
-    btn.removeEventListener('click', toggleJornada);
-    btn.addEventListener('click', toggleJornada);
-    
-    // Restaurar estado visual del botón desde localStorage
-    if(localStorage.getItem('jornada_activa')==='true'){
-      jornadaActiva=true;
-      btn.textContent='⏹ Finalizar Jornada';
-      btn.className='btn-jornada btn-finalizar';
-    }else{
-      jornadaActiva=false;
-      btn.textContent='▶ Iniciar Jornada';
-      btn.className='btn-jornada btn-iniciar';
+    if(btn){
+      // Restaurar estado visual del botón desde localStorage
+      if(localStorage.getItem('jornada_activa')==='true'){
+        jornadaActiva=true;
+        btn.textContent='⏹ Finalizar Jornada';
+        btn.className='btn-jornada btn-finalizar';
+      }else{
+        jornadaActiva=false;
+        btn.textContent='▶ Iniciar Jornada';
+        btn.className='btn-jornada btn-iniciar';
+      }
     }
   }else{
     // Admin puede eludir la regla ("saltearse")
@@ -6800,9 +6798,12 @@ async function guardarFrecuenciaTarea(id, dias){
 // \u2550\u2550 INICIO: intentar restaurar sesi\u00f3n guardada \u2550\u2550
 // Si hay una sesi\u00f3n guardada, el usuario no tiene que volver a loguearse
 document.addEventListener('DOMContentLoaded', async ()=>{
+  const btn = document.getElementById('btnJornada');
+  if (btn) btn.addEventListener('click', toggleJornada);
+  
   const restaurada = await intentarRestaurarSesion();
-  // Si no se restaur\u00f3, se muestra el login normalmente (ya est\u00e1 visible por defecto)
-  if(!restaurada) console.log('[auth] Sin sesi\u00f3n guardada. Mostrando login.');
+  // Si no se restauró, se muestra el login normalmente (ya está visible por defecto)
+  if(!restaurada) console.log('[auth] Sin sesión guardada. Mostrando login.');
 });
 
 </script>
