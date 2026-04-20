@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v12'; // bumped: mobile responsiveness and refactoring event listeners for fichajes button
+const CACHE_NAME = 'chillersystem-v13'; // force client eviction
 const ASSETS = [
   '/',
   '/index.html',
