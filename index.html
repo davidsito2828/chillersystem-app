@@ -2512,8 +2512,14 @@ async function loadFichajes(){
     const fInicio = new Date(f + 'T00:00:00-03:00').toISOString();
     const fFin = new Date(f + 'T23:59:59-03:00').toISOString();
 
-    let urlJ = `jornadas_tecnicos?timestamp=gte.${fInicio}&timestamp=lte.${fFin}&select=*`;
-    const jData = await api(urlJ) || [];
+    const jDataRaw = await api('rpc/obtener_jornadas_admin', { method: 'POST' }) || [];
+    const fInicioObj = new Date(fInicio);
+    const fFinObj = new Date(fFin);
+    const jData = jDataRaw.filter(j => {
+      if (!j.timestamp) return false;
+      const t = new Date(j.timestamp);
+      return t >= fInicioObj && t <= fFinObj;
+    });
     console.log('Jornadas obtenidas de Supabase:', jData);
     
     let urlI = `intervenciones?created_at=gte.${fInicio}&created_at=lte.${fFin}&latitud=not.is.null&select=*,equipos(nombre),clientes(nombre)`;

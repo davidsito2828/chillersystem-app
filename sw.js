@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v18'; // fix postgrest timestamp bounds formatting
+const CACHE_NAME = 'chillersystem-v20'; // fix postgrest timestamp bounds formatting and admin jornadas rpc
 const ASSETS = [
   '/',
   '/index.html',
