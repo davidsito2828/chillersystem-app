@@ -1998,42 +1998,71 @@ async function descartarAlarmaGrupo(eqIds){
 // ══════════════════════════════════════════
 //  FIRMA DIGITAL CANVAS
 // ══════════════════════════════════════════
+let _firmaCanvasCleanup = null;
 function initFirmaCanvas(){
   const canvas=document.getElementById('firmaClienteCanvas');
   if(!canvas)return;
-  // Reset click-confirmation button
   const clickBtn=document.getElementById('sBtnConformidadClick');
   if(clickBtn){clickBtn.style.background='';clickBtn.style.color='';clickBtn.textContent='✅ Confirmo conformidad (sin firma)';}
   document.getElementById('sNombreFirmante').value='';
   canvas.classList.remove('has-firma');
-  // Set proper pixel dimensions
-  const w=canvas.offsetWidth||canvas.parentElement?.offsetWidth||300;
-  canvas.width=w;
-  canvas.height=150;
-  const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#fff';
-  ctx.fillRect(0,0,w,150);
-  // Remove old listeners by replacing node
-  const fresh=canvas.cloneNode(false);
-  canvas.parentNode.replaceChild(fresh,canvas);
-  fresh.width=w; fresh.height=150;
-  const ctx2=fresh.getContext('2d');
-  ctx2.fillStyle='#fff'; ctx2.fillRect(0,0,w,150);
-  ctx2.strokeStyle='#111'; ctx2.lineWidth=2.5; ctx2.lineCap='round'; ctx2.lineJoin='round';
-  let drawing=false,lx=0,ly=0;
-  function pos(e){
-    const r=fresh.getBoundingClientRect();
-    const sx=fresh.width/r.width, sy=fresh.height/r.height;
-    if(e.touches) return {x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};
-    return {x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};
+  // Remove previous event listeners via stored refs
+  if(_firmaCanvasCleanup){_firmaCanvasCleanup();_firmaCanvasCleanup=null;}
+  // Defer canvas sizing to first pointer event (panel may not be visible yet)
+  let sized=false;
+  function ensureSize(){
+    if(sized)return; sized=true;
+    const r=canvas.getBoundingClientRect();
+    const w=r.width>0?Math.round(r.width):300;
+    canvas.width=w; canvas.height=150;
+    const c=canvas.getContext('2d');
+    c.fillStyle='#fff'; c.fillRect(0,0,w,150);
+    c.strokeStyle='#111'; c.lineWidth=2.5; c.lineCap='round'; c.lineJoin='round';
   }
-  fresh.addEventListener('mousedown',e=>{drawing=true;const p=pos(e);lx=p.x;ly=p.y;});
-  fresh.addEventListener('mousemove',e=>{if(!drawing)return;const p=pos(e);ctx2.beginPath();ctx2.moveTo(lx,ly);ctx2.lineTo(p.x,p.y);ctx2.stroke();lx=p.x;ly=p.y;fresh.classList.add('has-firma');});
-  fresh.addEventListener('mouseup',()=>drawing=false);
-  fresh.addEventListener('mouseleave',()=>drawing=false);
-  fresh.addEventListener('touchstart',e=>{drawing=true;const p=pos(e);lx=p.x;ly=p.y;e.preventDefault();},{passive:false});
-  fresh.addEventListener('touchmove',e=>{if(!drawing)return;const p=pos(e);ctx2.beginPath();ctx2.moveTo(lx,ly);ctx2.lineTo(p.x,p.y);ctx2.stroke();lx=p.x;ly=p.y;fresh.classList.add('has-firma');e.preventDefault();},{passive:false});
-  fresh.addEventListener('touchend',()=>drawing=false);
+  // Clear any prior content (works even if canvas is 0×0 at init time)
+  {const c=canvas.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,canvas.width,canvas.height);}
+  let drawing=false,lx=0,ly=0;
+  function getPos(e){
+    const r=canvas.getBoundingClientRect();
+    const sx=canvas.width/r.width||1, sy=canvas.height/r.height||1;
+    if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};
+    return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};
+  }
+  function onMousedown(e){ensureSize();drawing=true;const p=getPos(e);lx=p.x;ly=p.y;}
+  function onMousemove(e){
+    if(!drawing)return;
+    const p=getPos(e);
+    const c=canvas.getContext('2d');
+    c.beginPath();c.moveTo(lx,ly);c.lineTo(p.x,p.y);c.stroke();
+    lx=p.x;ly=p.y;canvas.classList.add('has-firma');
+  }
+  function onMouseup(){drawing=false;}
+  function onMouseleave(){drawing=false;}
+  function onTouchstart(e){ensureSize();drawing=true;const p=getPos(e);lx=p.x;ly=p.y;e.preventDefault();}
+  function onTouchmove(e){
+    if(!drawing)return;
+    const p=getPos(e);
+    const c=canvas.getContext('2d');
+    c.beginPath();c.moveTo(lx,ly);c.lineTo(p.x,p.y);c.stroke();
+    lx=p.x;ly=p.y;canvas.classList.add('has-firma');e.preventDefault();
+  }
+  function onTouchend(){drawing=false;}
+  canvas.addEventListener('mousedown',onMousedown);
+  canvas.addEventListener('mousemove',onMousemove);
+  canvas.addEventListener('mouseup',onMouseup);
+  canvas.addEventListener('mouseleave',onMouseleave);
+  canvas.addEventListener('touchstart',onTouchstart,{passive:false});
+  canvas.addEventListener('touchmove',onTouchmove,{passive:false});
+  canvas.addEventListener('touchend',onTouchend);
+  _firmaCanvasCleanup=function(){
+    canvas.removeEventListener('mousedown',onMousedown);
+    canvas.removeEventListener('mousemove',onMousemove);
+    canvas.removeEventListener('mouseup',onMouseup);
+    canvas.removeEventListener('mouseleave',onMouseleave);
+    canvas.removeEventListener('touchstart',onTouchstart);
+    canvas.removeEventListener('touchmove',onTouchmove);
+    canvas.removeEventListener('touchend',onTouchend);
+  };
 }
 function limpiarFirmaCanvas(){
   const canvas=document.getElementById('firmaClienteCanvas');
@@ -2065,6 +2094,15 @@ function getFirmaData(){
   if(btn&&btn.textContent.includes('confirmada')) return {base64:'click_confirmado',tipo:'click'};
   const canvas=document.getElementById('firmaClienteCanvas');
   if(!canvas||!canvas.classList.contains('has-firma')) return {base64:null,tipo:null};
+  // Verify actual non-white pixels exist
+  try{
+    const data=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+    let hasContent=false;
+    for(let i=0;i<data.length;i+=4){
+      if(data[i]<250||data[i+1]<250||data[i+2]<250){hasContent=true;break;}
+    }
+    if(!hasContent) return {base64:null,tipo:null};
+  }catch(e){/* tainted canvas — assume has content */}
   return {base64:canvas.toDataURL('image/png'),tipo:'canvas'};
 }
 
@@ -2415,6 +2453,11 @@ async function getUbicacionActual(timeoutMs = 8000) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           clearTimeout(timer);
+          if (pos.coords.accuracy > 500) {
+            showToast('⚠️ GPS impreciso (' + Math.round(pos.coords.accuracy) + 'm). Activá GPS real e intentá de nuevo.', true);
+            resolve(null);
+            return;
+          }
           resolve({
             latitud: pos.coords.latitude,
             longitud: pos.coords.longitude,
@@ -2425,7 +2468,7 @@ async function getUbicacionActual(timeoutMs = 8000) {
           clearTimeout(timer);
           resolve(null);
         },
-        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     } catch (e) {
       clearTimeout(timer);
@@ -2449,9 +2492,11 @@ async function toggleJornada(){
   }
   
   if(!coords){
-    showToast('⚠️ No se pudo obtener la ubicación GPS.', true);
+    showToast('❌ No se pudo obtener ubicación GPS precisa. Activá el GPS y volvé a intentar.', true);
+    btn.disabled=false;
+    return;
   }
-  
+
   showToast('Guardando ficha de '+tipoStr+'...');
   
   let targetUserId = usuarioActual.id;
@@ -2480,7 +2525,7 @@ async function toggleJornada(){
     p_tipo: tipoStr,
     p_lat: coords?.latitud || null,
     p_lon: coords?.longitud || null,
-    p_prec: coords?.precision_gps ? Math.min(Number(coords.precision_gps), 9999.99) : null
+    p_prec: coords?.precision_gps || null
   };
   
   console.log('Datos enviados a Supabase (RPC):', objetoEnvio);
@@ -4093,6 +4138,9 @@ function abrirServiceEq(eqId){
   // Renderizar tareas recomendadas para este equipo
   _renderTareasService(eq);
 
+  // Mark equipo as visited for validation
+  if(!servicePlanilla[eqId]) servicePlanilla[eqId]={};
+  servicePlanilla[eqId].revisado=true;
   const p=servicePlanilla[eqId];
   if(p){
     document.getElementById('sTrabajoRealizado').value=p.trabajo||'';
@@ -4418,6 +4466,11 @@ async function guardarSoloPreventivo(){
   if(!eqs.length){showToast('Sin equipos para registrar',true);return;}
   const firmaClienteSP=getFirmaData();
   const nombreFirmanteSP=document.getElementById('sNombreFirmante')?.value.trim()||null;
+  // Validaciones bloqueantes antes de guardar
+  const noRevisados=eqs.filter(e=>!servicePlanilla[e.id]?.revisado).map(e=>e.nombre);
+  if(noRevisados.length){showToast('⚠️ Abrí el formulario de cada equipo antes de guardar: '+noRevisados.join(', '),true);return;}
+  if(!firmaClienteSP.base64){showToast('⚠️ La firma del cliente está vacía o en blanco.',true);return;}
+  if(!nombreFirmanteSP){showToast('⚠️ Ingresá el nombre del firmante.',true);return;}
   showToast('Guardando preventivo...');
   document.getElementById('btnGuardarPreventivo').disabled=true;
   try{
@@ -4529,7 +4582,7 @@ async function guardarSoloPreventivo(){
         firma_cliente:firmaClienteSP.base64||null,
         firma_tipo:firmaClienteSP.tipo||null,
         nombre_firmante:nombreFirmanteSP||null
-      }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion patch]',e));
+      }),headers:{...H,'Prefer':'return=minimal'}});
     } else {
       await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
         intervencion_id:intervId||null,
@@ -4542,7 +4595,7 @@ async function guardarSoloPreventivo(){
         nombre_firmante:nombreFirmanteSP||null,
         estado:'pendiente',
         equipos_detalle:equiposDetalle
-      }),headers:{...H,'Prefer':'return=minimal'}}).catch(e=>console.error('[aprobacion insert]',e));
+      }),headers:{...H,'Prefer':'return=minimal'}});
     }
     showToast('Preventivo guardado ✓','success');
     await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
@@ -4571,6 +4624,9 @@ async function guardarPlanilla(){
   // Capturar firma del cliente UNA vez (panel global del service)
   const firmaClienteData=getFirmaData();
   const nombreFirmante=document.getElementById('sNombreFirmante')?.value.trim()||null;
+  // Validaciones bloqueantes antes de guardar
+  if(!firmaClienteData.base64){showToast('⚠️ La firma del cliente está vacía o en blanco.',true);return;}
+  if(!nombreFirmante){showToast('⚠️ Ingresá el nombre del firmante.',true);return;}
   showToast('Guardando planilla...');
   document.getElementById('btnGuardarPlanilla').disabled=true;
   try{
@@ -4626,9 +4682,9 @@ async function guardarPlanilla(){
     if(aprobExistente&&aprobExistente.length){
       const existId=aprobExistente[0].id;
       const detalleExistente=aprobExistente[0].equipos_detalle||[];
-      await api('preventivos_aprobacion?id=eq.'+existId,{method:'PATCH',body:JSON.stringify({equipos_detalle:[...detalleExistente,...equiposDetalle],firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null}),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+      await api('preventivos_aprobacion?id=eq.'+existId,{method:'PATCH',body:JSON.stringify({equipos_detalle:[...detalleExistente,...equiposDetalle],firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null}),headers:{...H,'Prefer':'return=minimal'}});
     }else{
-      await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({cliente_id:serviceClienteActual,equipo_id:null,tecnico:tecnico||firma,fecha_servicio:fecha,firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null,estado:'pendiente',equipos_detalle:equiposDetalle}),headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+      await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({cliente_id:serviceClienteActual,equipo_id:null,tecnico:tecnico||firma,fecha_servicio:fecha,firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null,estado:'pendiente',equipos_detalle:equiposDetalle}),headers:{...H,'Prefer':'return=minimal'}});
     }
     showToast('Planilla guardada ✓ — '+Object.keys(servicePlanilla).length+' equipo(s)','success');
     await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
@@ -4758,6 +4814,13 @@ function generarHtmlInforme(a){
     :'<div style="height:50px;border:1px dashed #ccc;border-radius:4px;margin-top:6px;"></div>';
   const trabajoRealizado=interv.descripcion||interv.solucion||'';
   const mostrarTrabajo=trabajoRealizado&&!trabajoRealizado.startsWith('Sin novedades');
+  // Banner datos incompletos
+  const _incItems=[];
+  if(!a.equipos_detalle||!a.equipos_detalle.length) _incItems.push('Sin detalle de equipos registrados');
+  if(!a.firma_cliente||(a.firma_cliente!=='click_confirmado'&&a.firma_cliente.length<100)) _incItems.push('Firma del cliente no registrada');
+  if(!a.nombre_firmante) _incItems.push('Nombre del firmante no registrado');
+  if(!a.fecha_servicio) _incItems.push('Fecha de servicio no registrada');
+  const _banner=_incItems.length?`<div style="margin-bottom:16px;padding:12px 16px;background:#fffbeb;border:1px solid #f59e0b;border-left:4px solid #d97706;border-radius:4px;font-size:11px;color:#92400e;"><strong style="font-size:12px;">&#9888; Informe con datos incompletos</strong><ul style="margin:6px 0 0 0;padding-left:18px;">${_incItems.map(i=>'<li>'+i+'</li>').join('')}</ul></div>`:''
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
 <style>body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
 h1{font-size:20px;font-weight:900;font-style:italic;margin:0;}
@@ -4768,7 +4831,7 @@ th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
 .hdr td{border:none;vertical-align:middle;}
 .footer{margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center;}
 @media print{.no-print{display:none!important;}}</style></head><body>
-<table class="hdr" style="margin-bottom:20px;"><tr>
+${_banner}<table class="hdr" style="margin-bottom:20px;"><tr>
   <td style="width:60%;"><h1>ChillerService S.A.</h1><div style="font-size:11px;color:#555;margin-top:2px;">Servicios e Instalaciones Termomecánicas</div></td>
   <td style="text-align:right;line-height:1.8;font-size:12px;"><strong style="font-size:14px;">Informe de Preventivo</strong><br/>N° ${a.numero_ipd||a.numero||'—'}<br/>Fecha: ${fechaFmt}<br/>Técnico: ${a.tecnico||'—'}</td>
 </tr></table>
@@ -4915,6 +4978,13 @@ function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
     :a.firma_cliente
     ?`<img src="${a.firma_cliente}" style="max-width:220px;max-height:90px;border:1px solid #ccc;border-radius:4px;display:block;margin-top:6px;"/>`
     :'<div style="height:50px;border:1px dashed #ccc;border-radius:4px;margin-top:6px;"></div>';
+  // Banner datos incompletos
+  const _incItemsC=[];
+  if(!a.equipos_detalle||!a.equipos_detalle.length) _incItemsC.push('Sin detalle de equipos registrados');
+  if(!a.firma_cliente||(a.firma_cliente!=='click_confirmado'&&a.firma_cliente.length<100)) _incItemsC.push('Firma del cliente no registrada');
+  if(!a.nombre_firmante) _incItemsC.push('Nombre del firmante no registrado');
+  if(!a.fecha_servicio) _incItemsC.push('Fecha de servicio no registrada');
+  const _bannerC=_incItemsC.length?`<div style="margin-bottom:16px;padding:12px 16px;background:#fffbeb;border:1px solid #f59e0b;border-left:4px solid #d97706;border-radius:4px;font-size:11px;color:#92400e;"><strong style="font-size:12px;">&#9888; Informe con datos incompletos</strong><ul style="margin:6px 0 0 0;padding-left:18px;">${_incItemsC.map(i=>'<li>'+i+'</li>').join('')}</ul></div>`:''
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe Preventivo — ${cli.nombre} — ${fechaFmt}</title>
 <style>body{font-family:Arial,sans-serif;font-size:12px;color:#000;padding:24px;background:#fff;max-width:800px;margin:0 auto;}
 h1{font-size:20px;font-weight:900;font-style:italic;margin:0;}
@@ -4925,7 +4995,7 @@ th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
 .hdr td{border:none;vertical-align:middle;}
 .footer{margin-top:24px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#888;text-align:center;}
 @media print{.no-print{display:none!important;}}</style></head><body>
-<table class="hdr" style="margin-bottom:20px;"><tr>
+${_bannerC}<table class="hdr" style="margin-bottom:20px;"><tr>
   <td style="width:60%;"><h1>ChillerService S.A.</h1><div style="font-size:11px;color:#555;margin-top:2px;">Servicios e Instalaciones Termomecánicas</div></td>
   <td style="text-align:right;line-height:1.8;font-size:12px;"><strong style="font-size:14px;">Informe de Preventivo</strong><br/>N° ${a.numero_ipd||a.numero||'—'}<br/>Fecha: ${fechaFmt}<br/>Técnico: ${a.tecnico||'—'}</td>
 </tr></table>
@@ -5040,27 +5110,33 @@ async function eliminarAprobacion(id){
 }
 
 async function mostrarInformePublico(aprobacionId){
+  console.log('[Informe] URL param:', aprobacionId);
   document.body.innerHTML='<div style="font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f4f6f9;"><div style="text-align:center;color:#666;">Cargando informe...</div></div>';
   try{
-    // 1) Traer la aprobación principal via api()
-    const dataAprob=await api('preventivos_aprobacion?id=eq.'+aprobacionId+'&select=*').catch(()=>[]);
+    // Paso 1: traer aprobación
+    console.log('[Informe] Query a preventivos_aprobacion...');
+    const dataAprob=await api('preventivos_aprobacion?id=eq.'+aprobacionId+'&select=*');
+    console.log('[Informe] Registros recibidos:', dataAprob ? dataAprob.length : 0);
     const aprob=(dataAprob||[])[0];
     if(!aprob){
+      const msg='No se encontró ningún informe con ID '+aprobacionId;
+      console.error('[Informe] ERROR:', msg);
       document.open();
-      document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;"><p style="color:#e11d48;font-size:18px;">⚠️ Informe no disponible.</p></body></html>');
+      document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;"><p style="color:#e11d48;font-size:18px;">⚠️ Error al cargar informe</p><p style="color:#555;font-size:13px;">'+msg+'</p></body></html>');
       document.close();
       return;
     }
 
-    // 2) Agrupar por numero_ipd si existe; si no, usar solo este registro
+    // Paso 2: agrupar por numero_ipd si existe
     let grupo=[aprob];
     if(aprob.numero_ipd){
-      const resGrupo=await api('preventivos_aprobacion?numero_ipd=eq.'+aprob.numero_ipd+'&select=*').catch(()=>[]);
+      console.log('[Informe] Agrupando por numero_ipd:', aprob.numero_ipd);
+      const resGrupo=await api('preventivos_aprobacion?numero_ipd=eq.'+aprob.numero_ipd+'&select=*');
       if(Array.isArray(resGrupo)&&resGrupo.length>0) grupo=resGrupo;
     }
-    console.log('[InformePublico] Grupo:',grupo.length,'registro(s)');
+    console.log('[Informe] Registros en grupo:', grupo.length);
 
-    // 3) Normalizar campos que pueden faltar en registros viejos
+    // Paso 3: normalizar campos opcionales
     grupo=grupo.map(r=>({
       ...r,
       fecha_servicio: r.fecha_servicio||r.fecha||null,
@@ -5070,12 +5146,13 @@ async function mostrarInformePublico(aprobacionId){
       nombre_firmante: r.nombre_firmante||''
     }));
 
-    // 4) Cargar datos en paralelo
+    // Paso 4: cargar datos de soporte en paralelo
+    console.log('[Informe] Cargando clientes, equipos, intervenciones, tareas...');
     const [resClientes,resEquipos,resInterv,resTareas]=await Promise.all([
-      api('clientes?select=*').catch(()=>[]),
-      api('equipos?select=*').catch(()=>[]),
-      api('intervenciones?select=*').catch(()=>[]),
-      api('tareas_realizadas?select=*').catch(()=>[])
+      api('clientes?select=*'),
+      api('equipos?select=*'),
+      api('intervenciones?select=*'),
+      api('tareas_realizadas?select=*')
     ]);
     clientes=resClientes||[];
     equipos=resEquipos||[];
@@ -5083,21 +5160,26 @@ async function mostrarInformePublico(aprobacionId){
     tareasRealizadas=resTareas||[];
     aprobaciones=grupo;
 
-    // 5) Generar HTML consolidado o simple
+    // Paso 5: generar HTML
     const grupoIds=grupo.map(x=>x.id);
     const principal=grupo.find(x=>x.id===aprobacionId)||grupo[0];
     const htmlInforme=(grupo.length>1&&typeof generarHtmlInformeConsolidado==='function')
       ?generarHtmlInformeConsolidado(grupoIds,principal)
       :generarHtmlInforme(principal);
 
-    // 6) Renderizar reemplazando el documento completo
+    // Paso 6: renderizar
     document.open();
     document.write(htmlInforme);
     document.close();
+    console.log('[Informe] Render OK');
   }catch(e){
-    console.error('[InformePublico]',e);
+    console.error('[Informe] ERROR:', e);
     document.open();
-    document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;"><p style="color:#e11d48;font-size:18px;">⚠️ Error al cargar el informe.</p><p style="color:#888;font-size:13px;">'+e.message+'</p></body></html>');
+    document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;">'
+      +'<p style="color:#e11d48;font-size:18px;">⚠️ Error al cargar informe</p>'
+      +'<p style="color:#555;font-size:13px;">'+e.message+'</p>'
+      +'<pre style="color:#888;font-size:11px;text-align:left;max-width:640px;margin:20px auto;white-space:pre-wrap;border:1px solid #ddd;padding:12px;border-radius:6px;">'+e.stack+'</pre>'
+      +'</body></html>');
     document.close();
   }
 }
