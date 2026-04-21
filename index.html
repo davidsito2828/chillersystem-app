@@ -4721,10 +4721,11 @@ function renderAprobaciones(){
 }
 
 function generarHtmlInforme(a){
+  if(!a) throw new Error('Registro preventivo vacío');
   const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente'};
   const eq=equipos.find(e=>e.id===a.equipo_id)||{nombre:'—'};
   const interv=intervenciones.find(i=>i.id===a.intervencion_id)||{};
-  const fechaFmt=fmtF(a.fecha_servicio);
+  const fechaFmt=fmtF(a.fecha_servicio||a.fecha||'');
   const tareasDeEstaInterv=tareasRealizadas.filter(t=>t.intervencion_id===a.intervencion_id);
   console.log('[generarHtmlInforme] intervencion_id:',a.intervencion_id);
   console.log('[generarHtmlInforme] tareasRealizadas total:',tareasRealizadas.length);
@@ -5002,21 +5003,6 @@ async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
   const aprobacionPrincipal=aprobaciones.find(a=>a.id===idPrincipal);
   if(!aprobacionPrincipal){showToast('Error: aprobación no encontrada',true);return;}
   showToast('Aprobando...');
-  // Cargar tareas y generar informe consolidado
-  tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
-  const htmlInforme=generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal);
-  // Intentar subir a Storage (puede fallar, no importa)
-  let informeUrl=window.location.origin+'?aprobacion='+idPrincipal;
-  try{
-    const blob=new Blob([htmlInforme],{type:'text/html'});
-    const nombreArchivo=`preventivo-${idPrincipal}-${Date.now()}.html`;
-    const uploadRes=await fetch(`${SURL}/storage/v1/object/informes-preventivos/${nombreArchivo}`,{
-      method:'POST',
-      headers:{'apikey':SKEY,'Authorization':'Bearer '+SKEY,'Content-Type':'text/html','x-upsert':'true'},
-      body:blob
-    });
-    if(uploadRes.ok) informeUrl=`${SURL}/storage/v1/object/public/informes-preventivos/${nombreArchivo}`;
-  }catch(e){console.warn('Storage no disponible:',e.message);}
   // Generar número IPD
   const ultimos=await api('preventivos_aprobacion?select=numero_ipd&order=created_at.desc&limit=50');
   const numerosIPD=(ultimos||[]).map(a=>a.numero_ipd).filter(n=>n&&n.includes('-IPD')).map(n=>parseInt(n.split('-')[0])||0);
@@ -5025,7 +5011,6 @@ async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
   const urlPublica=window.location.origin+window.location.pathname+'?informe='+idPrincipal;
   try{
     for(const gid of grupoIds){
-      const isPrincipal=gid===idPrincipal;
       await api('preventivos_aprobacion?id=eq.'+gid,{
         method:'PATCH',
         body:JSON.stringify({
@@ -5033,8 +5018,7 @@ async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
           numero_ipd:numeroIPD,
           pdf_url:urlPublica,
           aprobado_por:usuarioActual.nombre,
-          fecha_aprobacion:new Date().toISOString(),
-          ...(isPrincipal?{informe_html:htmlInforme}:{})
+          fecha_aprobacion:new Date().toISOString()
         }),
         headers:{...H,'Prefer':'return=minimal'}
       });
@@ -5056,51 +5040,42 @@ async function eliminarAprobacion(id){
 }
 
 async function mostrarInformePublico(aprobacionId){
-  document.body.innerHTML='<div id="informePublicoContenedor" style="font-family:Arial,sans-serif;background:#f4f6f9;min-height:100vh;display:flex;justify-content:center;padding:20px;">'+
-    '<div id="informePublicoInner" style="width:100%;max-width:750px;">'+
-    '<div style="text-align:center;padding:40px;color:#666;">Cargando informe...</div>'+
-    '</div></div>';
+  document.body.innerHTML='<div style="font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f4f6f9;"><div style="text-align:center;color:#666;">Cargando informe...</div></div>';
   try{
-    const H2={'apikey':SKEY,'Authorization':'Bearer '+SKEY};
-    const BASE=SURL+'/rest/v1';
-
-    // 1) Traer la aprobación principal
-    const resAprob=await fetch(BASE+'/preventivos_aprobacion?id=eq.'+aprobacionId+'&select=*',{headers:H2});
-    const dataAprob=await resAprob.json();
-    const aprob=dataAprob?.[0];
+    // 1) Traer la aprobación principal via api()
+    const dataAprob=await api('preventivos_aprobacion?id=eq.'+aprobacionId+'&select=*').catch(()=>[]);
+    const aprob=(dataAprob||[])[0];
     if(!aprob){
-      document.getElementById('informePublicoInner').innerHTML=
-        '<div style="text-align:center;padding:40px;color:#e11d48;">⚠️ Informe no disponible.</div>';
+      document.open();
+      document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;"><p style="color:#e11d48;font-size:18px;">⚠️ Informe no disponible.</p></body></html>');
+      document.close();
       return;
     }
 
-    // Si tiene informe_html cacheado, usarlo directamente
-    if(aprob.informe_html){
-      document.getElementById('informePublicoInner').innerHTML=
-        '<div style="text-align:right;margin-bottom:12px;">'+
-        '<button onclick="window.print()" style="padding:10px 24px;background:#1a2332;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>'+
-        aprob.informe_html;
-      return;
-    }
-
-    // 2) Intentar buscar grupo SOLO si tiene fecha_servicio (columna nueva)
+    // 2) Agrupar por numero_ipd si existe; si no, usar solo este registro
     let grupo=[aprob];
-    if(aprob.cliente_id&&aprob.fecha_servicio){
-      const resGrupo=await fetch(
-        BASE+'/preventivos_aprobacion?cliente_id=eq.'+aprob.cliente_id+
-        '&fecha_servicio=eq.'+aprob.fecha_servicio+'&select=*',
-        {headers:H2}
-      ).then(r=>r.json()).catch(()=>[]);
+    if(aprob.numero_ipd){
+      const resGrupo=await api('preventivos_aprobacion?numero_ipd=eq.'+aprob.numero_ipd+'&select=*').catch(()=>[]);
       if(Array.isArray(resGrupo)&&resGrupo.length>0) grupo=resGrupo;
     }
-    console.log('[InformePublico] Mostrando',grupo.length,'equipo(s)');
+    console.log('[InformePublico] Grupo:',grupo.length,'registro(s)');
 
-    // 3) Cargar datos necesarios en memoria
+    // 3) Normalizar campos que pueden faltar en registros viejos
+    grupo=grupo.map(r=>({
+      ...r,
+      fecha_servicio: r.fecha_servicio||r.fecha||null,
+      equipos_detalle: r.equipos_detalle||[],
+      firma_cliente: r.firma_cliente||null,
+      firma_tipo: r.firma_tipo||null,
+      nombre_firmante: r.nombre_firmante||''
+    }));
+
+    // 4) Cargar datos en paralelo
     const [resClientes,resEquipos,resInterv,resTareas]=await Promise.all([
-      fetch(BASE+'/clientes?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]),
-      fetch(BASE+'/equipos?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]),
-      fetch(BASE+'/intervenciones?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]),
-      fetch(BASE+'/tareas_realizadas?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
+      api('clientes?select=*').catch(()=>[]),
+      api('equipos?select=*').catch(()=>[]),
+      api('intervenciones?select=*').catch(()=>[]),
+      api('tareas_realizadas?select=*').catch(()=>[])
     ]);
     clientes=resClientes||[];
     equipos=resEquipos||[];
@@ -5108,21 +5083,22 @@ async function mostrarInformePublico(aprobacionId){
     tareasRealizadas=resTareas||[];
     aprobaciones=grupo;
 
-    // 4) Generar HTML: consolidado si hay varios, simple si es informe viejo con uno solo
+    // 5) Generar HTML consolidado o simple
     const grupoIds=grupo.map(x=>x.id);
+    const principal=grupo.find(x=>x.id===aprobacionId)||grupo[0];
     const htmlInforme=(grupo.length>1&&typeof generarHtmlInformeConsolidado==='function')
-      ?generarHtmlInformeConsolidado(grupoIds,aprob)
-      :generarHtmlInforme(aprob);
+      ?generarHtmlInformeConsolidado(grupoIds,principal)
+      :generarHtmlInforme(principal);
 
-    document.getElementById('informePublicoInner').innerHTML=
-      '<div style="text-align:right;margin-bottom:12px;">'+
-      '<button onclick="window.print()" style="padding:10px 24px;background:#1a2332;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>'+
-      htmlInforme;
+    // 6) Renderizar reemplazando el documento completo
+    document.open();
+    document.write(htmlInforme);
+    document.close();
   }catch(e){
-    console.error('[InformePublico] Error:',e);
-    document.getElementById('informePublicoInner').innerHTML=
-      '<div style="text-align:center;padding:40px;color:#e11d48;">⚠️ Error al cargar el informe.<br>'+
-      '<small style="color:#888;">'+e.message+'</small></div>';
+    console.error('[InformePublico]',e);
+    document.open();
+    document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;"><p style="color:#e11d48;font-size:18px;">⚠️ Error al cargar el informe.</p><p style="color:#888;font-size:13px;">'+e.message+'</p></body></html>');
+    document.close();
   }
 }
 
