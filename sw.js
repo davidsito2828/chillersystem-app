@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v20'; // fix postgrest timestamp bounds formatting and admin jornadas rpc
+const CACHE_NAME = 'chillersystem-v21'; // fix geolocation blocking and report visualizer null-safety
 const ASSETS = [
   '/',
   '/index.html',

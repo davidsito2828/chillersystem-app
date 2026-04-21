@@ -2311,12 +2311,15 @@ async function iniciarApp(){
     document.getElementById('tabEq').classList.add('active');
     document.getElementById('tabCli').classList.remove('active');
     
-    // Test GPS obligatorio
-    const coord=await obtenerGPS();
+    // Test GPS opcional (mejor esfuerzo)
+    let coord = null;
+    try {
+      coord = await getUbicacionActual();
+    } catch (e) {
+      coord = null;
+    }
     if(!coord){
-      showToast('❌ Debes permitir y encender el GPS para ingresar a la app.',true);
-      doLogout();
-      return;
+      showToast('⚠️ GPS no disponible. Podrás trabajar pero sin registro de ubicación.', true);
     }
   } else {
     jornadaActiva=true; // Jefatura inicia con jornada virtual activa para no bloquear flujos de sistema
@@ -2401,16 +2404,32 @@ function cerrarCamara(){
 // ══════════════════════════════════════════════
 let jornadaActiva = false;
 
-function obtenerGPS(){
-  return new Promise((resolve)=>{
-    if(!navigator.geolocation){
+async function getUbicacionActual(timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
       resolve(null);
-    }else{
+      return;
+    }
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+    try {
       navigator.geolocation.getCurrentPosition(
-        pos=>resolve({lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy}),
-        err=>resolve(null),
-        {enableHighAccuracy:true,timeout:7000}
+        (pos) => {
+          clearTimeout(timer);
+          resolve({
+            latitud: pos.coords.latitude,
+            longitud: pos.coords.longitude,
+            precision_gps: pos.coords.accuracy
+          });
+        },
+        () => {
+          clearTimeout(timer);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30000 }
       );
+    } catch (e) {
+      clearTimeout(timer);
+      resolve(null);
     }
   });
 }
@@ -2422,12 +2441,15 @@ async function toggleJornada(){
   const tipoStr=nuevoEstado?'entrada':'salida';
   
   showToast('Obteniendo ubicación GPS...');
-  const coords=await obtenerGPS();
+  let coords = null;
+  try {
+    coords = await getUbicacionActual();
+  } catch (e) {
+    coords = null;
+  }
   
   if(!coords){
-    showToast('❌ No se pudo obtener la ubicación. Revisá el GPS celular.',true);
-    btn.disabled=false;
-    return;
+    showToast('⚠️ No se pudo obtener la ubicación GPS.', true);
   }
   
   showToast('Guardando ficha de '+tipoStr+'...');
@@ -2456,9 +2478,9 @@ async function toggleJornada(){
   const objetoEnvio = {
     p_usuario_id: targetUserId,
     p_tipo: tipoStr,
-    p_lat: Number(coords.lat),
-    p_lon: Number(coords.lng),
-    p_prec: coords.acc ? Math.min(Number(coords.acc), 9999.99) : 0
+    p_lat: coords?.latitud || null,
+    p_lon: coords?.longitud || null,
+    p_prec: coords?.precision_gps ? Math.min(Number(coords.precision_gps), 9999.99) : null
   };
   
   console.log('Datos enviados a Supabase (RPC):', objetoEnvio);
@@ -2536,6 +2558,7 @@ async function loadFichajes(){
       }
       fichajesGlobal.push({
         tipo_registro: 'ficha',
+        id: j.id,
         tec: nombreCruzado,
         fecha_obj: new Date(j.timestamp),
         tipo: j.tipo,
@@ -2602,7 +2625,10 @@ function renderFichajes(){
     }
     
     const mapsLink = `https://www.google.com/maps?q=${item.lat},${item.lng}`;
-    
+    const btnEliminar = (item.tipo_registro === 'ficha' && item.id && esGerencia())
+      ? `<button onclick="eliminarJornada('${item.id}')" style="padding:6px 10px;background:#dc2626;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-left:8px;flex-shrink:0;" title="Eliminar registro">🗑️</button>`
+      : '';
+
     return `
       <div style="display:flex; gap:12px; margin-bottom:12px; background:${colorBg}; border-left:4px solid ${colorBorder}; padding:10px 14px; border-radius:4px; box-shadow:0 1px 2px rgba(0,0,0,0.05); align-items:center;">
         <div style="font-size:20px; flex-shrink:0;">${icon}</div>
@@ -2614,14 +2640,28 @@ function renderFichajes(){
             ${desc}
           </div>
         </div>
-        <div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
           <a href="${mapsLink}" target="_blank" style="padding:6px 12px; background:#1e40af; color:#fff; text-decoration:none; border-radius:4px; font-size:11px; font-weight:700; display:inline-block; white-space:nowrap; box-shadow:0 2px 4px rgba(30,64,175,0.2);">
             🗺️ Ver Mapa
           </a>
+          ${btnEliminar}
         </div>
       </div>
     `;
   }).join('');
+}
+
+async function eliminarJornada(jornadaId){
+  if(!esGerencia()){showToast('⛔ Solo gerencia puede eliminar jornadas',true);return;}
+  if(!confirm('¿Eliminar este registro de jornada?\n\nEsta acción NO se puede deshacer.')) return;
+  try{
+    await api('jornadas_tecnicos?id=eq.'+jornadaId,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    showToast('✅ Jornada eliminada','success');
+    await loadFichajes();
+  }catch(e){
+    showToast('Error al eliminar: '+e.message,true);
+    console.error('[eliminarJornada]',e);
+  }
 }
 
 function restaurarEstadoService(){
@@ -3540,12 +3580,14 @@ async function loadIntervenciones(){
 
 async function guardarInterv(){
   if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
-  let _lat=null,_lng=null;
+  let coords = null;
   if(usuarioActual&&usuarioActual.rol!=='admin'){
     showToast('Ubicando GPS...',false);
-    const c=await obtenerGPS();
-    if(!c){showToast('❌ GPS celular no disponible',true);return;}
-    _lat=c.lat;_lng=c.lng;
+    try {
+      coords = await getUbicacionActual();
+    } catch (e) {
+      coords = null;
+    }
   }
   const id=document.getElementById('intervId').value;
   const eqId=document.getElementById('iEqId').value;
@@ -3565,7 +3607,9 @@ async function guardarInterv(){
     horas_trabajo:parseFloat(document.getElementById('iHoras').value)||null,
     notas:document.getElementById('iNotas').value.trim()||null,
     fotos:[...existentes,...fotosUrls],
-    latitud:_lat, longitud:_lng
+    latitud: coords?.latitud || null,
+    longitud: coords?.longitud || null,
+    precision_gps: coords?.precision_gps || null
   };
   try{
     if(id) await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
@@ -3644,12 +3688,14 @@ function agregarCompletarFotos(files){
 
 async function guardarCompletarDatos(){
   if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
-  let _lat=null,_lng=null;
+  let coords = null;
   if(usuarioActual&&usuarioActual.rol!=='admin'){
     showToast('Ubicando GPS...',false);
-    const c=await obtenerGPS();
-    if(!c){showToast('❌ GPS celular no disponible',true);return;}
-    _lat=c.lat;_lng=c.lng;
+    try {
+      coords = await getUbicacionActual();
+    } catch (e) {
+      coords = null;
+    }
   }
   const id=document.getElementById('completarId').value;
   const i=intervenciones.find(x=>x.id===id);
@@ -3677,8 +3723,9 @@ async function guardarCompletarDatos(){
     const notasExtra=document.getElementById('cNotasExtra').value.trim();
     // 3. Patch intervenci\u00f3n
     const patch={fotos:fotosUrls};
-    if(_lat) patch.latitud=_lat;
-    if(_lng) patch.longitud=_lng;
+    if(coords?.latitud) patch.latitud=coords.latitud;
+    if(coords?.longitud) patch.longitud=coords.longitud;
+    if(coords?.precision_gps) patch.precision_gps=coords.precision_gps;
     if(tieneAlgunaLectura) patch.lecturas_operativas=lec;
     if(notasExtra) patch.notas=[(i.notas||''),notasExtra].filter(Boolean).join('\n').trim();
     await api('intervenciones?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch),headers:{...H,'Prefer':'return=minimal'}});
@@ -4353,12 +4400,14 @@ function guardarServiceEq(){
 }
 async function guardarSoloPreventivo(){
   if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
-  let _lat=null,_lng=null;
+  let coords = null;
   if(usuarioActual&&usuarioActual.rol!=='admin'){
     showToast('Ubicando GPS...',false);
-    const c=await obtenerGPS();
-    if(!c){showToast('❌ GPS celular no disponible',true);return;}
-    _lat=c.lat;_lng=c.lng;
+    try {
+      coords = await getUbicacionActual();
+    } catch (e) {
+      coords = null;
+    }
   }
   const firma=document.getElementById('firmaDigital').value.trim();
   const tecnico=document.getElementById('firmaTecnico').value.trim();
@@ -4397,7 +4446,9 @@ async function guardarSoloPreventivo(){
           necesita_correctivo:p.tipo==='Correctivo',
           correctivo_resuelto:p.tipo==='Correctivo'?false:null,
           lecturas_operativas:p.lecturas_operativas||null,
-          latitud:_lat, longitud:_lng,
+          latitud: coords?.latitud || null,
+          longitud: coords?.longitud || null,
+          precision_gps: coords?.precision_gps || null,
           firma:firma, es_planilla:true
         };
         const eqRes=await api('intervenciones',{method:'POST',body:JSON.stringify(eqData),headers:{...H,'Prefer':'return=representation'}});
@@ -4442,7 +4493,9 @@ async function guardarSoloPreventivo(){
       descripcion:'✅ Preventivo — '+cli.nombre,
       solucion:'Equipos operativos — '+eqs.length+' equipo(s) revisados',
       firma:firma, notas:notasGlobal,
-      latitud:_lat, longitud:_lng,
+      latitud: coords?.latitud || null,
+      longitud: coords?.longitud || null,
+      precision_gps: coords?.precision_gps || null,
       es_planilla:true, necesita_correctivo:false, fotos:[]
     };
     const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
@@ -4500,12 +4553,14 @@ async function guardarSoloPreventivo(){
 
 async function guardarPlanilla(){
   if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
-  let _lat=null,_lng=null;
+  let coords = null;
   if(usuarioActual&&usuarioActual.rol!=='admin'){
     showToast('Ubicando GPS...',false);
-    const c=await obtenerGPS();
-    if(!c){showToast('❌ GPS celular no disponible',true);return;}
-    _lat=c.lat;_lng=c.lng;
+    try {
+      coords = await getUbicacionActual();
+    } catch (e) {
+      coords = null;
+    }
   }
   const firma=document.getElementById('firmaDigital').value.trim();
   const tecnico=document.getElementById('firmaTecnico').value.trim();
@@ -4536,7 +4591,9 @@ async function guardarPlanilla(){
         necesita_correctivo:p.tipo==='Correctivo',
         correctivo_resuelto:p.tipo==='Correctivo'?false:null,
         lecturas_operativas:p.lecturas_operativas||null,
-        latitud:_lat, longitud:_lng,
+        latitud: coords?.latitud || null,
+        longitud: coords?.longitud || null,
+        precision_gps: coords?.precision_gps || null,
         firma:firma,es_planilla:true};
       const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
       const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
@@ -4645,7 +4702,7 @@ function renderAprobaciones(){
       <td><span class="${esPendiente?'badge-pendiente':'badge-aprobado'}">${esPendiente?'⏳ Pendiente':'✅ Aprobado'}</span></td>
       <td style="white-space:nowrap;">
         ${esPendiente
-          ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarGrupoPreventivos(${grupoIdsJson},'${a.id}')">✅ Aprobar</button>`
+          ?`<button class="btn-primary" style="padding:4px 12px;font-size:11px;" onclick="aprobarGrupoPreventivosClick(this)" data-grupo-ids='${grupoIdsJson.replace(/'/g,"&#39;")}' data-id-principal="${a.id}">✅ Aprobar</button>`
           :`<div style="display:flex;gap:5px;flex-wrap:wrap;">
               <a href="${urlInforme}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
               <button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="mostrarModalWhatsApp('${a.id}')">📲 WhatsApp</button>
@@ -4718,6 +4775,7 @@ th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
 <table>
   <tr><th>Cliente</th><td>${cli.nombre}</td><th>Equipo</th><td>${eq.nombre}</td></tr>
   <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Fecha</th><td>${fechaFmt}</td></tr>
+  <tr><th>Ubicación GPS</th><td colspan="3">${(interv.latitud && interv.longitud) ? `<a href="https://www.google.com/maps?q=${interv.latitud},${interv.longitud}" target="_blank" style="color:#1d4ed8;text-decoration:none;">📍 ${interv.latitud.toFixed(5)}, ${interv.longitud.toFixed(5)}</a>` : '<span style="color:#888;font-style:italic;">Sin registro de geolocalización</span>'}</td></tr>
 </table>
 ${mostrarTrabajo?`<h2>Trabajo realizado</h2><div style="padding:8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${trabajoRealizado}</div>`:''}
 ${seccionTareas}
@@ -4874,6 +4932,7 @@ th{background:#f0f0f0;font-weight:700;font-size:10px;text-transform:uppercase;}
 <table>
   <tr><th>Cliente</th><td colspan="3">${cli.nombre}</td></tr>
   <tr><th>Fecha</th><td>${fechaFmt}</td><th>Equipos</th><td>${grupoAprobaciones.length}</td></tr>
+  <tr><th>Ubicación GPS</th><td colspan="3">${(a.latitud && a.longitud) ? `<a href="https://www.google.com/maps?q=${a.latitud},${a.longitud}" target="_blank" style="color:#1d4ed8;text-decoration:none;">📍 ${a.latitud.toFixed(5)}, ${a.longitud.toFixed(5)}</a>` : '<span style="color:#888;font-style:italic;">Sin registro de geolocalización</span>'}</td></tr>
 </table>
 <h2>Detalle por equipo</h2>
 ${seccionesEquipos}
@@ -4928,9 +4987,20 @@ async function aprobarPreventivo(id){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
+function aprobarGrupoPreventivosClick(btn){
+  const grupoIds=JSON.parse(btn.dataset.grupoIds);
+  const idPrincipal=btn.dataset.idPrincipal;
+  aprobarGrupoPreventivos(grupoIds,idPrincipal);
+}
+
 async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
+  if(!Array.isArray(grupoIds)){
+    try{grupoIds=JSON.parse(grupoIds);}catch(e){grupoIds=[idPrincipal];}
+  }
+  if(!grupoIds.length) grupoIds=[idPrincipal];
+  console.log('[Aprobar] IDs:',grupoIds,'Principal:',idPrincipal);
   const aprobacionPrincipal=aprobaciones.find(a=>a.id===idPrincipal);
-  if(!aprobacionPrincipal) return;
+  if(!aprobacionPrincipal){showToast('Error: aprobación no encontrada',true);return;}
   showToast('Aprobando...');
   // Cargar tareas y generar informe consolidado
   tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
@@ -4986,18 +5056,24 @@ async function eliminarAprobacion(id){
 }
 
 async function mostrarInformePublico(aprobacionId){
-  document.body.innerHTML='<div style="font-family:Arial,sans-serif;background:#f4f6f9;min-height:100vh;display:flex;justify-content:center;padding:20px;"><div id="informePublicoInner" style="width:100%;max-width:750px;"><div style="text-align:center;padding:40px;color:#666;">Cargando informe...</div></div></div>';
+  document.body.innerHTML='<div id="informePublicoContenedor" style="font-family:Arial,sans-serif;background:#f4f6f9;min-height:100vh;display:flex;justify-content:center;padding:20px;">'+
+    '<div id="informePublicoInner" style="width:100%;max-width:750px;">'+
+    '<div style="text-align:center;padding:40px;color:#666;">Cargando informe...</div>'+
+    '</div></div>';
   try{
     const H2={'apikey':SKEY,'Authorization':'Bearer '+SKEY};
     const BASE=SURL+'/rest/v1';
-    // Traer aprobacion
+
+    // 1) Traer la aprobación principal
     const resAprob=await fetch(BASE+'/preventivos_aprobacion?id=eq.'+aprobacionId+'&select=*',{headers:H2});
     const dataAprob=await resAprob.json();
-    if(!dataAprob||!dataAprob[0]){
-      document.getElementById('informePublicoInner').innerHTML='<div style="text-align:center;padding:40px;color:#e11d48;">⚠️ Informe no disponible.</div>';
+    const aprob=dataAprob?.[0];
+    if(!aprob){
+      document.getElementById('informePublicoInner').innerHTML=
+        '<div style="text-align:center;padding:40px;color:#e11d48;">⚠️ Informe no disponible.</div>';
       return;
     }
-    const aprob=dataAprob[0];
+
     // Si tiene informe_html cacheado, usarlo directamente
     if(aprob.informe_html){
       document.getElementById('informePublicoInner').innerHTML=
@@ -5006,45 +5082,47 @@ async function mostrarInformePublico(aprobacionId){
         aprob.informe_html;
       return;
     }
-    // Si no hay caché, generar en tiempo real
-    // Poblar globales mínimos
-    if(!clientes.length) clientes=await fetch(BASE+'/clientes?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
-    if(!equipos.length) equipos=await fetch(BASE+'/equipos?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
-    // Buscar TODOS los registros del mismo cliente y fecha (el grupo completo)
-    const resGrupo=await fetch(
-      BASE+'/preventivos_aprobacion?cliente_id=eq.'+aprob.cliente_id+
-      '&fecha_servicio=eq.'+aprob.fecha_servicio+'&select=*',
-      {headers:H2}
-    ).then(r=>r.json()).catch(()=>[]);
-    console.log('[InformePublico] grupo encontrado:',resGrupo.length,'registros');
-    console.log('[InformePublico] ids:',resGrupo.map(x=>x.id));
-    const grupoIds=resGrupo.length?resGrupo.map(x=>x.id):[aprobacionId];
-    const grupoCompleto=resGrupo.length?resGrupo:[aprob];
-    // Cargar intervenciones y tareas de todo el grupo en paralelo
-    await Promise.all(grupoCompleto.map(async gItem=>{
-      if(!gItem.intervencion_id) return;
-      if(!intervenciones.find(i=>i.id===gItem.intervencion_id)){
-        const ri=await fetch(BASE+'/intervenciones?id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]);
-        if(ri[0]) intervenciones=[...intervenciones,ri[0]];
-      }
-    }));
-    const todasTareas=await Promise.all(grupoCompleto.map(gItem=>
-      gItem.intervencion_id
-        ?fetch(BASE+'/tareas_realizadas?intervencion_id=eq.'+gItem.intervencion_id+'&select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
-        :Promise.resolve([])
-    ));
-    tareasRealizadas=[...todasTareas.flat()];
-    // Asegurar que los registros del grupo estén en el array global de aprobaciones
-    grupoCompleto.forEach(g=>{if(!aprobaciones.find(a=>a.id===g.id))aprobaciones=[...aprobaciones,g];});
-    // Siempre usar generarHtmlInformeConsolidado
-    let htmlInforme;
-    htmlInforme=generarHtmlInformeConsolidado(grupoIds,aprob);
+
+    // 2) Intentar buscar grupo SOLO si tiene fecha_servicio (columna nueva)
+    let grupo=[aprob];
+    if(aprob.cliente_id&&aprob.fecha_servicio){
+      const resGrupo=await fetch(
+        BASE+'/preventivos_aprobacion?cliente_id=eq.'+aprob.cliente_id+
+        '&fecha_servicio=eq.'+aprob.fecha_servicio+'&select=*',
+        {headers:H2}
+      ).then(r=>r.json()).catch(()=>[]);
+      if(Array.isArray(resGrupo)&&resGrupo.length>0) grupo=resGrupo;
+    }
+    console.log('[InformePublico] Mostrando',grupo.length,'equipo(s)');
+
+    // 3) Cargar datos necesarios en memoria
+    const [resClientes,resEquipos,resInterv,resTareas]=await Promise.all([
+      fetch(BASE+'/clientes?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]),
+      fetch(BASE+'/equipos?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]),
+      fetch(BASE+'/intervenciones?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[]),
+      fetch(BASE+'/tareas_realizadas?select=*',{headers:H2}).then(r=>r.json()).catch(()=>[])
+    ]);
+    clientes=resClientes||[];
+    equipos=resEquipos||[];
+    intervenciones=resInterv||[];
+    tareasRealizadas=resTareas||[];
+    aprobaciones=grupo;
+
+    // 4) Generar HTML: consolidado si hay varios, simple si es informe viejo con uno solo
+    const grupoIds=grupo.map(x=>x.id);
+    const htmlInforme=(grupo.length>1&&typeof generarHtmlInformeConsolidado==='function')
+      ?generarHtmlInformeConsolidado(grupoIds,aprob)
+      :generarHtmlInforme(aprob);
+
     document.getElementById('informePublicoInner').innerHTML=
       '<div style="text-align:right;margin-bottom:12px;">'+
       '<button onclick="window.print()" style="padding:10px 24px;background:#1a2332;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>'+
       htmlInforme;
   }catch(e){
-    document.getElementById('informePublicoInner').innerHTML='<div style="text-align:center;padding:40px;color:#e11d48;">Error al cargar el informe: '+e.message+'</div>';
+    console.error('[InformePublico] Error:',e);
+    document.getElementById('informePublicoInner').innerHTML=
+      '<div style="text-align:center;padding:40px;color:#e11d48;">⚠️ Error al cargar el informe.<br>'+
+      '<small style="color:#888;">'+e.message+'</small></div>';
   }
 }
 
@@ -5062,12 +5140,14 @@ function abrirResolverCorrectivo(id){
 
 async function guardarResolucionCorrectivo(){
   if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
-  let _lat=null,_lng=null;
+  let coords = null;
   if(usuarioActual&&usuarioActual.rol!=='admin'){
     showToast('Ubicando GPS...',false);
-    const c=await obtenerGPS();
-    if(!c){showToast('❌ GPS celular no disponible',true);return;}
-    _lat=c.lat;_lng=c.lng;
+    try {
+      coords = await getUbicacionActual();
+    } catch (e) {
+      coords = null;
+    }
   }
   const id=document.getElementById('resCorrectivoId').value;
   const fecha=document.getElementById('resFecha').value;
@@ -5086,7 +5166,9 @@ async function guardarResolucionCorrectivo(){
       descripcion:'Resolución de correctivo: '+descripcion,
       solucion:descripcion,
       notas:null,
-      latitud:_lat, longitud:_lng,
+      latitud: coords?.latitud || null,
+      longitud: coords?.longitud || null,
+      precision_gps: coords?.precision_gps || null,
       fotos:fotosUrls,
       necesita_correctivo:false,
       correctivo_resuelto:true,
@@ -5484,12 +5566,14 @@ function abrirTrabajoEvt(cliId){
 
 async function guardarTrabajoEvt(){
   if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
-  let _lat=null,_lng=null;
+  let coords = null;
   if(usuarioActual&&usuarioActual.rol!=='admin'){
     showToast('Ubicando GPS...',false);
-    const c=await obtenerGPS();
-    if(!c){showToast('❌ GPS celular no disponible',true);return;}
-    _lat=c.lat;_lng=c.lng;
+    try {
+      coords = await getUbicacionActual();
+    } catch (e) {
+      coords = null;
+    }
   }
   const cliId=document.getElementById('trabajoClienteEvtId').value;
   const fecha=document.getElementById('tTrabajoFecha').value;
@@ -5511,7 +5595,9 @@ async function guardarTrabajoEvt(){
     repuestos:document.getElementById('tTrabajoRep').value.trim()||null,
     horas_trabajo:parseFloat(document.getElementById('tTrabajoHoras').value)||null,
     fotos:fotosUrls,
-    latitud:_lat, longitud:_lng,
+    latitud: coords?.latitud || null,
+    longitud: coords?.longitud || null,
+    precision_gps: coords?.precision_gps || null,
     es_planilla:false,necesita_correctivo:false
   };
   try{
@@ -6837,9 +6923,10 @@ async function guardarFrecuenciaTarea(id, dias){
 // \u2550\u2550 INICIO: intentar restaurar sesi\u00f3n guardada \u2550\u2550
 // Si hay una sesi\u00f3n guardada, el usuario no tiene que volver a loguearse
 window.addEventListener('load', async ()=>{
+  if(new URLSearchParams(window.location.search).get('informe')) return;
   const btn = document.getElementById('btnJornada');
   if (btn) btn.addEventListener('click', toggleJornada);
-  
+
   const restaurada = await intentarRestaurarSesion();
   if(!restaurada) console.log('[auth] Sin sesión guardada. Mostrando login.');
 });
@@ -6902,12 +6989,8 @@ function enviarWhatsAppA(cual){
 }
 
 // ── VISOR DE INFORME PÚBLICO (sin login) ──────────────────
-(async function checkInformePublico(){
-  const params=new URLSearchParams(window.location.search);
-  const informeId=params.get('informe');
-  if(!informeId) return;
-  await mostrarInformePublico(informeId);
-})();
+const _informePublicoId = new URLSearchParams(window.location.search).get('informe');
+if(_informePublicoId) mostrarInformePublico(_informePublicoId);
 
 // PWA Install prompt
 let deferredPrompt;
