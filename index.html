@@ -2367,14 +2367,42 @@ async function iniciarApp(){
   document.getElementById('btnJornada').style.display='block';
   const btn = document.getElementById('btnJornada');
   if(btn){
-    if(localStorage.getItem('jornada_activa')==='true'){
-      jornadaActiva=true;
+    if(esJefatura){
+      // Jefatura: estado virtual, no consultar DB
       btn.textContent='⏹ Finalizar Jornada';
       btn.className='btn-jornada btn-finalizar';
-    }else{
-      if(!esJefatura) jornadaActiva=false;
-      btn.textContent='▶ Iniciar Jornada';
-      btn.className='btn-jornada btn-iniciar';
+    } else {
+      // Técnico: consultar Supabase como fuente de verdad
+      btn.disabled=true;
+      btn.textContent='Cargando estado...';
+      btn.className='btn-jornada';
+      try{
+        const hoy=new Date().toISOString().slice(0,10);
+        const [entradas,salidas]=await Promise.all([
+          api(`jornadas_tecnicos?usuario_id=eq.${usuarioActual.id}&tipo=eq.entrada&timestamp=gte.${hoy}T00:00:00&order=timestamp.desc&limit=1`),
+          api(`jornadas_tecnicos?usuario_id=eq.${usuarioActual.id}&tipo=eq.salida&timestamp=gte.${hoy}T00:00:00&order=timestamp.desc&limit=1`)
+        ]);
+        const ultimaEntrada=entradas&&entradas[0]?new Date(entradas[0].timestamp):null;
+        const ultimaSalida=salidas&&salidas[0]?new Date(salidas[0].timestamp):null;
+        // Jornada activa si hay entrada hoy y no hay salida posterior
+        const activa=ultimaEntrada&&(!ultimaSalida||ultimaSalida<ultimaEntrada);
+        jornadaActiva=!!activa;
+        localStorage.setItem('jornada_activa',jornadaActiva?'true':'false');
+        if(jornadaActiva){
+          btn.textContent='⏹ Finalizar Jornada';
+          btn.className='btn-jornada btn-finalizar';
+        }else{
+          btn.textContent='▶ Iniciar Jornada';
+          btn.className='btn-jornada btn-iniciar';
+        }
+        btn.disabled=false;
+      }catch(e){
+        console.error('Error verificando estado jornada:',e);
+        showToast('No se pudo verificar estado de jornada. Reintentá.',true);
+        btn.textContent='⚠ Error — Reintentá';
+        btn.className='btn-jornada';
+        // btn queda disabled hasta que el usuario recargue
+      }
     }
   }
   try{
@@ -2697,13 +2725,20 @@ function renderFichajes(){
 }
 
 async function eliminarJornada(jornadaId){
+  console.log('[elimJornada] llamada con id:', jornadaId);
+  console.log('[elimJornada] esGerencia():', esGerencia(), '| rol:', usuarioActual?.rol);
   if(!esGerencia()){showToast('⛔ Solo gerencia puede eliminar jornadas',true);return;}
-  if(!confirm('¿Eliminar este registro de jornada?\n\nEsta acción NO se puede deshacer.')) return;
+  const resultado=confirm('¿Eliminar este registro de jornada?\n\nEsta acción NO se puede deshacer.');
+  console.log('[elimJornada] confirm devolvió:', resultado);
+  if(!resultado) return;
   try{
-    await api('jornadas_tecnicos?id=eq.'+jornadaId,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    console.log('[elimJornada] antes del fetch — id:', jornadaId);
+    const resp=await api('jornadas_tecnicos?id=eq.'+jornadaId,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    console.log('[elimJornada] respuesta:', resp);
     showToast('✅ Jornada eliminada','success');
     await loadFichajes();
   }catch(e){
+    console.log('[elimJornada] error:', e);
     showToast('Error al eliminar: '+e.message,true);
     console.error('[eliminarJornada]',e);
   }
