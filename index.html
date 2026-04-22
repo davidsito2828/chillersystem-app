@@ -4467,7 +4467,13 @@ async function guardarSoloPreventivo(){
   const firmaClienteSP=getFirmaData();
   const nombreFirmanteSP=document.getElementById('sNombreFirmante')?.value.trim()||null;
   // Validaciones bloqueantes antes de guardar
-  const noRevisados=eqs.filter(e=>!servicePlanilla[e.id]?.revisado).map(e=>e.nombre);
+  const noRevisados=eqs.filter(e=>{
+    const p=servicePlanilla[e.id];
+    if(p?.revisado) return false;
+    if(p?.trabajo&&p.trabajo.trim()) return false;
+    if(p?.tareas_realizadas&&p.tareas_realizadas.length) return false;
+    return true;
+  }).map(e=>e.nombre);
   if(noRevisados.length){showToast('⚠️ Abrí el formulario de cada equipo antes de guardar: '+noRevisados.join(', '),true);return;}
   if(!firmaClienteSP.base64){showToast('⚠️ La firma del cliente está vacía o en blanco.',true);return;}
   if(!nombreFirmanteSP){showToast('⚠️ Ingresá el nombre del firmante.',true);return;}
