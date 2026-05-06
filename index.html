@@ -1343,6 +1343,7 @@ tbody tr:hover{background:#f8faff;}
         <option value="enviado">📤 Enviados</option>
       </select>
       <button class="btn-primary" onclick="abrirModalPpto()">＋ Nuevo presupuesto</button>
+      <button class="btn-secondary" onclick="abrirModalCargarPpto()">📎 Cargar presupuesto</button>
     </div>
   </div>
   <div class="table-wrap">
@@ -1402,8 +1403,12 @@ tbody tr:hover{background:#f8faff;}
           <input type="checkbox" id="pIncluyeIva" onchange="calcularTotal()"/>
           <label for="pIncluyeIva" style="font-size:12px;color:var(--text-dim);">Incluye IVA (21%)</label>
         </div>
-        <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">
-          Valor referencia dólar Venta BNA: USD 1.- = $<input type="text" id="pDolar" class="form-input" style="display:inline;width:80px;padding:3px 6px;font-size:11px;" placeholder="1435"/>
+        <div style="margin-top:8px;">
+          <label class="form-label" style="margin-bottom:4px;">Moneda</label>
+          <select class="form-select" id="pMoneda">
+            <option value="ARS">$ Pesos (ARS)</option>
+            <option value="USD">U$D Dólar (USD)</option>
+          </select>
         </div>
       </div>
 
@@ -1420,6 +1425,65 @@ tbody tr:hover{background:#f8faff;}
       <button class="btn-secondary" onclick="cerrar('mPpto')">Cancelar</button>
       <button class="btn-primary" onclick="guardarPpto('borrador')" style="background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);">💾 Guardar borrador</button>
       <button class="btn-primary" onclick="previewPpto()">👁 Vista previa / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CARGAR PRESUPUESTO EXISTENTE -->
+<div class="modal-overlay" id="mCargarPpto">
+  <div class="modal" style="max-width:600px;">
+    <button class="modal-close" onclick="cerrar('mCargarPpto')">✕</button>
+    <div class="modal-title">📎 Cargar presupuesto existente</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Empresa *</label>
+        <div class="emp-selector">
+          <button class="emp-opt sel-cs" id="cpOptCS" onclick="selEmpCP('ChillerSystem')">🔵 ChillerSystem S.R.L.</button>
+          <button class="emp-opt" id="cpOptCV" onclick="selEmpCP('ChillerService')">🟣 ChillerService S.A.</button>
+        </div>
+        <input type="hidden" id="cpEmpresa" value="ChillerSystem"/>
+      </div>
+      <div class="form-group"><label class="form-label">N° Presupuesto *</label><input class="form-input" id="cpNumero" placeholder="Ej: 42426SO/2026"/></div>
+      <div class="form-group"><label class="form-label">Fecha del documento *</label><input class="form-input" id="cpFecha" type="date"/></div>
+      <div class="form-group full"><label class="form-label">Cliente — Seleccioná o escribí</label>
+        <select class="form-select" id="cpClienteId" onchange="autocompletarClienteCP(this.value)">
+          <option value="">— Seleccioná un cliente —</option>
+        </select>
+      </div>
+      <div class="form-group full"><label class="form-label">Razón Social del destinatario *</label><input class="form-input" id="cpClienteNombre" placeholder="Ej: SANTA OFELIA S.A.U"/></div>
+      <div class="form-group"><label class="form-label">Monto total *</label><input class="form-input" id="cpMonto" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+      <div class="form-group"><label class="form-label">Moneda</label>
+        <select class="form-select" id="cpMoneda">
+          <option value="ARS">$ Pesos (ARS)</option>
+          <option value="USD">U$D Dólar (USD)</option>
+        </select>
+      </div>
+      <div class="form-group full"><label class="form-label">Referencia</label><input class="form-input" id="cpReferencia" placeholder="Descripción breve del trabajo"/></div>
+      <div class="form-group"><label class="form-label">Estado inicial</label>
+        <select class="form-select" id="cpEstado">
+          <option value="borrador">🔴 Borrador</option>
+          <option value="enviado">📤 Enviado</option>
+          <option value="aprobado">✅ Aprobado</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Archivo PDF o imagen *</label>
+        <div id="cpDropZone" style="border:2px dashed var(--border);border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color 0.2s;"
+          onclick="document.getElementById('cpArchivo').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+          ondragleave="this.style.borderColor='var(--border)'"
+          ondrop="event.preventDefault();this.style.borderColor='var(--border)';cpHandleDrop(event.dataTransfer.files)">
+          <div style="font-size:28px;margin-bottom:6px;">📁</div>
+          <div style="color:var(--text-dim);font-size:13px;">Arrastrá el archivo aquí o hacé clic</div>
+          <div style="color:var(--text-dim);font-size:11px;margin-top:4px;">PDF, JPG, JPEG o PNG</div>
+        </div>
+        <input type="file" id="cpArchivo" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="cpMostrarArchivo(this.files)"/>
+        <div id="cpArchivoPreview" style="margin-top:8px;font-size:12px;color:var(--green);display:none;"></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mCargarPpto')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarCargarPpto()">💾 Cargar presupuesto</button>
     </div>
   </div>
 </div>
@@ -5769,7 +5833,7 @@ let seccionesActuales=[]; // [{titulo, items:[]}]
 let preciosActuales={}; // {idx: precio}
 
 async function loadPresupuestos(){
-  presupuestos=await api('presupuestos?select=*&order=created_at.desc');
+  presupuestos=await api('presupuestos?select=*&order=fecha.desc.nullslast,created_at.desc');
   renderPresupuestos();
 }
 
@@ -5819,7 +5883,8 @@ function renderPresupuestos(){
       :'color:var(--accent);background:#eff6ff;border-color:#bfdbfe';
     const estadoLabel=p.estado==='borrador'?'🔴 Borrador':p.estado==='aprobado'?'✅ Aprobado':'📤 Enviado';
     const isCS=p.empresa==='ChillerSystem';
-    const total=p.precio_total?'$'+Number(p.precio_total).toLocaleString('es-AR'):'—';
+    const monedaSim=p.moneda==='USD'?'U$D ':'$';
+    const total=p.precio_total?(monedaSim+Number(p.precio_total).toLocaleString('es-AR')):'—';
     // CAMBIO 1: badge estado_flujo simple
     const flujo=p.estado_flujo||'borrador';
     const puedeAvanzar=puedeAvanzarEstadoPpto()&&!!siguienteEstado[flujo];
@@ -5860,8 +5925,11 @@ function renderPresupuestos(){
       '<div style="font-size:10px;color:#6b7280;margin-top:3px;">'+(responsables[flujo]||'')+'</div>'+
       badgeFacturacion+
       '</div>';
+    const badgeManual=p.origen==='manual'?'<span style="margin-left:5px;padding:1px 6px;border-radius:10px;font-size:10px;background:#1e3a5f;color:#bfdbfe;">📎 Manual</span>':'';
+    const btnPdf=p.pdf_url?`<a href="${p.pdf_url}" target="_blank" class="btn-edit" style="text-decoration:none;display:inline-flex;align-items:center;">📄</a>`:'';
+    const fechaMostrar=p.fecha?fmtF(p.fecha):(p.created_at?fmtF(p.created_at.split('T')[0]):'—');
     return `<tr>
-      <td class="td-mono">${p.numero}</td>
+      <td class="td-mono">${p.numero}${badgeManual}</td>
       <td><span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span></td>
       <td class="td-name">${p.cliente_nombre||'—'}</td>
       <td class="td-dim" style="max-width:160px;">${p.referencia||'—'}</td>
@@ -5870,8 +5938,9 @@ function renderPresupuestos(){
         <span class="badge" style="${estadoStyle}">${estadoLabel}</span>
         ${badgeFlujo}
       </td>
-      <td class="td-dim">${p.created_at?fmtF(p.created_at.split('T')[0]):'—'}</td>
+      <td class="td-dim">${fechaMostrar}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap;">
+        ${btnPdf}
         <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
         <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
         ${p.estado==='borrador'?`<button class="btn-green" onclick="aprobarPpto('${p.id}')">✅ OK</button>`:''}
@@ -5963,7 +6032,8 @@ function calcularTotal(){
 
 function abrirModalPpto(id=null){
   seccionesActuales=[];preciosActuales={};
-  ['pptoId','pNumero','pClienteNombre','pClienteDireccion','pContacto','pReferencia','pFormaPago','pPlazo','pValidez','pNotas','pDolar'].forEach(x=>document.getElementById(x).value='');
+  ['pptoId','pNumero','pClienteNombre','pClienteDireccion','pContacto','pReferencia','pFormaPago','pPlazo','pValidez','pNotas'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('pMoneda').value='ARS';
   document.getElementById('pFecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('pIncluyeIva').checked=false;
   document.getElementById('pClienteId').innerHTML='<option value="">— Seleccioná un cliente —</option>'+clientes.filter(c=>c.tipo_cliente!=='eventual').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
@@ -5983,6 +6053,7 @@ function abrirModalPpto(id=null){
     document.getElementById('pValidez').value=p.validez||'';
     document.getElementById('pNotas').value=p.notas||'';
     document.getElementById('pIncluyeIva').checked=p.incluye_iva||false;
+    document.getElementById('pMoneda').value=p.moneda||'ARS';
     selEmpP(p.empresa||'ChillerSystem');
     // Load secciones
     const items=p.items||[];
@@ -6015,6 +6086,7 @@ async function guardarPpto(estado){
   const itemsData=seccionesActuales.map((sec,i)=>({titulo:sec.titulo,items:sec.items.filter(x=>x.trim()),precio:preciosActuales[i]||0}));
   const data={
     numero,empresa:document.getElementById('pEmpresa').value,
+    fecha:document.getElementById('pFecha').value||null,
     cliente_id:document.getElementById('pClienteId').value||null,
     cliente_nombre:clienteNombre,
     cliente_direccion:document.getElementById('pClienteDireccion').value.trim()||null,
@@ -6027,6 +6099,7 @@ async function guardarPpto(estado){
     plazo_entrega:document.getElementById('pPlazo').value.trim()||null,
     validez:document.getElementById('pValidez').value.trim()||null,
     notas:document.getElementById('pNotas').value.trim()||null,
+    moneda:document.getElementById('pMoneda').value||'ARS',
     estado:id?(presupuestos.find(x=>x.id===id)||{}).estado||estado:estado,
     creado_por:usuarioActual?usuarioActual.nombre:null,
     updated_at:new Date().toISOString()
@@ -6053,6 +6126,106 @@ async function elimPpto(id){
   if(!confirm('¿Eliminar este presupuesto?'))return;
   try{await api('presupuestos?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await loadPresupuestos();}catch(e){showToast('Error',true);}
+}
+
+// ── Cargar presupuesto existente ──────────────────────────────────────────
+function selEmpCP(v){
+  document.getElementById('cpEmpresa').value=v;
+  document.getElementById('cpOptCS').className='emp-opt'+(v==='ChillerSystem'?' sel-cs':'');
+  document.getElementById('cpOptCV').className='emp-opt'+(v==='ChillerService'?' sel-cv':'');
+}
+
+function autocompletarClienteCP(cliId){
+  if(!cliId) return;
+  const c=clientes.find(x=>x.id===cliId);
+  if(!c) return;
+  document.getElementById('cpClienteNombre').value=c.nombre||'';
+}
+
+function cpMostrarArchivo(files){
+  if(!files||!files.length) return;
+  const f=files[0];
+  const prev=document.getElementById('cpArchivoPreview');
+  prev.textContent='📎 '+f.name+' ('+Math.round(f.size/1024)+' KB)';
+  prev.style.display='block';
+  // Guardar referencia en el input
+  const inp=document.getElementById('cpArchivo');
+  if(inp._files===undefined){
+    try{
+      const dt=new DataTransfer();dt.items.add(f);inp.files=dt.files;
+    }catch(e){}
+  }
+}
+
+function cpHandleDrop(files){
+  if(!files||!files.length) return;
+  const inp=document.getElementById('cpArchivo');
+  try{const dt=new DataTransfer();dt.items.add(files[0]);inp.files=dt.files;}catch(e){}
+  cpMostrarArchivo(files);
+}
+
+function abrirModalCargarPpto(){
+  ['cpNumero','cpClienteNombre','cpReferencia','cpMonto'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('cpFecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('cpMoneda').value='ARS';
+  document.getElementById('cpEstado').value='borrador';
+  document.getElementById('cpArchivo').value='';
+  document.getElementById('cpArchivoPreview').style.display='none';
+  document.getElementById('cpArchivoPreview').textContent='';
+  document.getElementById('cpClienteId').innerHTML='<option value="">— Seleccioná un cliente —</option>'+clientes.filter(c=>c.tipo_cliente!=='eventual').map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  selEmpCP('ChillerSystem');
+  document.getElementById('mCargarPpto').classList.add('open');
+}
+
+async function subirArchivoPpto(file){
+  const mime=file.type||'application/octet-stream';
+  const nombre='presupuestos/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const r=await fetch(SURL+'/storage/v1/object/fotos/'+nombre,{
+    method:'POST',
+    headers:{'apikey':SKEY,'Authorization':'Bearer '+(_authToken||SKEY),'Content-Type':mime,'x-upsert':'true'},
+    body:file
+  });
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.message||'Error al subir archivo');}
+  return SURL+'/storage/v1/object/public/fotos/'+nombre;
+}
+
+async function guardarCargarPpto(){
+  const numero=document.getElementById('cpNumero').value.trim();
+  const clienteNombre=document.getElementById('cpClienteNombre').value.trim();
+  const fecha=document.getElementById('cpFecha').value;
+  const monto=document.getElementById('cpMonto').value;
+  const archivo=document.getElementById('cpArchivo').files[0];
+  if(!numero){showToast('N° de presupuesto obligatorio',true);return;}
+  if(!clienteNombre){showToast('Razón Social obligatoria',true);return;}
+  if(!fecha){showToast('Fecha obligatoria',true);return;}
+  if(!monto){showToast('Monto obligatorio',true);return;}
+  if(!archivo){showToast('Adjuntá un archivo PDF o imagen',true);return;}
+  showToast('Subiendo archivo...');
+  let pdfUrl;
+  try{pdfUrl=await subirArchivoPpto(archivo);}
+  catch(e){showToast('Error al subir archivo: '+e.message,true);return;}
+  const data={
+    numero,
+    empresa:document.getElementById('cpEmpresa').value,
+    cliente_id:document.getElementById('cpClienteId').value||null,
+    cliente_nombre:clienteNombre,
+    fecha,
+    precio_total:parseFloat(monto),
+    moneda:document.getElementById('cpMoneda').value||'ARS',
+    referencia:document.getElementById('cpReferencia').value.trim()||null,
+    estado:document.getElementById('cpEstado').value,
+    pdf_url:pdfUrl,
+    origen:'manual',
+    creado_por:usuarioActual?usuarioActual.nombre:null,
+    updated_at:new Date().toISOString(),
+    items:[]
+  };
+  try{
+    await api('presupuestos',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    showToast('Presupuesto cargado ✓','success');
+    cerrar('mCargarPpto');
+    await loadPresupuestos();
+  }catch(e){showToast('Error: '+e.message,true);}
 }
 
 const _etiquetasFlujoModal={
