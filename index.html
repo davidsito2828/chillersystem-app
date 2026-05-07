@@ -3254,7 +3254,7 @@ function renderCli(lista){
       <div class="cliente-row" onclick="toggleExp('${c.id}')">
         <div class="cliente-avatar ${isCS?'av-cs':'av-cv'}">${ini}</div>
         <div class="cliente-info">
-          <div class="cliente-nombre">${c.nombre}${alarmBadge}</div>
+          <div class="cliente-nombre">${escapeHtml(c.nombre)}${alarmBadge}</div>
           <div class="cliente-meta">${[c.contacto,c.telefono].filter(Boolean).join(' · ')||'Sin datos'}</div>
         </div>
         <span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span>
@@ -3271,8 +3271,8 @@ function renderCli(lista){
           return `<div class="equipo-item ${cls}">
             <div class="equipo-header">
               <div style="flex:1;min-width:120px;">
-                <div class="equipo-nombre">⚙️ ${eq.nombre}</div>
-                <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'Sin detalles'}</div>
+                <div class="equipo-nombre">⚙️ ${escapeHtml(eq.nombre)}</div>
+                <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].map(escapeHtml).filter(Boolean).join(' · ')||'Sin detalles'}</div>
                 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px;">${proxPrevHTML(eq)}${(()=>{const {badge_estacional,badge_trimestral}=getTareasEquipo(eq.tipo||'',eq.ultimo_preventivo||null);const bs=badge_estacional?'<span style="display:inline-flex;align-items:center;background:var(--yellow-bg);border:1px solid var(--yellow-border);color:#92400e;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">🍂 Estacionales pendientes</span>':'';const bt=badge_trimestral&&!badge_estacional?'<span style="display:inline-flex;align-items:center;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">⚙️ Trimestral vencido</span>':'';return bs+bt;})()}</div>
                 ${fotosHTML(eq.fotos)}
               </div>
@@ -3565,7 +3565,7 @@ function renderIntervItem(i){
   html+=esCorrectivo?'<span class="badge b-correctivo">🔴 Correctivo</span>':'<span class="badge b-preventivo2">'+i.tipo+'</span>';
   html+='<span class="interv-fecha">'+fmtF(i.fecha)+'</span>';
   if(i.tecnico) html+='<span class="interv-tecnico">'+i.tecnico+'</span>';
-  if(i.firma) html+='<span style="font-size:10px;color:var(--green);">✍️ '+i.firma+'</span>';
+  if(i.firma) html+='<span style="font-size:10px;color:var(--green);">✍️ '+escapeHtml(i.firma)+'</span>';
   html+='<span style="margin-left:auto;display:flex;gap:4px;">';
   if(puedeEditar) html+='<button class="btn-edit" onclick="event.stopPropagation();abrirModalInterv(\''+i.id+'\')">✏️</button>';
   // Botón Completar datos: aparece cuando faltan lecturas o fotos
@@ -3577,10 +3577,10 @@ function renderIntervItem(i){
   html+='</div>';
 
   // CONTENIDO
-  if(i.descripcion) html+='<div class="interv-desc">'+i.descripcion+'</div>';
-  if(i.solucion) html+='<div class="interv-sol">✓ '+i.solucion+'</div>';
-  if(i.repuestos) html+='<div class="interv-rep">🔩 '+i.repuestos+'</div>';
-  if(i.notas) html+='<div class="interv-rep">📝 '+i.notas+'</div>';
+  if(i.descripcion) html+='<div class="interv-desc">'+escapeHtmlMultiline(i.descripcion)+'</div>';
+  if(i.solucion) html+='<div class="interv-sol">✓ '+escapeHtmlMultiline(i.solucion)+'</div>';
+  if(i.repuestos) html+='<div class="interv-rep">🔩 '+escapeHtmlMultiline(i.repuestos)+'</div>';
+  if(i.notas) html+='<div class="interv-rep">📝 '+escapeHtmlMultiline(i.notas)+'</div>';
   html+=lecHtml;
   // ARCHIVOS ADJUNTOS — fotos + informe de aprobación
   console.log('[historial interv]',i.id,window._aprobacionesByInterv);
@@ -3594,7 +3594,7 @@ function renderIntervItem(i){
       const esAprobado=aprobacion.estado==='aprobado';
       html+=`<div style="margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
       html+=`<a href="${aprobacion.pdf_url}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--accent);color:#fff;border-radius:5px;font-size:11px;font-weight:600;text-decoration:none;">📄 Ver orden de trabajo</a>`;
-      if(esAprobado) html+=`<span class="badge-aprobado" style="font-size:10px;">✅ Aprobado por ${aprobacion.aprobado_por||'admin'}</span>`;
+      if(esAprobado) html+=`<span class="badge-aprobado" style="font-size:10px;">✅ Aprobado por ${escapeHtml(aprobacion.aprobado_por||'admin')}</span>`;
       else html+=`<span class="badge-pendiente" style="font-size:10px;">⏳ Pendiente aprobación</span>`;
       html+='</div>';
     }
@@ -4183,8 +4183,8 @@ function renderServiceEquipos(eqs){
     return `<div class="equipo-item ${pendiente?'alarm-vencido':''}" style="margin-bottom:10px;">
       <div class="equipo-header">
         <div style="flex:1;">
-          <div class="equipo-nombre">⚙️ ${eq.nombre}</div>
-          <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'Sin detalles'}${eq.ubicacion?' · '+eq.ubicacion:''}</div>
+          <div class="equipo-nombre">⚙️ ${escapeHtml(eq.nombre)}</div>
+          <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].map(escapeHtml).filter(Boolean).join(' · ')||'Sin detalles'}${eq.ubicacion?' · '+escapeHtml(eq.ubicacion):''}</div>
           ${pendiente?`<div style="margin-top:4px;"><span class="badge b-correctivo">🔴 Correctivo pendiente</span></div>`:''}
           ${resuelto?`<div style="margin-top:4px;"><span class="badge b-preventivo2">✅ Correctivo resuelto</span></div>`:''}
         </div>
@@ -4997,7 +4997,7 @@ ${_banner}<table class="hdr" style="margin-bottom:20px;"><tr>
 </tr></table>
 <h2>Datos del servicio</h2>
 <table>
-  <tr><th>Cliente</th><td colspan="3">${cli.nombre}</td></tr>
+  <tr><th>Cliente</th><td colspan="3">${escapeHtml(cli.nombre)}</td></tr>
   <tr><th>Fecha</th><td>${fechaFmt}</td><th>Equipos</th><td>${detalle.length||'—'}</td></tr>
   <tr><th>Ubicación GPS</th><td colspan="3">${gpsHtml}</td></tr>
 </table>
@@ -5058,10 +5058,10 @@ function generarHtmlInformeConsolidado(grupoIds,aprobacionPrincipal){
       }
       seccionesEquipos+=`
       <div style="margin-bottom:24px;padding:16px;border:1px solid #ddd;border-radius:6px;page-break-inside:avoid;">
-        <div style="font-size:13px;font-weight:bold;text-transform:uppercase;border-left:4px solid #1a2332;padding-left:10px;margin-bottom:12px;">${eq.nombre}</div>
+        <div style="font-size:13px;font-weight:bold;text-transform:uppercase;border-left:4px solid #1a2332;padding-left:10px;margin-bottom:12px;">${escapeHtml(eq.nombre)}</div>
         <table width="100%" style="border-collapse:collapse;margin-bottom:10px;">
           <tr><th style="border:1px solid #bbb;padding:5px 9px;font-size:10px;text-transform:uppercase;background:#f0f0f0;text-align:left;width:30%;">Tipo / Marca</th>
-              <td style="border:1px solid #bbb;padding:5px 9px;font-size:11px;">${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td></tr>
+              <td style="border:1px solid #bbb;padding:5px 9px;font-size:11px;">${[eq.tipo,eq.marca,eq.modelo].map(escapeHtml).filter(Boolean).join(' · ')||'—'}</td></tr>
         </table>
         ${tablaLecturas}
         ${mostrarTrabajo?`<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Trabajo realizado</div><div style="padding:7px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;font-size:11px;margin-bottom:10px;">${trabajoText}</div>`:''}
@@ -5607,7 +5607,7 @@ async function renderEstadisticas(){
     const pct=Math.round((s.correctivos/(rankCorrectivos[0]?.correctivos||1))*100);
     html+='<div style="margin-bottom:10px;">';
     html+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">';
-    html+='<span>'+s.cliente.nombre+'</span>';
+    html+='<span>'+escapeHtml(s.cliente.nombre)+'</span>';
     html+='<span style="font-weight:700;color:#dc2626;">'+s.correctivos+' correctivos</span></div>';
     html+='<div style="background:var(--border);border-radius:4px;height:6px;"><div style="background:#dc2626;width:'+pct+'%;height:100%;border-radius:4px;"></div></div></div>';
   });
@@ -6451,9 +6451,9 @@ function renderPptoPdf(p){
 
   const trabajosHTML=items.map((sec,si)=>`
     <div style="margin-bottom:16px;">
-      <p style="font-weight:bold;text-decoration:underline;margin-bottom:8px;">${sec.titulo||String.fromCharCode(65+si)+')-  DESCRIPCIÓN DE TRABAJOS A REALIZAR:'}</p>
+      <p style="font-weight:bold;text-decoration:underline;margin-bottom:8px;">${escapeHtml(sec.titulo)||String.fromCharCode(65+si)+')-  DESCRIPCIÓN DE TRABAJOS A REALIZAR:'}</p>
       <ul style="list-style:none;padding:0;">
-        ${(sec.items||[]).map(item=>`<li style="padding:2px 0 2px 16px;">&#9658; ${item}</li>`).join('')}
+        ${(sec.items||[]).map(item=>`<li style="padding:2px 0 2px 16px;">&#9658; ${escapeHtml(item)}</li>`).join('')}
       </ul>
     </div>`).join('');
 
@@ -6471,11 +6471,11 @@ function renderPptoPdf(p){
   // DESTINATARIO
   html+='<table width="100%" style="margin-bottom:20px;"><tr>';
   html+='<td width="50%" style="vertical-align:top;"><div><em>Señores</em></div>';
-  html+='<div><strong>'+p.cliente_nombre+'</strong></div>';
+  html+='<div><strong>'+escapeHtml(p.cliente_nombre)+'</strong></div>';
   if(p.cliente_direccion) html+='<div><em>'+p.cliente_direccion+'</em></div>';
   html+='</td><td width="50%" style="vertical-align:top;text-align:right;">';
   if(p.cliente_contacto) html+='<div><strong>At.: '+p.cliente_contacto+'</strong></div>';
-  if(p.referencia) html+='<div><em>Ref.: '+p.referencia+'</em></div>';
+  if(p.referencia) html+='<div><em>Ref.: '+escapeHtml(p.referencia)+'</em></div>';
   html+='<div><strong>Presupuesto N°'+p.numero+'</strong></div>';
   html+='</td></tr></table>';
   html+='<p style="margin-bottom:16px;">De nuestra mayor consideración:</p>';
@@ -6493,10 +6493,10 @@ function renderPptoPdf(p){
   html+='<p style="font-style:italic;">(el valor se ajustará según la variación más significativa en la paridad de divisa al momento de contratación).</p>';
   html+='</div>';
   // FORMA DE PAGO
-  if(p.forma_pago) html+='<div style="margin:16px 0;"><p><strong>2) FORMA DE PAGO:</strong> '+p.forma_pago.split('\n').join('<br/>')+'</p></div>';
-  if(p.plazo_entrega) html+='<div style="margin:12px 0;"><p><strong>3) PLAZO DE ENTREGA:</strong> '+p.plazo_entrega+'</p></div>';
-  if(p.validez) html+='<div style="margin:12px 0;"><p><strong>4) VALIDEZ DE LA OFERTA:</strong> '+p.validez+'</p></div>';
-  if(p.notas) html+='<div style="margin:16px 0;"><p style="font-weight:bold;text-decoration:underline;">CONSIDERACIONES PARTICULARES:</p><p style="margin-top:8px;">'+p.notas+'</p></div>';
+  if(p.forma_pago) html+='<div style="margin:16px 0;"><p><strong>2) FORMA DE PAGO:</strong> '+escapeHtmlMultiline(p.forma_pago)+'</p></div>';
+  if(p.plazo_entrega) html+='<div style="margin:12px 0;"><p><strong>3) PLAZO DE ENTREGA:</strong> '+escapeHtml(p.plazo_entrega)+'</p></div>';
+  if(p.validez) html+='<div style="margin:12px 0;"><p><strong>4) VALIDEZ DE LA OFERTA:</strong> '+escapeHtml(p.validez)+'</p></div>';
+  if(p.notas) html+='<div style="margin:16px 0;"><p style="font-weight:bold;text-decoration:underline;">CONSIDERACIONES PARTICULARES:</p><p style="margin-top:8px;">'+escapeHtmlMultiline(p.notas)+'</p></div>';
   html+='<p style="margin:20px 0;">Sin otro particular, y a su disposición por cualquier duda o consulta que pudieran tener al respecto, aprovechamos la oportunidad para saludarlos muy cordialmente.</p>';
   // FIRMA
   html+='<div style="text-align:right;margin-top:40px;">';
@@ -6828,7 +6828,7 @@ function renderInformePdf(inf){
   html+='<div style="font-size:13px;margin-top:4px;">N° '+inf.numero+periodo+'</div></div>';
   // DATOS
   html+='<table width="100%" style="margin-bottom:16px;"><tr>';
-  html+='<td width="50%"><div><strong>Cliente:</strong> '+inf.cliente_nombre+'</div>';
+  html+='<td width="50%"><div><strong>Cliente:</strong> '+escapeHtml(inf.cliente_nombre)+'</div>';
   if(inf.cliente_direccion) html+='<div>'+inf.cliente_direccion+'</div>';
   if(inf.cliente_contacto) html+='<div><strong>At.:</strong> '+inf.cliente_contacto+'</div>';
   html+='</td><td width="50%" style="text-align:right;">';
@@ -6852,7 +6852,7 @@ function renderInformePdf(inf){
   // DESARROLLO
   html+='<div style="margin:16px 0;">';
   html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">2. DESARROLLO</div>';
-  if(inf.desarrollo) html+='<p style="white-space:pre-wrap;">'+inf.desarrollo+'</p>';
+  if(inf.desarrollo) html+='<p style="white-space:pre-wrap;">'+escapeHtmlMultiline(inf.desarrollo)+'</p>';
   else html+='<p style="color:#666;font-style:italic;">Ver registro de intervenciones adjunto.</p>';
   html+='</div>';
   // FOTOS
@@ -6879,7 +6879,7 @@ function renderInformePdf(inf){
   html+='<div style="margin:16px 0;">';
   const numConc=fotos.length?'4':'3';
   html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">'+numConc+'. CONCLUSIONES Y RECOMENDACIONES</div>';
-  if(inf.conclusion) html+='<p style="white-space:pre-wrap;">'+inf.conclusion+'</p>';
+  if(inf.conclusion) html+='<p style="white-space:pre-wrap;">'+escapeHtmlMultiline(inf.conclusion)+'</p>';
   else html+='<p style="color:#666;font-style:italic;">Sin observaciones adicionales.</p>';
   html+='</div>';
   // FIRMA
@@ -6927,6 +6927,19 @@ function togglePass(id){
   if(!el) return;
   el.style.filter=el.style.filter==='none'?'blur(4px)':'none';
 }
+function escapeHtml(s){
+  if(s==null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function escapeHtmlMultiline(s){
+  return escapeHtml(s).replace(/\n/g,'<br/>');
+}
+
 let tt;
 function showToast(msg,type=''){
   const t=document.getElementById('toast');
@@ -7132,8 +7145,8 @@ function renderEstadisticas(){
               const dias=Math.floor((hoy-new Date(iv.fecha))/(1000*60*60*24));
               return `<tr>
                 <td><span class="badge b-correctivo">CORRECTIVO</span></td>
-                <td style="font-weight:600">${iv.descripcion?iv.descripcion.substring(0,50)+'…':eq.nombre}</td>
-                <td style="color:var(--text-dim)">${cli.nombre}</td>
+                <td style="font-weight:600">${iv.descripcion?escapeHtml(iv.descripcion.substring(0,50))+'…':escapeHtml(eq.nombre)}</td>
+                <td style="color:var(--text-dim)">${escapeHtml(cli.nombre)}</td>
                 <td style="font-family:IBM Plex Mono,monospace;color:var(--yellow);font-weight:700">${dias}d</td>
               </tr>`;
             }).join('')}
