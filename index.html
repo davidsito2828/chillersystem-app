@@ -3945,15 +3945,16 @@ function renderUsers(){
     const estadoBadge=u.activo?'b-op':'b-fs';
     const estadoLabel=u.activo?'Activo':'Inactivo';
     const delBtn=u.usuario!=='admin'?`<button class="btn-danger" onclick="elimUser('${u.id}','${u.nombre.replace(/'/g,'')}')">🗑</button>`:'';
+    const uEmail=`${(u.usuario||'').toLowerCase().replace(/\s+/g,'')}@${AUTH_DOMAIN}`;
+    const uNom=u.nombre.replace(/'/g,'');
+    const puedeResetear=esGerencia()||esAdministrativo();
+    const resetBtn=puedeResetear
+      ?`<button class="btn-secondary" onclick="resetearPasswordUsuario('${u.id}','${uEmail}','${uNom}')" style="font-size:11px;padding:4px 10px;">🔑 Resetear contraseña</button>`
+      :`<span style="color:var(--text-dim);">🔒</span>`;
     return `<tr>
       <td class="td-name">${u.nombre}</td>
       <td class="td-mono">${u.usuario}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <span class="td-mono" id="pass-${u.id}" style="filter:blur(4px);transition:filter 0.2s;">${u.password||'—'}</span>
-          <button onclick="togglePass('${u.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:13px;" title="Ver/ocultar">👁</button>
-        </div>
-      </td>
+      <td>${resetBtn}</td>
       <td><span class="badge ${rolBadge}">${rolLabel}</span></td>
       <td><span class="badge ${estadoBadge}">${estadoLabel}</span></td>
       <td style="display:flex;gap:4px;">
@@ -6922,10 +6923,26 @@ function instalarApp(){
     });
   }
 }
-function togglePass(id){
-  const el=document.getElementById('pass-'+id);
-  if(!el) return;
-  el.style.filter=el.style.filter==='none'?'blur(4px)':'none';
+async function resetearPasswordUsuario(userId, email, nombre){
+  const nueva=prompt(`Nueva contraseña para ${nombre} (${email}):\n(mínimo 8 caracteres)`);
+  if(!nueva) return;
+  if(nueva.length<8){ showToast('La contraseña debe tener al menos 8 caracteres','error'); return; }
+  const confirmar=prompt(`Confirmá la nueva contraseña para ${nombre}:`);
+  if(nueva!==confirmar){ showToast('Las contraseñas no coinciden','error'); return; }
+  try{
+    const r=await fetch(`${SURL}/rest/v1/rpc/reset_password_admin`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+(_authToken||SKEY)},
+      body:JSON.stringify({p_user_email:email,p_new_password:nueva})
+    });
+    if(!r.ok){
+      const err=await r.json().catch(()=>({}));
+      throw new Error(err.message||err.hint||r.statusText);
+    }
+    showToast(`✅ Contraseña reseteada — ${email} → ${nueva}`,'success');
+  }catch(e){
+    showToast('Error al resetear: '+e.message,'error');
+  }
 }
 function escapeHtml(s){
   if(s==null) return '';
