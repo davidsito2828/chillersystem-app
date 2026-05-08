@@ -3948,9 +3948,18 @@ function renderUsers(){
     const uEmail=`${(u.usuario||'').toLowerCase().replace(/\s+/g,'')}@${AUTH_DOMAIN}`;
     const uNom=u.nombre.replace(/'/g,'');
     const puedeResetear=esGerencia()||esAdministrativo();
-    const resetBtn=puedeResetear
-      ?`<button class="btn-secondary" onclick="resetearPasswordUsuario('${u.id}','${uEmail}','${uNom}')" style="font-size:11px;padding:4px 10px;">🔑 Resetear contraseña</button>`
-      :`<span style="color:var(--text-dim);">🔒</span>`;
+    const targetEsTecnico=u.rol==='tecnico';
+    const tieneLinkAuth=!!u.auth_user_id;
+    let resetBtn;
+    if(!puedeResetear){
+      resetBtn=`<span style="color:var(--text-dim);" title="Sin permiso">🔒</span>`;
+    } else if(!targetEsTecnico){
+      resetBtn=`<span style="color:var(--text-dim);" title="Solo se resetea a técnicos">—</span>`;
+    } else if(!tieneLinkAuth){
+      resetBtn=`<span style="color:var(--text-dim);" title="Usuario sin link a Auth">⚠️</span>`;
+    } else {
+      resetBtn=`<button class="btn-secondary" onclick="resetearPasswordUsuario('${u.auth_user_id}','${uEmail}','${uNom}')" style="font-size:11px;padding:4px 10px;">🔑 Resetear contraseña</button>`;
+    }
     return `<tr>
       <td class="td-name">${u.nombre}</td>
       <td class="td-mono">${u.usuario}</td>
@@ -6923,23 +6932,24 @@ function instalarApp(){
     });
   }
 }
-async function resetearPasswordUsuario(userId, email, nombre){
+async function resetearPasswordUsuario(authUserId, email, nombre){
+  if(!authUserId){
+    showToast('Usuario sin link a Auth — no se puede resetear','error');
+    return;
+  }
   const nueva=prompt(`Nueva contraseña para ${nombre} (${email}):\n(mínimo 8 caracteres)`);
   if(!nueva) return;
   if(nueva.length<8){ showToast('La contraseña debe tener al menos 8 caracteres','error'); return; }
   const confirmar=prompt(`Confirmá la nueva contraseña para ${nombre}:`);
   if(nueva!==confirmar){ showToast('Las contraseñas no coinciden','error'); return; }
+  if(!confirm(`¿Confirmás resetear la contraseña de ${nombre} (${email})?`)) return;
   try{
-    const r=await fetch(`${SURL}/rest/v1/rpc/reset_password_admin`,{
+    await api('rpc/reset_password_admin',{
       method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+(_authToken||SKEY)},
-      body:JSON.stringify({p_user_email:email,p_new_password:nueva})
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({p_target_user_id:authUserId, p_new_password:nueva})
     });
-    if(!r.ok){
-      const err=await r.json().catch(()=>({}));
-      throw new Error(err.message||err.hint||r.statusText);
-    }
-    showToast(`✅ Contraseña reseteada — ${email} → ${nueva}`,'success');
+    showToast(`✅ Contraseña reseteada para ${email}. Comunicásela por canal seguro.`,'success');
   }catch(e){
     showToast('Error al resetear: '+e.message,'error');
   }
