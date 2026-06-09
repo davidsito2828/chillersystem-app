@@ -5861,24 +5861,31 @@ function renderPresupuestos(){
     'enviado':          'Esperando respuesta del cliente',
     'aprobado_cliente': 'Pendiente inicio — David / Norberto',
     'en_ejecucion':     '🔔 Pendiente facturar 50% inicial — Lucas Dimarchi',
-    'finalizado':       '🔔 Pendiente facturar 50% final — Lucas Dimarchi'
+    'finalizado':       '🔔 Pendiente facturar 50% final — Lucas Dimarchi',
+    'rechazado':        '❌ El cliente rechazó la oferta'
   };
+  
   const coloresFlujo={
     'borrador':         'background:#e5e7eb;color:#374151;',
     'en_revision':      'background:#fef3c7;color:#92400e;',
     'enviado':          'background:#dbeafe;color:#1e40af;',
     'aprobado_cliente': 'background:#d1fae5;color:#065f46;',
     'en_ejecucion':     'background:#fed7aa;color:#92400e;',
-    'finalizado':       'background:#bbf7d0;color:#14532d;'
+    'finalizado':       'background:#bbf7d0;color:#14532d;',
+    'rechazado':        'background:#fee2e2;color:#991b1b;'
   };
+  
   const etiquetasFlujo={
+    const etiquetasFlujo={
     'borrador':         '📝 Borrador',
     'en_revision':      '🔍 En revisión',
     'enviado':          '📤 Enviado al cliente',
     'aprobado_cliente': '✅ Aprobado por cliente',
     'en_ejecucion':     '⚙️ En ejecución',
-    'finalizado':       '🏁 Finalizado'
-  };
+    'finalizado':       '🏁 Finalizado',
+    'rechazado':        '❌ Rechazado por cliente'
+  };'
+  
   const siguienteEstado={
     'borrador':'en_revision','en_revision':'enviado','enviado':'aprobado_cliente',
     'aprobado_cliente':'en_ejecucion','en_ejecucion':'finalizado'
@@ -5898,6 +5905,10 @@ function renderPresupuestos(){
     // CAMBIO 1: badge estado_flujo simple
     const flujo=p.estado_flujo||'borrador';
     const puedeAvanzar=puedeAvanzarEstadoPpto()&&!!siguienteEstado[flujo];
+     ${flujo==='enviado'&&puedeAvanzarEstadoPpto()?'<button class="btn-danger" style="padding:4px 9px;" onclick="rechazarPpto(\''+p.id+'\',\''+p.numero+'\')" title="Cliente rechazó">❌</button>':''}
+        ${flujo==='rechazado'&&puedeAvanzarEstadoPpto()?'<button class="btn-edit" style="background:#059669;" onclick="reactivarPpto(\''+p.id+'\',\''+p.numero+'\')" title="Reactivar presupuesto">↩️</button>':''}
+
+     
     const facturado50i=p.facturado_50_inicial||false;
     const facturado50f=p.facturado_50_final||false;
     const histFact=p.historial_estados||[];
@@ -6347,7 +6358,37 @@ async function retrocederEstadoPpto(pId,estadoActual,numero){
     await loadPresupuestos();
   }catch(e){showToast('Error: '+e.message,true);}
 }
+async function rechazarPpto(pId,numero){
+  if(!confirm('❌ Marcar Presupuesto #'+numero+' como RECHAZADO por el cliente?\n\nQuedará registrado como rechazado. Podés reactivarlo después.')) return;
+  const ppto=presupuestos.find(x=>x.id===pId);
+  const historial=[...(ppto&&ppto.historial_estados||[])];
+  historial.push({estado:'rechazado',accion:'rechazado',fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
+  try{
+    await api('presupuestos?id=eq.'+pId,{
+      method:'PATCH',
+      body:JSON.stringify({estado_flujo:'rechazado',historial_estados:historial}),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
+    showToast('❌ Presupuesto marcado como rechazado','success');
+    await loadPresupuestos();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
 
+async function reactivarPpto(pId,numero){
+  if(!confirm('↩️ Reactivar Presupuesto #'+numero+'?\n\nVolverá al estado "Enviado al cliente".')) return;
+  const ppto=presupuestos.find(x=>x.id===pId);
+  const historial=[...(ppto&&ppto.historial_estados||[])];
+  historial.push({estado:'enviado',accion:'reactivado',fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
+  try{
+    await api('presupuestos?id=eq.'+pId,{
+      method:'PATCH',
+      body:JSON.stringify({estado_flujo:'enviado',historial_estados:historial}),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
+    showToast('↩️ Presupuesto reactivado','success');
+    await loadPresupuestos();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
 async function loadNotificaciones(){
   try{
     const jerarquia=usuarioActual&&usuarioActual.jerarquia;
