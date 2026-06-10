@@ -970,7 +970,7 @@ tbody tr:hover{background:#f8faff;}
 
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Nombre</th><th>Usuario</th><th>Contraseña</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Acceso Auth</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
       <tbody id="usersBody"></tbody>
     </table>
   </div>
@@ -1338,9 +1338,12 @@ tbody tr:hover{background:#f8faff;}
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <select class="search-box" style="width:auto;" onchange="filtroPptoEstado=this.value;renderPresupuestos()">
         <option value="">Todos</option>
-        <option value="borrador">🔴 Borradores</option>
-        <option value="aprobado">✅ Aprobados</option>
-        <option value="enviado">📤 Enviados</option>
+        <option value="borrador">📝 Borrador</option>
+        <option value="en_revision">🔍 En revisión</option>
+        <option value="enviado">📤 Enviado</option>
+        <option value="aprobado_cliente">✅ Aprobado</option>
+        <option value="en_ejecucion">⚙️ En ejecución</option>
+        <option value="finalizado">🏁 Finalizado</option>
       </select>
       <button class="btn-primary" onclick="abrirModalPpto()">＋ Nuevo presupuesto</button>
       <button class="btn-secondary" onclick="abrirModalCargarPpto()">📎 Cargar presupuesto</button>
@@ -4434,9 +4437,9 @@ function imprimirOrdenTrabajo(){
 
 <h2>Datos del servicio</h2>
 <table>
-  <tr><th>Equipo</th><td>${eq.nombre}</td><th>Cliente</th><td>${cli.nombre}</td></tr>
-  <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].filter(Boolean).join(' · ')||'—'}</td><th>Técnico</th><td>${tecnico}</td></tr>
-  <tr><th>Fecha</th><td>${fechaFmt}</td><th>Ubicación</th><td>${eq.ubicacion||'—'}</td></tr>
+  <tr><th>Equipo</th><td>${escapeHtml(eq.nombre)}</td><th>Cliente</th><td>${escapeHtml(cli.nombre)}</td></tr>
+  <tr><th>Tipo / Marca</th><td>${[eq.tipo,eq.marca,eq.modelo].map(escapeHtml).filter(Boolean).join(' · ')||'—'}</td><th>Técnico</th><td>${escapeHtml(tecnico)}</td></tr>
+  <tr><th>Fecha</th><td>${fechaFmt}</td><th>Ubicación</th><td>${escapeHtml(eq.ubicacion)||'—'}</td></tr>
 </table>
 
 ${tareasItems.length?`<h2>Checklist de tareas</h2>
@@ -4453,13 +4456,13 @@ ${lecRows.length?`<h2>Lecturas operativas</h2>
 </table>`:''}
 
 ${repuestos?`<h2>Repuestos / materiales</h2>
-<div style="padding:6px 8px;border:1px solid #ccc;border-radius:3px;">${repuestos}</div>`:''}
+<div style="padding:6px 8px;border:1px solid #ccc;border-radius:3px;">${escapeHtml(repuestos)}</div>`:''}
 
 ${trabajo?`<h2>Trabajo realizado / Observaciones</h2>
-<div style="padding:6px 8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${trabajo}</div>`:''}
+<div style="padding:6px 8px;border:1px solid #ccc;border-radius:3px;white-space:pre-wrap;">${escapeHtml(trabajo)}</div>`:''}
 
 <div style="display:flex;justify-content:space-between;margin-top:16px;">
-  <div class="firma-area">${tecnico}<br/><span style="font-size:10px;color:#777;">Firma del Técnico</span></div>
+  <div class="firma-area">${escapeHtml(tecnico)}<br/><span style="font-size:10px;color:#777;">Firma del Técnico</span></div>
   <div class="firma-area" style="text-align:left;min-width:240px;">
     ${firmaClienteHTML}
     <div style="margin-top:6px;font-size:10px;color:#777;text-align:center;">Conformidad del Cliente</div>
@@ -5345,8 +5348,7 @@ async function mostrarInformePublico(aprobacionId){
     document.open();
     document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;">'
       +'<p style="color:#e11d48;font-size:18px;">⚠️ Error al cargar informe</p>'
-      +'<p style="color:#555;font-size:13px;">'+e.message+'</p>'
-      +'<pre style="color:#888;font-size:11px;text-align:left;max-width:640px;margin:20px auto;white-space:pre-wrap;border:1px solid #ddd;padding:12px;border-radius:6px;">'+e.stack+'</pre>'
+      +'<p style="color:#555;font-size:13px;">Error al generar el informe. Por favor, intentá de nuevo o contactá al administrador.</p>'
       +'</body></html>');
     document.close();
   }
@@ -5848,7 +5850,7 @@ async function loadPresupuestos(){
 }
 
 function renderPresupuestos(){
-  const lista=filtroPptoEstado?presupuestos.filter(p=>p.estado===filtroPptoEstado):presupuestos;
+  const lista=filtroPptoEstado?presupuestos.filter(p=>p.estado_flujo===filtroPptoEstado):presupuestos;
   document.getElementById('pptoCount').textContent=lista.length+' presupuesto(s)';
   const tb=document.getElementById('pptoBody');
   if(!lista.length){
