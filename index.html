@@ -1924,6 +1924,7 @@ tbody tr:hover{background:#f8faff;}
 
 <script>
 console.log("App cargada en versión v14");
+function debug(...args){if(localStorage.getItem('debug')==='1') console.log(...args);}
 const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
 const AUTH_DOMAIN='chillersystem.app';
@@ -2624,7 +2625,7 @@ async function toggleJornada(){
     p_prec: coords?.precision_gps || null
   };
   
-  console.log('Datos enviados a Supabase (RPC):', objetoEnvio);
+  debug('Datos enviados a Supabase (RPC):', objetoEnvio);
   
   try{
     await api('rpc/registrar_jornada',{
@@ -2683,7 +2684,7 @@ async function loadFichajes(){
       const t = new Date(j.timestamp);
       return t >= fInicioObj && t <= fFinObj;
     });
-    console.log('Jornadas obtenidas de Supabase:', jData);
+    debug('Jornadas obtenidas de Supabase:', jData);
     
     let urlI = `intervenciones?created_at=gte.${fInicio}&created_at=lte.${fFin}&latitud=not.is.null&select=*,equipos(nombre),clientes(nombre)`;
     const iData = await api(urlI) || [];
@@ -2722,7 +2723,7 @@ async function loadFichajes(){
     
     // Ordenar descendente por fecha_obj
     fichajesGlobal.sort((a,b) => b.fecha_obj - a.fecha_obj);
-    console.log('Jornadas cruzadas con usuarios:', fichajesGlobal);
+    debug('Jornadas cruzadas con usuarios:', fichajesGlobal);
     
     // Rellenar select de tecnicos
     const selectTec = document.getElementById('fFiltroTecnico');
@@ -2793,20 +2794,20 @@ function renderFichajes(){
 }
 
 async function eliminarJornada(jornadaId){
-  console.log('[elimJornada] llamada con id:', jornadaId);
-  console.log('[elimJornada] esGerencia():', esGerencia(), '| rol:', usuarioActual?.rol);
+  debug('[elimJornada] llamada con id:', jornadaId);
+  debug('[elimJornada] esGerencia():', esGerencia(), '| rol:', usuarioActual?.rol);
   if(!esGerencia()){showToast('⛔ Solo gerencia puede eliminar jornadas',true);return;}
   const resultado=confirm('¿Eliminar este registro de jornada?\n\nEsta acción NO se puede deshacer.');
-  console.log('[elimJornada] confirm devolvió:', resultado);
+  debug('[elimJornada] confirm devolvió:', resultado);
   if(!resultado) return;
   try{
-    console.log('[elimJornada] antes del fetch — id:', jornadaId);
+    debug('[elimJornada] antes del fetch — id:', jornadaId);
     const resp=await api('jornadas_tecnicos?id=eq.'+jornadaId,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
-    console.log('[elimJornada] respuesta:', resp);
+    debug('[elimJornada] respuesta:', resp);
     showToast('✅ Jornada eliminada','success');
     await loadFichajes();
   }catch(e){
-    console.log('[elimJornada] error:', e);
+    console.error('[elimJornada] error:', e);
     showToast('Error al eliminar: '+e.message,true);
     console.error('[eliminarJornada]',e);
   }
@@ -3137,10 +3138,16 @@ function previewFotos(input,previewId,varName){
 function removeFotoPreview(idx,previewId,varName){
   if(varName==='eqFotosNuevas') eqFotosNuevas.splice(idx,1);
   else if(varName==='resFotosNuevas') resFotosNuevas.splice(idx,1);
+  else if(varName==='serviceFotosNuevas') serviceFotosNuevas.splice(idx,1);
+  else if(varName==='evtFotosNuevas') evtFotosNuevas.splice(idx,1);
   else intervFotosNuevas.splice(idx,1);
   const prev=document.getElementById(previewId);
   const items=prev.querySelectorAll('.foto-preview');
-  if(items[idx]) items[idx].remove();
+  if(items[idx]){
+    const img=items[idx].querySelector('img');
+    if(img&&img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+    items[idx].remove();
+  }
 }
 async function comprimirFoto(file){
   // iOS/Safari: HEIC or blob from camera may fail canvas — catch and fallback
@@ -3534,7 +3541,7 @@ async function abrirHistCliente(cliId){
   if(!window._aprobacionesByInterv||!Object.keys(window._aprobacionesByInterv).length){
     await loadAprobaciones();
   }
-  console.log('[abrirHistCliente] _aprobacionesByInterv keys:',Object.keys(window._aprobacionesByInterv||{}).length);
+  debug('[abrirHistCliente] _aprobacionesByInterv keys:',Object.keys(window._aprobacionesByInterv||{}).length);
   renderHistDetalle();
 }
 
@@ -3587,7 +3594,7 @@ function renderIntervItem(i){
   if(i.notas) html+='<div class="interv-rep">📝 '+escapeHtmlMultiline(i.notas)+'</div>';
   html+=lecHtml;
   // ARCHIVOS ADJUNTOS — fotos + informe de aprobación
-  console.log('[historial interv]',i.id,window._aprobacionesByInterv);
+  debug('[historial interv]',i.id,window._aprobacionesByInterv);
   const aprobacion=(window._aprobacionesByInterv&&window._aprobacionesByInterv[i.id])||aprobaciones.find(a=>a.intervencion_id===i.id);
   const tieneFotos=i.fotos&&i.fotos.length;
   const tieneInforme=aprobacion&&aprobacion.pdf_url;
@@ -3719,11 +3726,6 @@ function volverHistClientes(){
 function renderHist(){
   const base=filtroEmp==='todas'?clientes:clientes.filter(c=>c.empresa===filtroEmp);
   renderHistClientes(base);
-}
-
-async function loadIntervenciones(){
-  intervenciones=await api('intervenciones?select=*&order=fecha.desc');
-  renderHist();
 }
 
 async function guardarInterv(){
@@ -4672,7 +4674,7 @@ async function guardarSoloPreventivo(){
     };
     const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
     const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
-    console.log('[guardarSoloPreventivo] intervId:',intervId);
+    debug('[guardarSoloPreventivo] intervId:',intervId);
     // Guardar tareas del checklist global (si se usó el panel global)
     try{
       const filasTareas=document.querySelectorAll('#sTareasList .checklist-row');
@@ -4752,7 +4754,7 @@ async function guardarPlanilla(){
     for(const eqId of Object.keys(servicePlanilla)){
       const p=servicePlanilla[eqId];
       let fotosUrls=[];
-      console.log('[Fotos] equipo:',eqId,'fotos:',p.fotos_nuevas?.length);
+      debug('[Fotos] equipo:',eqId,'fotos:',p.fotos_nuevas?.length);
       if(p.fotos_nuevas&&p.fotos_nuevas.length) fotosUrls=await subirFotos(p.fotos_nuevas,'service');
       const descCorr=p.tipo==='Correctivo'
         ?([p.desc_correctivo,p.necesita_resolucion?'Necesita: '+p.necesita_resolucion:null].filter(Boolean).join(' — '))
@@ -4822,7 +4824,7 @@ async function loadAprobaciones(){
     tareasRealizadas=await api('tareas_realizadas?select=*&order=fecha_realizada.desc');
     window._aprobacionesByInterv={};
     aprobaciones.forEach(a=>{if(a.intervencion_id)window._aprobacionesByInterv[a.intervencion_id]=a;});
-    console.log('[Aprobaciones] cargadas:',aprobaciones.length,aprobaciones);
+    debug('[Aprobaciones] cargadas:',aprobaciones.length,aprobaciones);
   }catch(e){
     console.error('[Aprobaciones] error al cargar:',e);
     aprobaciones=[];
@@ -4897,7 +4899,7 @@ function renderAprobaciones(){
 
 function generarHtmlInforme(a){
   if(!a) throw new Error('Registro preventivo vacío');
-  console.log('[generarHtml] registro:', a);
+  debug('[generarHtml] registro:', a);
   const cli=clientes.find(c=>c.id===a.cliente_id)||{nombre:'Cliente'};
   const interv=intervenciones.find(i=>i.id===a.intervencion_id)||{};
   const fechaFmt=fmtF(a.fecha_servicio||a.fecha||'');
@@ -5241,7 +5243,7 @@ async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
     try{grupoIds=JSON.parse(grupoIds);}catch(e){grupoIds=[idPrincipal];}
   }
   if(!grupoIds.length) grupoIds=[idPrincipal];
-  console.log('[Aprobar] IDs:',grupoIds,'Principal:',idPrincipal);
+  debug('[Aprobar] IDs:',grupoIds,'Principal:',idPrincipal);
   const aprobacionPrincipal=aprobaciones.find(a=>a.id===idPrincipal);
   if(!aprobacionPrincipal){showToast('Error: aprobación no encontrada',true);return;}
   showToast('Aprobando...');
@@ -5282,7 +5284,7 @@ async function eliminarAprobacion(id){
 }
 
 async function mostrarInformePublico(aprobacionId){
-  console.log('[Informe] URL param:', aprobacionId);
+  debug('[Informe] URL param:', aprobacionId);
   document.body.innerHTML='<div style="font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f4f6f9;"><div style="text-align:center;color:#666;">Cargando informe...</div></div>';
   try{
     // Paso 1: traer aprobación
@@ -5302,7 +5304,7 @@ async function mostrarInformePublico(aprobacionId){
     // Paso 2: agrupar por numero_ipd si existe
     let grupo=[aprob];
     if(aprob.numero_ipd){
-      console.log('[Informe] Agrupando por numero_ipd:', aprob.numero_ipd);
+      debug('[Informe] Agrupando por numero_ipd:', aprob.numero_ipd);
       const resGrupo=await api('preventivos_aprobacion?numero_ipd=eq.'+aprob.numero_ipd+'&select=*');
       if(Array.isArray(resGrupo)&&resGrupo.length>0) grupo=resGrupo;
     }
