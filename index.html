@@ -637,22 +637,22 @@ tbody tr:hover{background:#f8faff;}
   from{opacity:0;}
   to{opacity:1;}
 }
-.dash-wrap{padding:20px;display:flex;flex-direction:column;gap:20px;}
+.dash-wrap{padding:24px 20px;display:flex;flex-direction:column;gap:24px;}
 .dash-section-title{
   font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;
-  color:var(--text-dim);margin-bottom:12px;display:flex;align-items:center;gap:8px;
+  color:var(--text-dim);margin-bottom:14px;display:flex;align-items:center;gap:8px;
 }
 .dash-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
 
 /* KPI Cards Grid */
 .kpi-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:12px;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:14px;
 }
 .kpi-card{
   background:var(--bg2);border:1px solid var(--border);
-  border-radius:var(--r-lg);padding:16px 18px;
+  border-radius:var(--r-lg);padding:20px;
   border-top:3px solid transparent;
   box-shadow:var(--shadow);transition:box-shadow 0.2s,transform 0.2s;
   animation:fadeSlideUp 0.4s ease both;
@@ -664,14 +664,14 @@ tbody tr:hover{background:#f8faff;}
   width:80px;height:80px;border-radius:50%;
   background:currentColor;opacity:0.04;
 }
-.kpi-icon{font-size:22px;margin-bottom:8px;display:block;}
+.kpi-icon{font-size:18px;margin-top:10px;display:block;opacity:0.7;}
 .kpi-num{
-  font-size:32px;font-weight:900;line-height:1;
+  font-size:36px;font-weight:900;line-height:1;
   font-family:'IBM Plex Mono',monospace;
   font-variant-numeric:tabular-nums;
-  letter-spacing:-1px;
+  letter-spacing:-1.5px;
 }
-.kpi-label{font-size:10px;color:var(--text-dim);margin-top:6px;letter-spacing:0.5px;font-weight:600;text-transform:uppercase;}
+.kpi-label{font-size:10px;color:var(--text-dim);margin-top:8px;letter-spacing:0.5px;font-weight:600;text-transform:uppercase;}
 .kpi-sub{font-size:11px;margin-top:4px;font-weight:600;}
 .kpi-blue{border-top-color:var(--accent);color:var(--accent);}
 .kpi-green{border-top-color:var(--green);color:var(--green);}
@@ -682,13 +682,14 @@ tbody tr:hover{background:#f8faff;}
 
 /* Charts */
 .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:600px){.chart-row{grid-template-columns:1fr;}}
 .chart-card{
   background:var(--bg2);border:1px solid var(--border);
-  border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);
+  border-radius:var(--r-lg);padding:22px 20px;box-shadow:var(--shadow);
   animation:fadeSlideUp 0.5s ease both;
 }
-.chart-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:14px;}
-.bar-chart{display:flex;flex-direction:column;gap:8px;}
+.chart-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:16px;}
+.bar-chart{display:flex;flex-direction:column;gap:10px;}
 .bar-row{display:flex;align-items:center;gap:10px;}
 .bar-label{font-size:11px;color:var(--text-dim);min-width:28px;text-align:right;font-weight:600;}
 .bar-label-left{font-size:11px;color:var(--text-dim);min-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -701,55 +702,61 @@ tbody tr:hover{background:#f8faff;}
 .bar-val{font-size:11px;font-weight:700;min-width:24px;font-family:'IBM Plex Mono',monospace;}
 
 /* Vertical bar chart (monthly) */
-.vbar-chart{display:flex;align-items:flex-end;gap:6px;height:100px;}
+.vbar-chart{display:flex;align-items:flex-end;gap:8px;height:120px;}
 .vbar-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;}
 .vbar-fill{
-  width:100%;border-radius:4px 4px 0 0;
+  width:100%;border-radius:5px 5px 0 0;
   background:var(--accent);min-height:4px;
   animation:fadeSlideUp 0.6s ease both;
   transition:height 0.5s ease;
 }
 .vbar-fill.prev-color{background:#60a5fa;}
 .vbar-fill.corr-color{background:var(--red);}
-.vbar-label-x{font-size:9px;color:var(--text-dim);font-weight:600;}
-.vbar-num{font-size:9px;font-weight:700;color:var(--text-dim);}
+.vbar-label-x{font-size:10px;color:var(--text-dim);font-weight:600;}
+.vbar-num{font-size:10px;font-weight:700;color:var(--text-dim);}
 
 /* Donut style using conic-gradient */
-.donut-wrap{display:flex;align-items:center;gap:16px;}
+.donut-wrap{display:flex;align-items:center;gap:20px;}
 .donut-chart{
-  width:100px;height:100px;border-radius:50%;
+  width:110px;height:110px;border-radius:50%;
   flex-shrink:0;position:relative;
 }
-.donut-legend{display:flex;flex-direction:column;gap:6px;}
-.donut-leg-item{display:flex;align-items:center;gap:7px;font-size:11px;}
+.donut-chart::after{
+  content:'';position:absolute;inset:22px;
+  border-radius:50%;background:var(--bg2);
+}
+.donut-legend{display:flex;flex-direction:column;gap:8px;}
+.donut-leg-item{display:flex;align-items:center;gap:8px;font-size:12px;}
 .donut-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 
 /* Alert table inside dashboard */
 .dash-alert-table{width:100%;border-collapse:collapse;font-size:12px;}
 .dash-alert-table th{
-  padding:8px 12px;text-align:left;font-size:9px;letter-spacing:1.5px;
+  padding:10px 14px;text-align:left;font-size:9px;letter-spacing:1.5px;
   text-transform:uppercase;font-weight:700;color:var(--text-dim);
   background:var(--bg3);border-bottom:1px solid var(--border);
 }
-.dash-alert-table td{padding:9px 12px;border-bottom:1px solid var(--border-dim);vertical-align:middle;}
+.dash-alert-table td{padding:10px 14px;border-bottom:1px solid var(--border-dim);vertical-align:middle;}
 .dash-alert-table tr:last-child td{border-bottom:none;}
-.dash-alert-table tr:hover td{background:#f8faff;}
+.dash-alert-table tr:hover td{background:var(--bg3);}
 
 /* Top ranking */
 .ranking-item{
-  display:flex;align-items:center;gap:10px;
-  padding:8px 0;border-bottom:1px solid var(--border-dim);
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--border-dim);
 }
 .ranking-item:last-child{border-bottom:none;}
 .rank-num{
-  width:22px;height:22px;border-radius:50%;
+  width:26px;height:26px;border-radius:50%;
   background:var(--bg4);color:var(--text-dim);
-  font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
 }
 .rank-num.gold{background:#fef3c7;color:#92400e;}
 .rank-num.silver{background:#f3f4f6;color:#374151;}
 .rank-num.bronze{background:#fef0e7;color:#92400e;}
+.rank-name{flex:1;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-bar-mini{flex:1;max-width:120px;}
 .rank-name{flex:1;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rank-bar-mini{width:80px;}
 .refresh-btn{
@@ -7087,40 +7094,40 @@ function renderEstadisticas(){
     <div class="dash-section-title">📌 Resumen General</div>
     <div class="kpi-grid">
       <div class="kpi-card kpi-blue" style="${delay(0)}">
-        <span class="kpi-icon">🏢</span>
         <div class="kpi-num" style="color:var(--accent)">${totalClientes}</div>
         <div class="kpi-label">Clientes</div>
         <div class="kpi-sub" style="color:var(--text-dim)">${totalCS} CS · ${totalCV} CV</div>
+        <span class="kpi-icon">🏢</span>
       </div>
       <div class="kpi-card kpi-teal" style="${delay(1)}">
-        <span class="kpi-icon">⚙️</span>
         <div class="kpi-num" style="color:#0891b2">${totalEquipos}</div>
         <div class="kpi-label">Equipos</div>
         <div class="kpi-sub" style="color:var(--green)">${eqOperativos} operativos</div>
+        <span class="kpi-icon">⚙️</span>
       </div>
       <div class="kpi-card kpi-green" style="${delay(2)}">
-        <span class="kpi-icon">✅</span>
         <div class="kpi-num" style="color:var(--green)">${prevMes}</div>
         <div class="kpi-label">Preventivos este mes</div>
         <div class="kpi-sub" style="color:var(--text-dim)">${intervMes.length} intervenciones totales</div>
+        <span class="kpi-icon">✅</span>
       </div>
       <div class="kpi-card kpi-red" style="${delay(3)}">
-        <span class="kpi-icon">🔴</span>
         <div class="kpi-num" style="color:var(--red)">${corrPendientes}</div>
         <div class="kpi-label">Correctivos pendientes</div>
         <div class="kpi-sub" style="color:${corrMes?'var(--red)':'var(--text-dim)'}">${corrMes} registrados este mes</div>
+        <span class="kpi-icon">🔴</span>
       </div>
       <div class="kpi-card kpi-yellow" style="${delay(4)}">
-        <span class="kpi-icon">⚠️</span>
         <div class="kpi-num" style="color:var(--yellow)">${eqVencidos.length}</div>
         <div class="kpi-label">Preventivos vencidos</div>
         <div class="kpi-sub" style="color:var(--yellow)">${eqProximos.length} próximos a vencer</div>
+        <span class="kpi-icon">⚠️</span>
       </div>
       <div class="kpi-card kpi-purple" style="${delay(5)}">
-        <span class="kpi-icon">💼</span>
         <div class="kpi-num" style="color:#7c3aed">${pptoActivos}</div>
         <div class="kpi-label">Ptos. en ejecución</div>
         <div class="kpi-sub" style="color:#7c3aed">${pptoTotal?'$'+pptoTotal.toLocaleString('es-AR'):'-'}</div>
+        <span class="kpi-icon">💼</span>
       </div>
     </div>
   </div>`;
