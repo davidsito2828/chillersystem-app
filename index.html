@@ -7049,19 +7049,17 @@ function renderEstadisticas(){
   const corrAbiertos=intervenciones.filter(i=>i.tipo==='Correctivo'&&!i.correctivo_resuelto);
   const corrPendientes=corrAbiertos.length;
 
-  // Equipos vencidos: días desde ultimo_preventivo > frecuencia_preventivo
-  // Excluye sin ultimo_preventivo o con ignorar_alarma=true
+  // Vencidos: mismo criterio que calcAlertas → proximo_preventivo en el pasado (dh<0)
+  // Excluye Inactivo, ignorar_alarma, sin proximo_preventivo
   const eqVencidos=equipos.filter(e=>{
-    if(!e.ultimo_preventivo||e.ignorar_alarma) return false;
-    const dias=Math.floor((hoy-new Date(e.ultimo_preventivo))/(1000*60*60*24));
-    return dias>(e.frecuencia_preventivo||30);
+    if(e.estado==='Inactivo'||e.ignorar_alarma||!e.proximo_preventivo) return false;
+    return diasHabilesHasta(e.proximo_preventivo)<0;
   });
-  // Próximos: entre 80% y 100% de la frecuencia (dentro del plazo pero cercano)
+  // Próximos: mismo umbral que calcAlertas → vence en ≤5 días hábiles (dh>=0 && dh<=5)
   const eqProximos=equipos.filter(e=>{
-    if(!e.ultimo_preventivo||e.ignorar_alarma) return false;
-    const dias=Math.floor((hoy-new Date(e.ultimo_preventivo))/(1000*60*60*24));
-    const frec=e.frecuencia_preventivo||30;
-    return dias>=frec*0.8&&dias<=frec;
+    if(e.estado==='Inactivo'||e.ignorar_alarma||!e.proximo_preventivo) return false;
+    const dh=diasHabilesHasta(e.proximo_preventivo);
+    return dh>=0&&dh<=5;
   });
 
   // Presupuestos: pptoActivos = cantidad en_ejecucion
