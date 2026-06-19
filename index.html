@@ -771,6 +771,43 @@ tbody tr:hover{background:#f8faff;}
   .sparkline-kpi-grid{grid-template-columns:1fr;}
   .kpi-spark-num{font-size:26px;}
 }
+/* ═══ PRESUPUESTOS CARDS ═══ */
+.ppto-cards-container{display:flex;flex-direction:column;gap:12px;padding:16px 0;}
+.ppto-card{background:#fff;border-radius:10px;border:1px solid var(--border);border-left-width:4px;box-shadow:0 1px 3px rgba(0,0,0,.07);padding:16px;transition:box-shadow .15s;}
+.ppto-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.ppto-card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.ppto-card-header-left{flex:1;min-width:0;}
+.ppto-card-top-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;}
+.ppto-numero{font-family:monospace;font-size:13px;font-weight:700;color:var(--text);}
+.ppto-badge-manual{padding:1px 6px;border-radius:10px;font-size:10px;background:#1e3a5f;color:#bfdbfe;}
+.ppto-cliente{font-size:16px;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ppto-ref{font-size:12px;color:var(--text-dim);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ppto-card-header-right{text-align:right;flex-shrink:0;}
+.ppto-total{font-size:20px;font-weight:800;color:var(--green);white-space:nowrap;}
+.ppto-fecha{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.ppto-timeline{display:flex;align-items:center;margin:14px 0 10px;overflow-x:auto;padding-bottom:4px;}
+.ppto-tl-step{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:60px;}
+.ppto-tl-circle{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.ppto-tl-done{background:#059669;color:#fff;}
+.ppto-tl-cur{background:#1e3a5f;color:#fff;box-shadow:0 0 0 4px #bfdbfe;width:28px;height:28px;}
+.ppto-tl-fut{background:#e5e7eb;color:#9ca3af;}
+.ppto-tl-label{font-size:9px;color:var(--text-dim);text-align:center;line-height:1.2;max-width:58px;}
+.ppto-tl-line{flex:1;height:2px;background:#e5e7eb;min-width:10px;}
+.ppto-tl-line-done{background:#059669;}
+.ppto-rechazado-badge{margin:12px 0;display:inline-block;background:#fee2e2;color:#991b1b;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;}
+.ppto-facturacion-band{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;padding:10px 14px;margin:8px 0;display:flex;flex-wrap:wrap;gap:14px;}
+.ppto-card-footer{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.ppto-responsable{font-size:11px;color:var(--text-dim);flex:1;min-width:0;}
+.ppto-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
+@media(max-width:600px){
+  .ppto-card-header{flex-direction:column;}
+  .ppto-card-header-right{text-align:left;}
+  .ppto-total{font-size:16px;}
+  .ppto-cliente{font-size:14px;white-space:normal;}
+  .ppto-tl-label{font-size:8px;}
+  .ppto-card-footer{flex-direction:column;align-items:flex-start;}
+  .ppto-actions{width:100%;}
+}
 </style>
 </head>
 <body>
@@ -1354,15 +1391,7 @@ tbody tr:hover{background:#f8faff;}
       <button class="btn-secondary" onclick="abrirModalCargarPpto()">📎 Cargar presupuesto</button>
     </div>
   </div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr>
-        <th>N° Presupuesto</th><th>Empresa</th><th>Cliente</th><th>Referencia</th>
-        <th>Monto</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
-      </tr></thead>
-      <tbody id="pptoBody"></tbody>
-    </table>
-  </div>
+  <div id="pptoBody" class="ppto-cards-container"></div>
 </div>
 
 <!-- MODAL PRESUPUESTO -->
@@ -5895,18 +5924,21 @@ function renderPresupuestos(){
   document.getElementById('pptoCount').textContent=lista.length+' presupuesto(s)';
   const tb=document.getElementById('pptoBody');
   if(!lista.length){
-    tb.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">💼</div><div class="empty-title">Sin presupuestos</div></div></td></tr>';
+    tb.innerHTML='<div class="empty-state"><div class="empty-icon">💼</div><div class="empty-title">Sin presupuestos</div></div>';
     return;
   }
+  const borderColorFlujoMap={
+    'borrador':'#9ca3af','en_revision':'#f59e0b','enviado':'#3b82f6',
+    'aprobado_cliente':'#10b981','en_ejecucion':'#f97316','finalizado':'#22c55e','rechazado':'#ef4444'
+  };
+  const flujoSeq=['borrador','en_revision','enviado','aprobado_cliente','en_ejecucion','finalizado'];
+  const flujoLabels={
+    'borrador':'Borrador','en_revision':'En revisión','enviado':'Enviado',
+    'aprobado_cliente':'Aprobado','en_ejecucion':'En ejecución','finalizado':'Finalizado'
+  };
   tb.innerHTML=lista.map(p=>{
     // CAMBIO 2: sincronizar estado_flujo con estado existente
     if(p.estado==='aprobado'&&(!p.estado_flujo||p.estado_flujo==='borrador')) p.estado_flujo='enviado';
-    const estadoStyle=p.estado==='borrador'
-      ?'color:var(--red);background:var(--red-bg);border-color:var(--red-border)'
-      :p.estado==='aprobado'
-      ?'color:var(--green);background:var(--green-bg);border-color:var(--green-border)'
-      :'color:var(--accent);background:#eff6ff;border-color:#bfdbfe';
-    const estadoLabel=p.estado==='borrador'?'🔴 Borrador':p.estado==='aprobado'?'✅ Aprobado':'📤 Enviado';
     const isCS=p.empresa==='ChillerSystem';
     const monedaSim=p.moneda==='USD'?'U$D ':'$';
     const total=p.precio_total?(monedaSim+Number(p.precio_total).toLocaleString('es-AR')):'—';
@@ -5918,20 +5950,42 @@ function renderPresupuestos(){
     const histFact=p.historial_estados||[];
     const regInicial=histFact.filter(h=>h.estado==='facturacion_inicial'&&h.accion==='facturado').pop();
     const regFinal=histFact.filter(h=>h.estado==='facturacion_final'&&h.accion==='facturado').pop();
+    const fechaMostrar=p.fecha?fmtF(p.fecha):(p.created_at?fmtF(p.created_at.split('T')[0]):'—');
+    const badgeManual=p.origen==='manual'?'<span class="ppto-badge-manual">📎 Manual</span>':'';
+    const btnPdf=p.pdf_url?`<a href="${p.pdf_url}" target="_blank" class="btn-edit" style="text-decoration:none;display:inline-flex;align-items:center;">📄</a>`:'';
+    const borderColor=borderColorFlujoMap[flujo]||'#9ca3af';
+    // Timeline
+    const curIdx=flujoSeq.indexOf(flujo);
+    let timelineHTML;
+    if(flujo==='rechazado'){
+      timelineHTML='<div class="ppto-rechazado-badge">❌ Rechazado por cliente</div>';
+    } else {
+      let tl='<div class="ppto-timeline">';
+      flujoSeq.forEach((st,i)=>{
+        const done=i<curIdx;
+        const cur=i===curIdx;
+        tl+='<div class="ppto-tl-step">';
+        tl+='<div class="ppto-tl-circle '+(done?'ppto-tl-done':cur?'ppto-tl-cur':'ppto-tl-fut')+'">'+(done?'✓':'')+'</div>';
+        tl+='<div class="ppto-tl-label">'+(flujoLabels[st]||st)+'</div>';
+        tl+='</div>';
+        if(i<flujoSeq.length-1) tl+='<div class="ppto-tl-line'+(i<curIdx?' ppto-tl-line-done':'')+'"></div>';
+      });
+      tl+='</div>';
+      timelineHTML=tl;
+    }
+    // Facturación band — checkboxes y condiciones preservados del original
     let badgeFacturacion='';
     if(puedeVerPresupuestos()&&(flujo==='en_ejecucion'||flujo==='finalizado')){
-      badgeFacturacion='<div style="margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;">';
-      if(flujo==='en_ejecucion'||flujo==='finalizado'){
-        badgeFacturacion+='<div>'+
-          '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
-          '<input type="checkbox" '+(facturado50i?'checked':'')+
-          ' onchange="toggleFacturacion(\''+p.id+'\',\'inicial\',this.checked)"'+
-          ' style="accent-color:#059669;width:14px;height:14px;"/>'+
-          '<span style="color:'+(facturado50i?'#059669':'#6b7280')+';font-weight:'+(facturado50i?'700':'400')+
-          ';">50% inicial facturado</span></label>'+
-          (regInicial?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regInicial.usuario+' — '+fmtF(regInicial.fecha)+'</div>':'')+
-          '</div>';
-      }
+      badgeFacturacion='<div class="ppto-facturacion-band">';
+      badgeFacturacion+='<div>'+
+        '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
+        '<input type="checkbox" '+(facturado50i?'checked':'')+
+        ' onchange="toggleFacturacion(\''+p.id+'\',\'inicial\',this.checked)"'+
+        ' style="accent-color:#059669;width:14px;height:14px;"/>'+
+        '<span style="color:'+(facturado50i?'#059669':'#6b7280')+';font-weight:'+(facturado50i?'700':'400')+
+        ';">50% inicial facturado</span></label>'+
+        (regInicial?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regInicial.usuario+' — '+fmtF(regInicial.fecha)+'</div>':'')+
+        '</div>';
       if(flujo==='finalizado'){
         badgeFacturacion+='<div>'+
           '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
@@ -5945,37 +5999,39 @@ function renderPresupuestos(){
       }
       badgeFacturacion+='</div>';
     }
-    const badgeFlujo='<div style="margin-top:6px;">'+
-      '<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(coloresFlujo[flujo]||'')+'">'+etiquetasFlujo[flujo]+'</span>'+
-      '<div style="font-size:10px;color:#6b7280;margin-top:3px;">'+(responsables[flujo]||'')+'</div>'+
-      badgeFacturacion+
-      '</div>';
-    const badgeManual=p.origen==='manual'?'<span style="margin-left:5px;padding:1px 6px;border-radius:10px;font-size:10px;background:#1e3a5f;color:#bfdbfe;">📎 Manual</span>':'';
-    const btnPdf=p.pdf_url?`<a href="${p.pdf_url}" target="_blank" class="btn-edit" style="text-decoration:none;display:inline-flex;align-items:center;">📄</a>`:'';
-    const fechaMostrar=p.fecha?fmtF(p.fecha):(p.created_at?fmtF(p.created_at.split('T')[0]):'—');
-    return `<tr>
-      <td class="td-mono">${p.numero}${badgeManual}</td>
-      <td><span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span></td>
-      <td class="td-name">${p.cliente_nombre||'—'}</td>
-      <td class="td-dim" style="max-width:160px;">${p.referencia||'—'}</td>
-      <td class="td-mono" style="color:var(--green);">${total}</td>
-      <td>
-        <span class="badge" style="${estadoStyle}">${estadoLabel}</span>
-        ${badgeFlujo}
-      </td>
-      <td class="td-dim">${fechaMostrar}</td>
-      <td style="display:flex;gap:4px;flex-wrap:wrap;">
-        ${btnPdf}
-        <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
-        <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
-        ${p.estado==='borrador'?`<button class="btn-green" onclick="aprobarPpto('${p.id}')">✅ OK</button>`:''}
-        ${puedeAvanzarEstadoPpto()&&flujo!=='borrador'&&flujo!=='rechazado'?'<button class="btn-edit" style="background:#374151;" onclick="retrocederEstadoPpto(\''+p.id+'\',\''+flujo+'\',\''+p.numero+'\')">⬅️</button>':''}
-        ${puedeAvanzar?'<button class="btn-edit" style="background:#1e3a5f;" onclick="abrirModalAvanzarEstado(\''+p.id+'\',\''+flujo+'\',\''+p.numero+'\',\''+((p.cliente_nombre||'').replace(/'/g,"\\'"))+'\','+( p.precio_total||0)+')">➡️</button>':''}
-        ${flujo==='enviado'&&puedeAvanzarEstadoPpto()?'<button class="btn-danger" style="font-size:11px;" onclick="rechazarPpto(\''+p.id+'\',\''+p.numero+'\')">❌ Rechazado</button>':''}
-        ${flujo==='rechazado'&&puedeAvanzarEstadoPpto()?'<button class="btn-edit" style="background:#6b7280;font-size:11px;" onclick="reactivarPpto(\''+p.id+'\',\''+p.numero+'\')">↩️ Reactivar</button>':''}
-        <button class="btn-danger" onclick="elimPpto('${p.id}')">🗑</button>
-      </td>
-    </tr>`;
+    return `<div class="ppto-card" style="border-left:4px solid ${borderColor};">
+      <div class="ppto-card-header">
+        <div class="ppto-card-header-left">
+          <div class="ppto-card-top-row">
+            <span class="ppto-numero">#${p.numero}</span>
+            <span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span>
+            ${badgeManual}
+          </div>
+          <div class="ppto-cliente">${p.cliente_nombre||'—'}</div>
+          ${p.referencia?'<div class="ppto-ref">'+p.referencia+'</div>':''}
+        </div>
+        <div class="ppto-card-header-right">
+          <div class="ppto-total">${total}</div>
+          <div class="ppto-fecha">${fechaMostrar}</div>
+        </div>
+      </div>
+      ${timelineHTML}
+      ${badgeFacturacion}
+      <div class="ppto-card-footer">
+        <div class="ppto-responsable">${responsables[flujo]||''}</div>
+        <div class="ppto-actions">
+          ${btnPdf}
+          <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
+          <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
+          ${p.estado==='borrador'?'<button class="btn-green" onclick="aprobarPpto(\''+p.id+'\')">✅ OK</button>':''}
+          ${puedeAvanzarEstadoPpto()&&flujo!=='borrador'&&flujo!=='rechazado'?'<button class="btn-edit" style="background:#374151;" onclick="retrocederEstadoPpto(\''+p.id+'\',\''+flujo+'\',\''+p.numero+'\')">⬅️</button>':''}
+          ${puedeAvanzar?'<button class="btn-edit" style="background:#1e3a5f;" onclick="abrirModalAvanzarEstado(\''+p.id+'\',\''+flujo+'\',\''+p.numero+'\',\''+((p.cliente_nombre||'').replace(/'/g,"\\'"))+'\','+( p.precio_total||0)+')">➡️</button>':''}
+          ${flujo==='enviado'&&puedeAvanzarEstadoPpto()?'<button class="btn-danger" style="font-size:11px;" onclick="rechazarPpto(\''+p.id+'\',\''+p.numero+'\')">❌ Rechazado</button>':''}
+          ${flujo==='rechazado'&&puedeAvanzarEstadoPpto()?'<button class="btn-edit" style="background:#6b7280;font-size:11px;" onclick="reactivarPpto(\''+p.id+'\',\''+p.numero+'\')">↩️ Reactivar</button>':''}
+          <button class="btn-danger" onclick="elimPpto('${p.id}')">🗑</button>
+        </div>
+      </div>
+    </div>`;
   }).join('');
 }
 
