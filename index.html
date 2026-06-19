@@ -2438,6 +2438,7 @@ async function iniciarApp(){
 
   // EL BOTÓN DE FICHAR SE MUESTRA PARA TODOS
   document.getElementById('btnJornada').style.display='block';
+  if(esJefatura){ document.getElementById('btnJornada').style.display='none'; }
   const btn = document.getElementById('btnJornada');
   if(btn){
     if(esJefatura){
