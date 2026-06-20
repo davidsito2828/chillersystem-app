@@ -63,50 +63,108 @@ body{
   line-height:1.5;
 }
 
-/* ── LOGIN ── */
+/* ── LOGIN SPLIT ── */
 #loginScreen{
-  display:flex;align-items:center;justify-content:center;
-  min-height:100vh;padding:20px;
+  display:flex;
+  min-height:100vh;
+}
+.login-brand{
+  flex:1;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:48px 40px;
   background:var(--bg-header);
+  position:relative;overflow:hidden;
 }
-.login-box{
-  background:var(--bg2);
+.login-brand::before{
+  content:'';position:absolute;
+  width:320px;height:320px;border-radius:50%;
+  background:rgba(40,96,245,0.09);
+  top:-100px;right:-100px;pointer-events:none;
+}
+.login-brand::after{
+  content:'';position:absolute;
+  width:200px;height:200px;border-radius:50%;
+  background:rgba(40,96,245,0.06);
+  bottom:-70px;left:-60px;pointer-events:none;
+}
+.login-brand-pill{
+  background:#fff;
   border-radius:var(--r-xl);
-  padding:40px 36px;
-  width:100%;max-width:380px;
-  text-align:center;
-  box-shadow:var(--shadow-lg);
+  padding:14px 28px;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;z-index:1;
+  box-shadow:0 2px 12px rgba(0,0,0,0.15);
 }
-.login-box::before{
-  content:'';display:block;height:4px;
-  background:#2563eb;
-  border-radius:var(--r-xl) var(--r-xl) 0 0;
-  margin:-40px -36px 32px;
+.login-brand-logo{
+  height:64px;width:auto;object-fit:contain;display:block;
 }
-.login-logo{height:52px;object-fit:contain;margin-bottom:14px;}
-.login-title{font-size:19px;font-weight:800;color:var(--text);margin-bottom:3px;letter-spacing:-0.3px;}
-.login-sub{font-size:12px;color:var(--text-dim);margin-bottom:28px;}
-.login-field{margin-bottom:14px;text-align:left;}
+.login-brand-text{
+  display:flex;flex-direction:column;align-items:center;
+  text-align:center;position:relative;z-index:1;
+}
+.login-brand-name{
+  font-size:24px;font-weight:800;
+  color:var(--text-inv);letter-spacing:-0.5px;margin-top:14px;
+}
+.login-brand-tagline{
+  font-size:14px;line-height:1.6;
+  color:var(--accent3);max-width:260px;margin-top:36px;
+  position:relative;z-index:1;text-align:center;
+}
+.login-form-panel{
+  flex:0 0 420px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg2);padding:48px 40px;
+}
+.login-box{width:100%;max-width:340px;}
+.login-title{
+  font-size:22px;font-weight:800;
+  color:var(--text);margin-bottom:6px;letter-spacing:-0.4px;
+}
+.login-sub{font-size:13px;color:var(--text-dim);margin-bottom:28px;}
+.login-field{margin-bottom:16px;text-align:left;}
 .login-field label{
   display:block;font-size:10px;letter-spacing:1.5px;
-  color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:5px;
+  color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:6px;
+}
+.login-input-wrap{position:relative;}
+.login-input-wrap svg{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  color:var(--text-muted);width:15px;height:15px;pointer-events:none;
 }
 .login-field input{
   width:100%;background:var(--bg3);
   border:1px solid var(--border);color:var(--text);
-  border-radius:var(--r);padding:10px 13px;
+  border-radius:var(--r);padding:10px 13px 10px 38px;
   font-size:13px;outline:none;font-family:inherit;
-  transition:border-color 0.15s,box-shadow 0.15s;
+  transition:border-color 0.15s,box-shadow 0.15s;box-sizing:border-box;
 }
-.login-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,0.1);}
+.login-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(40,96,245,0.1);}
 .btn-login{
   width:100%;background:var(--accent);color:#fff;border:none;
-  border-radius:var(--r);padding:11px;font-size:13px;font-weight:700;
-  cursor:pointer;font-family:inherit;margin-top:4px;
+  border-radius:var(--r);padding:12px;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;margin-top:6px;
   transition:background 0.15s,box-shadow 0.15s;letter-spacing:0.2px;
 }
-.btn-login:hover{background:#1d4ed8;box-shadow:0 4px 12px rgba(37,99,235,0.3);}
-.login-error{color:var(--red);font-size:12px;margin-top:10px;display:none;}
+.btn-login:hover{background:var(--accent2);box-shadow:0 4px 12px rgba(40,96,245,0.3);}
+.btn-login:disabled{opacity:0.6;cursor:not-allowed;}
+.login-error{color:var(--red);font-size:12px;margin-top:12px;display:none;text-align:center;}
+@media(max-width:768px){
+  #loginScreen{flex-direction:column;}
+  .login-brand{
+    flex:none;padding:20px 24px;
+    flex-direction:row;gap:12px;justify-content:center;
+  }
+  .login-brand::before,.login-brand::after{display:none;}
+  .login-brand-pill{padding:8px 14px;border-radius:var(--r);}
+  .login-brand-logo{height:36px;}
+  .login-brand-text{align-items:flex-start;text-align:left;}
+  .login-brand-name{font-size:17px;margin-top:0;}
+  .login-brand-tagline{font-size:11px;margin-top:3px;max-width:none;text-align:left;}
+  .login-form-panel{flex:1;padding:28px 20px;}
+  .login-box{max-width:100%;}
+}
 
 /* ── APP ── */
 #appScreen{display:none;}
@@ -814,21 +872,38 @@ tbody tr:hover{background:#f8faff;}
 
 <!-- ══════════ LOGIN ══════════ -->
 <div id="loginScreen">
-  <div class="login-box">
-    <img src="https://www.chillersystem.com/assets/img/logo.webp" class="login-logo" alt="CS"
-      onerror="this.style.display='none'"/>
-    <div class="login-title">ChillerSystem · Gestión</div>
-    <div class="login-sub">ChillerSystem S.R.L. &amp; ChillerService S.A.</div>
-    <div class="login-field">
-      <label>Usuario</label>
-      <input type="text" id="loginUser" placeholder="Tu usuario" autocomplete="username"/>
+  <!-- Panel izquierdo: marca -->
+  <div class="login-brand">
+    <div class="login-brand-pill">
+      <img src="ls.jpeg" class="login-brand-logo" alt="ChillerSystem"/>
     </div>
-    <div class="login-field">
-      <label>Contraseña</label>
-      <input type="password" id="loginPass" placeholder="Tu contraseña" autocomplete="current-password"/>
+    <div class="login-brand-text">
+      <div class="login-brand-name">ChillerSystem</div>
+      <p class="login-brand-tagline">Equipos, services y presupuestos en un solo lugar.</p>
     </div>
-    <button class="btn-login" onclick="doLogin()">Ingresar →</button>
-    <div class="login-error" id="loginErr">Usuario o contraseña incorrectos</div>
+  </div>
+  <!-- Panel derecho: formulario -->
+  <div class="login-form-panel">
+    <div class="login-box">
+      <div class="login-title">Bienvenido</div>
+      <div class="login-sub">Ingresá tus credenciales para continuar.</div>
+      <div class="login-field">
+        <label>Usuario</label>
+        <div class="login-input-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <input type="text" id="loginUser" placeholder="Tu usuario" autocomplete="username"/>
+        </div>
+      </div>
+      <div class="login-field">
+        <label>Contraseña</label>
+        <div class="login-input-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="loginPass" placeholder="Tu contraseña" autocomplete="current-password"/>
+        </div>
+      </div>
+      <button class="btn-login" onclick="doLogin()">Ingresar →</button>
+      <div class="login-error" id="loginErr">Usuario o contraseña incorrectos</div>
+    </div>
   </div>
 </div>
 
