@@ -979,6 +979,7 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn admin-only" id="tabAprobaciones" onclick="showTab('aprobaciones',this)">✅ Aprobaciones</button>
   <button class="nav-btn" id="tabEstadisticas" onclick="showTab('estadisticas',this)">📊 Estadísticas</button>
   <button class="nav-btn admin-only" id="tabFichajes" onclick="showTab('fichajes',this)">📍 Tiempos/Rutas</button>
+  <button class="nav-btn" id="tabMiPanel" onclick="showTab('mipanel',this)" style="display:none;">🗂️ Mi Panel</button>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -1792,6 +1793,63 @@ tbody tr:hover{background:#f8faff;}
   <div id="fichajesBody" style="padding:16px;"></div>
 </div>
 
+<!-- ═══ MI PANEL (solo admin) ═══ -->
+<div id="tab-mipanel" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">🗂️ Mi Panel · Seguimiento de presupuestos</div>
+      <div class="panel-count">Carga rápida de presupuestos comerciales</div>
+    </div>
+  </div>
+  <div style="padding:16px;max-width:700px;">
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Fecha *</label>
+        <input class="form-input" id="mpFecha" type="date"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">N° Presupuesto *</label>
+        <input class="form-input" id="mpNumero" placeholder="Ej: 42426SO/2026"/>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Cliente *</label>
+        <input class="form-input" id="mpCliente" placeholder="Nombre del cliente"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sector / Oficina</label>
+        <input class="form-input" id="mpSector" placeholder="Opcional"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Técnico</label>
+        <input class="form-input" id="mpTecnico" placeholder="Opcional"/>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Descripción / Detalle *</label>
+        <input class="form-input" id="mpDetalle" placeholder="Descripción del trabajo"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Monto neto sin IVA *</label>
+        <input class="form-input" id="mpMonto" type="number" min="0" step="0.01" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estado *</label>
+        <select class="form-select" id="mpEstado">
+          <option value="Borrador">Borrador</option>
+          <option value="Presentado">Presentado</option>
+          <option value="En espera">En espera</option>
+          <option value="Aprobado">Aprobado</option>
+          <option value="En ejecución">En ejecución</option>
+          <option value="Facturado">Facturado</option>
+          <option value="Rechazado">Rechazado</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions" style="margin-top:16px;">
+      <button class="btn-primary" onclick="guardarPptoComercial()">💾 Guardar presupuesto</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL INFORME -->
 <div class="modal-overlay" id="mInforme">
   <div class="modal" style="max-width:700px;">
@@ -2514,6 +2572,7 @@ async function iniciarApp(){
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
   document.getElementById('tabGaleria').style.display=puedeVerGaleria()?'':'none';
   document.getElementById('tabEstadisticas').style.display=puedeVerEstadisticas()?'':'none';
+  document.getElementById('tabMiPanel').style.display=(usuarioActual.rol==='admin')?'':'none';
   
   // Excepción exclusiva: Fichajes sí lo ve gerencia
   const tabFichajes = document.getElementById('tabFichajes');
@@ -5603,7 +5662,7 @@ function setFiltro(v,btn){
 function puedeVerGaleria(){return !esTecnico();}
 function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
@@ -5615,6 +5674,7 @@ function showTab(id,btn){
   if(id==='aprobaciones'){loadAprobaciones().then(renderAprobaciones);}
   if(id==='galeria'){renderGaleria();}
   if(id==='estadisticas'){renderEstadisticas();}
+  if(id==='mipanel'){const f=document.getElementById('mpFecha');if(f&&!f.value)f.value=new Date().toISOString().split('T')[0];}
 }
 
 
@@ -6284,6 +6344,45 @@ async function elimPpto(id){
   if(!confirm('¿Eliminar este presupuesto?'))return;
   try{await api('presupuestos?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await loadPresupuestos();}catch(e){showToast('Error',true);}
+}
+
+// ── Mi Panel · Carga rápida comercial ────────────────────────────────────────
+async function guardarPptoComercial(){
+  const numero=document.getElementById('mpNumero').value.trim();
+  const cliente=document.getElementById('mpCliente').value.trim();
+  const detalle=document.getElementById('mpDetalle').value.trim();
+  if(!numero){showToast('N° de presupuesto obligatorio',true);return;}
+  if(!cliente){showToast('Cliente obligatorio',true);return;}
+  if(!detalle){showToast('Descripción obligatoria',true);return;}
+  const data={
+    origen:'comercial_david',
+    numero,
+    cliente_nombre:cliente,
+    referencia:document.getElementById('mpSector').value.trim()||null,
+    detalle_trabajos:detalle,
+    precio_total:parseFloat(document.getElementById('mpMonto').value)||0,
+    incluye_iva:false,
+    estado:document.getElementById('mpEstado').value,
+    estado_flujo:document.getElementById('mpEstado').value,
+    creado_por:usuarioActual.nombre,
+    fecha:document.getElementById('mpFecha').value||null,
+    moneda:'ARS'
+  };
+  try{
+    await api('presupuestos',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    console.log('[Mi Panel] Presupuesto guardado:',data);
+    showToast('✅ Presupuesto guardado correctamente','success');
+    document.getElementById('mpNumero').value='';
+    document.getElementById('mpCliente').value='';
+    document.getElementById('mpSector').value='';
+    document.getElementById('mpDetalle').value='';
+    document.getElementById('mpMonto').value='';
+    document.getElementById('mpTecnico').value='';
+    document.getElementById('mpEstado').selectedIndex=0;
+    document.getElementById('mpFecha').value=new Date().toISOString().split('T')[0];
+  }catch(e){
+    showToast('Error al guardar: '+e.message,true);
+  }
 }
 
 // ── Cargar presupuesto existente ──────────────────────────────────────────
