@@ -1801,6 +1801,7 @@ tbody tr:hover{background:#f8faff;}
       <div class="panel-count">Carga rápida de presupuestos comerciales</div>
     </div>
   </div>
+  <div id="mpKpis" style="padding:16px 16px 0;"></div>
   <div style="padding:16px;max-width:700px;">
     <div class="form-grid">
       <div class="form-group">
@@ -5674,7 +5675,7 @@ function showTab(id,btn){
   if(id==='aprobaciones'){loadAprobaciones().then(renderAprobaciones);}
   if(id==='galeria'){renderGaleria();}
   if(id==='estadisticas'){renderEstadisticas();}
-  if(id==='mipanel'){const f=document.getElementById('mpFecha');if(f&&!f.value)f.value=new Date().toISOString().split('T')[0];}
+  if(id==='mipanel'){const f=document.getElementById('mpFecha');if(f&&!f.value)f.value=new Date().toISOString().split('T')[0];cargarDatosMiPanel();}
 }
 
 
@@ -6347,6 +6348,127 @@ async function elimPpto(id){
 }
 
 // ── Mi Panel · Carga rápida comercial ────────────────────────────────────────
+// ── MI PANEL · KPIs ──────────────────────────────────────────────────────────
+const FECHA_CORTE_KPI = '2026-06-30';
+let _mpIvaTasa = 0, _mpIibbTasa = 0, _mpChequeTasa = 0, _mpChequeActivo = false;
+window._miPanelPptos = [];
+
+function _netoPostImpuestos(monto) {
+  return monto * (1 - _mpIibbTasa - (_mpChequeActivo ? _mpChequeTasa : 0));
+}
+
+function calcularKpisMiPanel(pptos) {
+  const COBRO = ['Aprobado','En ejecución'];
+  const PIPE  = ['Presentado','En espera'];
+  const CONV_OK = ['Aprobado','En ejecución','Facturado'];
+
+  const facturadoNetoNuevo = pptos
+    .filter(p => p.origen === 'comercial_david' && p.estado === 'Facturado' && p.fecha >= FECHA_CORTE_KPI)
+    .reduce((s, p) => s + (p.precio_total || 0), 0);
+
+  const pendienteCobro = pptos
+    .filter(p => COBRO.includes(p.estado))
+    .reduce((s, p) => s + (p.precio_total || 0), 0);
+
+  const pipeline = pptos
+    .filter(p => PIPE.includes(p.estado))
+    .reduce((s, p) => s + (p.precio_total || 0), 0);
+
+  const convNumer = pptos.filter(p => CONV_OK.includes(p.estado)).length;
+  const convDenom = pptos.filter(p => [...CONV_OK, 'Rechazado'].includes(p.estado)).length;
+  const conversion = convDenom === 0 ? '—' : Math.round(convNumer / convDenom * 100);
+
+  const conteos = {};
+  ['Borrador','Presentado','En espera','Aprobado','En ejecución','Facturado','Rechazado']
+    .forEach(e => { conteos[e] = pptos.filter(p => p.estado === e).length; });
+
+  return { facturadoNetoNuevo, facturadoPostImp: _netoPostImpuestos(facturadoNetoNuevo), pendienteCobro, pipeline, conversion, conteos };
+}
+
+function _fmtARS(n) {
+  if (n >= 1e6) return '$' + (n / 1e6).toLocaleString('es-AR', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'M';
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+function renderKpisMiPanel() {
+  const el = document.getElementById('mpKpis');
+  if (!el) return;
+  const k = calcularKpisMiPanel(window._miPanelPptos || []);
+
+  const convStr   = typeof k.conversion === 'number' ? k.conversion + '%' : k.conversion;
+  const convColor = typeof k.conversion === 'number'
+    ? (k.conversion >= 50 ? 'var(--green)' : k.conversion >= 25 ? 'var(--yellow)' : 'var(--red)')
+    : 'var(--text-dim)';
+
+  const chips = [
+    {label:'Borrador',      color:'var(--text-dim)', bg:'var(--bg4)'},
+    {label:'Presentado',    color:'#2563eb',          bg:'#dbeafe'},
+    {label:'En espera',     color:'var(--yellow)',    bg:'var(--yellow-bg)'},
+    {label:'Aprobado',      color:'var(--green)',     bg:'var(--green-bg)'},
+    {label:'En ejecución',  color:'#7c3aed',          bg:'#ede9fe'},
+    {label:'Facturado',     color:'#0e7490',          bg:'#cffafe'},
+    {label:'Rechazado',     color:'var(--red)',       bg:'var(--red-bg)'},
+  ];
+
+  el.innerHTML =
+    '<div style="max-width:900px;">'
+    + '<div class="dash-section-title">📊 KPIs · Mi cartera comercial</div>'
+    + '<div class="sparkline-kpi-grid">'
+
+    + '<div class="kpi-spark-card" style="border-left-color:var(--accent)">'
+    + '<div class="kpi-spark-top"><div class="kpi-spark-label">Pendiente de cobro</div></div>'
+    + '<div class="kpi-spark-num" style="color:var(--accent);font-size:26px;">' + _fmtARS(k.pendienteCobro) + '</div>'
+    + '<div class="kpi-spark-sub">Aprobado + En ejecución</div>'
+    + '</div>'
+
+    + '<div class="kpi-spark-card" style="border-left-color:#2563eb">'
+    + '<div class="kpi-spark-top"><div class="kpi-spark-label">Pipeline en juego</div></div>'
+    + '<div class="kpi-spark-num" style="color:#2563eb;font-size:26px;">' + _fmtARS(k.pipeline) + '</div>'
+    + '<div class="kpi-spark-sub">Presentado + En espera</div>'
+    + '</div>'
+
+    + '<div class="kpi-spark-card" style="border-left-color:var(--green)">'
+    + '<div class="kpi-spark-top"><div class="kpi-spark-label">Facturado neto (desde ' + FECHA_CORTE_KPI + ')</div></div>'
+    + '<div class="kpi-spark-num" style="color:var(--green);font-size:26px;">' + _fmtARS(k.facturadoNetoNuevo) + '</div>'
+    + '<div class="kpi-spark-sub">post-imp: ' + _fmtARS(k.facturadoPostImp) + '</div>'
+    + '</div>'
+
+    + '<div class="kpi-spark-card" style="border-left-color:' + convColor + '">'
+    + '<div class="kpi-spark-top"><div class="kpi-spark-label">Conversión</div></div>'
+    + '<div class="kpi-spark-num" style="color:' + convColor + ';font-size:26px;">' + convStr + '</div>'
+    + '<div class="kpi-spark-sub">Aprobados / (Aprobados + Rechazados)</div>'
+    + '</div>'
+
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-bottom:4px;">'
+    + chips.map(c =>
+        '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;'
+        + 'background:' + c.bg + ';color:' + c.color + ';">'
+        + c.label + ' ' + (k.conteos[c.label] || 0)
+        + '</span>'
+      ).join('')
+    + '</div>'
+    + '</div>';
+}
+
+async function cargarDatosMiPanel() {
+  try {
+    const [pptos, impuestos] = await Promise.all([
+      api('presupuestos?select=*&origen=in.(comercial_david,comercial_david_historico)'),
+      api('config_impuestos?select=*')
+    ]);
+    window._miPanelPptos = pptos || [];
+    (impuestos || []).forEach(row => {
+      if (row.clave === 'iva')    { _mpIvaTasa    = row.activo ? (row.alicuota || 0) : 0; }
+      if (row.clave === 'iibb')   { _mpIibbTasa   = row.activo ? (row.alicuota || 0) : 0; }
+      if (row.clave === 'cheque') { _mpChequeActivo = !!row.activo; _mpChequeTasa = row.alicuota || 0; }
+    });
+    renderKpisMiPanel();
+  } catch(e) {
+    console.error('[Mi Panel KPIs]', e);
+  }
+}
+
 async function guardarPptoComercial(){
   const numero=document.getElementById('mpNumero').value.trim();
   const cliente=document.getElementById('mpCliente').value.trim();
@@ -6380,6 +6502,7 @@ async function guardarPptoComercial(){
     document.getElementById('mpTecnico').value='';
     document.getElementById('mpEstado').selectedIndex=0;
     document.getElementById('mpFecha').value=new Date().toISOString().split('T')[0];
+    cargarDatosMiPanel();
   }catch(e){
     showToast('Error al guardar: '+e.message,true);
   }
