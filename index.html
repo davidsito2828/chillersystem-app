@@ -1835,13 +1835,13 @@ tbody tr:hover{background:#f8faff;}
       <div class="form-group">
         <label class="form-label">Estado *</label>
         <select class="form-select" id="mpEstado">
-          <option value="Borrador">Borrador</option>
-          <option value="Presentado">Presentado</option>
-          <option value="En espera">En espera</option>
-          <option value="Aprobado">Aprobado</option>
-          <option value="En ejecución">En ejecución</option>
-          <option value="Facturado">Facturado</option>
-          <option value="Rechazado">Rechazado</option>
+          <option value="borrador">📝 Borrador</option>
+          <option value="enviado">📤 Enviado al cliente</option>
+          <option value="en_revision">🔍 En espera / revisión</option>
+          <option value="aprobado_cliente">✅ Aprobado por cliente</option>
+          <option value="en_ejecucion">⚙️ En ejecución</option>
+          <option value="finalizado">🏁 Finalizado / Facturado</option>
+          <option value="rechazado">❌ Rechazado</option>
         </select>
       </div>
     </div>
@@ -6051,7 +6051,7 @@ let seccionesActuales=[]; // [{titulo, items:[]}]
 let preciosActuales={}; // {idx: precio}
 
 async function loadPresupuestos(){
-  presupuestos=await api('presupuestos?select=*&order=fecha.desc.nullslast,created_at.desc');
+  presupuestos=await api('presupuestos?select=*&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.desc.nullslast,created_at.desc');
   renderPresupuestos();
 }
 
@@ -6358,29 +6358,29 @@ function _netoPostImpuestos(monto) {
 }
 
 function calcularKpisMiPanel(pptos) {
-  const COBRO = ['Aprobado','En ejecución'];
-  const PIPE  = ['Presentado','En espera'];
-  const CONV_OK = ['Aprobado','En ejecución','Facturado'];
+  const COBRO   = ['aprobado_cliente','en_ejecucion'];
+  const PIPE    = ['enviado','en_revision'];
+  const CONV_OK = ['aprobado_cliente','en_ejecucion','finalizado'];
 
   const facturadoNetoNuevo = pptos
-    .filter(p => p.origen === 'comercial_david' && p.estado === 'Facturado' && p.fecha >= FECHA_CORTE_KPI)
+    .filter(p => p.origen === 'comercial_david' && p.estado_flujo === 'finalizado' && p.fecha >= FECHA_CORTE_KPI)
     .reduce((s, p) => s + (p.precio_total || 0), 0);
 
   const pendienteCobro = pptos
-    .filter(p => COBRO.includes(p.estado))
+    .filter(p => COBRO.includes(p.estado_flujo))
     .reduce((s, p) => s + (p.precio_total || 0), 0);
 
   const pipeline = pptos
-    .filter(p => PIPE.includes(p.estado))
+    .filter(p => PIPE.includes(p.estado_flujo))
     .reduce((s, p) => s + (p.precio_total || 0), 0);
 
-  const convNumer = pptos.filter(p => CONV_OK.includes(p.estado)).length;
-  const convDenom = pptos.filter(p => [...CONV_OK, 'Rechazado'].includes(p.estado)).length;
+  const convNumer = pptos.filter(p => CONV_OK.includes(p.estado_flujo)).length;
+  const convDenom = pptos.filter(p => [...CONV_OK, 'rechazado'].includes(p.estado_flujo)).length;
   const conversion = convDenom === 0 ? '—' : Math.round(convNumer / convDenom * 100);
 
   const conteos = {};
-  ['Borrador','Presentado','En espera','Aprobado','En ejecución','Facturado','Rechazado']
-    .forEach(e => { conteos[e] = pptos.filter(p => p.estado === e).length; });
+  ['borrador','en_revision','enviado','aprobado_cliente','en_ejecucion','finalizado','rechazado']
+    .forEach(e => { conteos[e] = pptos.filter(p => p.estado_flujo === e).length; });
 
   return { facturadoNetoNuevo, facturadoPostImp: _netoPostImpuestos(facturadoNetoNuevo), pendienteCobro, pipeline, conversion, conteos };
 }
@@ -6400,15 +6400,16 @@ function renderKpisMiPanel() {
     ? (k.conversion >= 50 ? 'var(--green)' : k.conversion >= 25 ? 'var(--yellow)' : 'var(--red)')
     : 'var(--text-dim)';
 
-  const chips = [
-    {label:'Borrador',      color:'var(--text-dim)', bg:'var(--bg4)'},
-    {label:'Presentado',    color:'#2563eb',          bg:'#dbeafe'},
-    {label:'En espera',     color:'var(--yellow)',    bg:'var(--yellow-bg)'},
-    {label:'Aprobado',      color:'var(--green)',     bg:'var(--green-bg)'},
-    {label:'En ejecución',  color:'#7c3aed',          bg:'#ede9fe'},
-    {label:'Facturado',     color:'#0e7490',          bg:'#cffafe'},
-    {label:'Rechazado',     color:'var(--red)',       bg:'var(--red-bg)'},
-  ];
+  const CHIP_KEYS = ['borrador','en_revision','enviado','aprobado_cliente','en_ejecucion','finalizado','rechazado'];
+  const CHIP_COLORS = {
+    'borrador':         {color:'var(--text-dim)', bg:'var(--bg4)'},
+    'en_revision':      {color:'var(--yellow)',   bg:'var(--yellow-bg)'},
+    'enviado':          {color:'#2563eb',          bg:'#dbeafe'},
+    'aprobado_cliente': {color:'var(--green)',     bg:'var(--green-bg)'},
+    'en_ejecucion':     {color:'#7c3aed',          bg:'#ede9fe'},
+    'finalizado':       {color:'#0e7490',          bg:'#cffafe'},
+    'rechazado':        {color:'var(--red)',       bg:'var(--red-bg)'},
+  };
 
   el.innerHTML =
     '<div style="max-width:900px;">'
@@ -6441,10 +6442,10 @@ function renderKpisMiPanel() {
 
     + '</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-bottom:4px;">'
-    + chips.map(c =>
+    + CHIP_KEYS.map(key =>
         '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;'
-        + 'background:' + c.bg + ';color:' + c.color + ';">'
-        + c.label + ' ' + (k.conteos[c.label] || 0)
+        + 'background:' + CHIP_COLORS[key].bg + ';color:' + CHIP_COLORS[key].color + ';">'
+        + (etiquetasFlujo[key]||key) + ' ' + (k.conteos[key] || 0)
         + '</span>'
       ).join('')
     + '</div>'
@@ -6476,6 +6477,7 @@ async function guardarPptoComercial(){
   if(!numero){showToast('N° de presupuesto obligatorio',true);return;}
   if(!cliente){showToast('Cliente obligatorio',true);return;}
   if(!detalle){showToast('Descripción obligatoria',true);return;}
+  const _mpEstVal=document.getElementById('mpEstado').value;
   const data={
     origen:'comercial_david',
     numero,
@@ -6484,8 +6486,9 @@ async function guardarPptoComercial(){
     detalle_trabajos:detalle,
     precio_total:parseFloat(document.getElementById('mpMonto').value)||0,
     incluye_iva:false,
-    estado:document.getElementById('mpEstado').value,
-    estado_flujo:document.getElementById('mpEstado').value,
+    estado:_mpEstVal,
+    estado_flujo:_mpEstVal,
+    historial_estados:[{estado:_mpEstVal,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre}],
     creado_por:usuarioActual.nombre,
     fecha:document.getElementById('mpFecha').value||null,
     moneda:'ARS'
@@ -6624,13 +6627,20 @@ function abrirModalAvanzarEstado(pId,estadoActual,numero,cliente,monto){
 async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
   const siguiente=siguienteEstado[estadoActual];
   if(!siguiente) return;
-  const ppto=presupuestos.find(x=>x.id===pId);
+  let ppto=presupuestos.find(x=>x.id===pId);
+  if(!ppto) ppto=(window._miPanelPptos||[]).find(x=>x.id===pId);
+  const esComercial=ppto&&ppto.origen&&ppto.origen.startsWith('comercial_david');
+  let extraPatch={};
+  if(esComercial&&estadoActual==='borrador'&&!(ppto.numero||numero)){
+    const nroInput=prompt('N° de presupuesto (opcional — dejá vacío para omitir):','');
+    if(nroInput&&nroInput.trim()) extraPatch.numero=nroInput.trim();
+  }
   const historial=[...(ppto&&ppto.historial_estados||[])];
   historial.push({estado:siguiente,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
   try{
     await api('presupuestos?id=eq.'+pId,{
       method:'PATCH',
-      body:JSON.stringify({estado_flujo:siguiente,historial_estados:historial}),
+      body:JSON.stringify({estado_flujo:siguiente,historial_estados:historial,...extraPatch}),
       headers:{...H,'Prefer':'return=minimal'}
     });
     if(siguiente==='en_ejecucion'||siguiente==='finalizado'){
@@ -6639,7 +6649,7 @@ async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
       await api('notificaciones',{
         method:'POST',
         body:JSON.stringify({
-          mensaje:'💰 Facturar '+tipoFactura+' — Presupuesto #'+numero+' — '+cliente+' — $'+montoFactura.toLocaleString('es-AR'),
+          mensaje:'💰 Facturar '+tipoFactura+' — Presupuesto #'+(extraPatch.numero||numero)+' — '+cliente+' — $'+montoFactura.toLocaleString('es-AR'),
           tipo:'facturacion',leida:false,destinatario_jerarquia:'administrativo'
         }),
         headers:{...H,'Prefer':'return=minimal'}
@@ -6648,6 +6658,7 @@ async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
     showToast('Estado actualizado ✓','success');
     await loadPresupuestos();
     await loadNotificaciones();
+    if(esComercial) cargarDatosMiPanel();
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
