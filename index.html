@@ -1849,6 +1849,7 @@ tbody tr:hover{background:#f8faff;}
       <button class="btn-primary" onclick="guardarPptoComercial()">💾 Guardar presupuesto</button>
     </div>
   </div>
+  <div id="mpPlanilla" style="padding:0 16px 24px;"></div>
 </div>
 
 <!-- MODAL INFORME -->
@@ -6452,6 +6453,99 @@ function renderKpisMiPanel() {
     + '</div>';
 }
 
+// ── MI PANEL · PLANILLA ──────────────────────────────────────────────────────
+let _mpFiltro = 'todos';
+
+function calcularDiasSinRespuesta(ppto) {
+  if (!['enviado','en_revision'].includes(ppto.estado_flujo)) return null;
+  let fechaRef = null;
+  const hist = ppto.historial_estados;
+  if (hist && hist.length) {
+    const entradas = hist.filter(h => h.estado === 'enviado');
+    if (entradas.length) fechaRef = entradas[entradas.length - 1].fecha;
+  }
+  if (!fechaRef) fechaRef = ppto.fecha;
+  if (!fechaRef) return null;
+  return Math.floor((new Date() - new Date(fechaRef)) / 86400000);
+}
+
+function colorDias(dias) {
+  if (dias === null) return {emoji:'', color:'var(--text-muted)'};
+  if (dias <= 7)    return {emoji:'🟢', color:'var(--green)'};
+  if (dias <= 20)   return {emoji:'🟡', color:'var(--yellow)'};
+  return {emoji:'🔴', color:'var(--red)'};
+}
+
+function renderPlanillaMiPanel() {
+  const el = document.getElementById('mpPlanilla');
+  if (!el) return;
+  const todos = window._miPanelPptos || [];
+  const ESPERA = ['enviado','en_revision'];
+
+  let filtrados = todos;
+  if (_mpFiltro === 'perseguir') filtrados = todos.filter(p => ESPERA.includes(p.estado_flujo));
+  else if (_mpFiltro === 'aprobados') filtrados = todos.filter(p => p.estado_flujo === 'aprobado_cliente');
+
+  const esperan  = filtrados.filter(p => ESPERA.includes(p.estado_flujo))
+    .sort((a,b) => (calcularDiasSinRespuesta(b)??-1) - (calcularDiasSinRespuesta(a)??-1));
+  const resto    = filtrados.filter(p => !ESPERA.includes(p.estado_flujo));
+  const ordenados = [...esperan, ...resto];
+
+  const cntPerseguir = todos.filter(p => ESPERA.includes(p.estado_flujo)).length;
+  const cntAprobados = todos.filter(p => p.estado_flujo === 'aprobado_cliente').length;
+
+  function btnCls(f) {
+    const base = 'padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);font-family:inherit;transition:all 0.15s;';
+    return base + (_mpFiltro === f
+      ? 'background:var(--accent);color:#fff;border-color:var(--accent);'
+      : 'background:var(--bg3);color:var(--text-dim);');
+  }
+
+  let html = '<div style="max-width:900px;">'
+    + '<div class="dash-section-title" style="margin-bottom:10px;">📋 Planilla de seguimiento</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'
+    + '<button style="' + btnCls('todos') + '" onclick="_mpFiltro=\'todos\';renderPlanillaMiPanel()">Todos (' + todos.length + ')</button>'
+    + '<button style="' + btnCls('perseguir') + '" onclick="_mpFiltro=\'perseguir\';renderPlanillaMiPanel()">🔔 A perseguir (' + cntPerseguir + ')</button>'
+    + '<button style="' + btnCls('aprobados') + '" onclick="_mpFiltro=\'aprobados\';renderPlanillaMiPanel()">✅ Aprobados (' + cntAprobados + ')</button>'
+    + '</div>';
+
+  if (!ordenados.length) {
+    html += '<div style="padding:32px;text-align:center;color:var(--text-dim);font-size:13px;">'
+      + (todos.length === 0 ? '📭 Todavía no cargaste presupuestos.' : '📭 No hay presupuestos para este filtro.')
+      + '</div>';
+  } else {
+    html += '<div class="table-wrap"><table>'
+      + '<thead><tr>'
+      + '<th>Cliente / Trabajo</th><th>N°</th><th>Monto</th><th>Estado</th><th>Días sin resp.</th>'
+      + '</tr></thead><tbody>'
+      + ordenados.map(p => {
+          const dias = calcularDiasSinRespuesta(p);
+          const cd   = colorDias(dias);
+          const diasTxt = dias !== null ? cd.emoji + ' ' + dias : '—';
+          const flujo = p.estado_flujo || 'borrador';
+          const estStyle = coloresFlujo[flujo] || 'background:var(--bg4);color:var(--text-dim);';
+          const estLabel = etiquetasFlujo[flujo] || flujo;
+          const nro = (p.numero && !String(p.numero).startsWith('HIST-')) ? p.numero : '—';
+          const monto = p.precio_total ? '$' + Number(p.precio_total).toLocaleString('es-AR') : '—';
+          const detalle = p.detalle_trabajos
+            ? '<div class="td-dim" style="font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">'
+              + p.detalle_trabajos + '</div>'
+            : '';
+          return '<tr>'
+            + '<td><div class="td-name">' + (p.cliente_nombre||'—') + '</div>' + detalle + '</td>'
+            + '<td class="td-mono" style="font-size:11px;">' + nro + '</td>'
+            + '<td class="td-mono">' + monto + '</td>'
+            + '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;' + estStyle + '">' + estLabel + '</span></td>'
+            + '<td style="font-weight:700;color:' + cd.color + ';font-family:\'IBM Plex Mono\',monospace;font-size:12px;">' + diasTxt + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 async function cargarDatosMiPanel() {
   try {
     const [pptos, impuestos] = await Promise.all([
@@ -6465,6 +6559,7 @@ async function cargarDatosMiPanel() {
       if (row.clave === 'cheque') { _mpChequeActivo = !!row.activo; _mpChequeTasa = row.alicuota || 0; }
     });
     renderKpisMiPanel();
+    renderPlanillaMiPanel();
   } catch(e) {
     console.error('[Mi Panel KPIs]', e);
   }
