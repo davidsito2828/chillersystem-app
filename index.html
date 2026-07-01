@@ -6476,6 +6476,75 @@ function colorDias(dias) {
   return {emoji:'🔴', color:'var(--red)'};
 }
 
+async function mpEditarCampo(campo, pId, spanEl) {
+  const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto) return;
+  const valorActual = campo === 'precio_total' ? (ppto.precio_total || 0) : (ppto.numero || '');
+  const input = document.createElement('input');
+  input.type = campo === 'precio_total' ? 'number' : 'text';
+  input.value = String(valorActual);
+  input.style.cssText = 'width:80px;font-family:inherit;font-size:inherit;border:1px solid var(--accent);border-radius:4px;padding:2px 4px;background:var(--bg2);color:var(--text);min-width:60px;';
+  let guardado = false;
+  async function guardar() {
+    if (guardado) return;
+    guardado = true;
+    const raw = campo === 'precio_total' ? parseFloat(input.value) : input.value.trim();
+    if (raw === valorActual || (campo === 'precio_total' && isNaN(raw))) {
+      spanEl.style.display = ''; input.remove(); return;
+    }
+    try {
+      await api('presupuestos?id=eq.'+pId, {
+        method:'PATCH',
+        body: JSON.stringify({[campo]: campo === 'precio_total' ? raw : (raw||null)}),
+        headers: {...H, 'Prefer':'return=minimal'}
+      });
+      showToast('✅ Guardado','success');
+      cargarDatosMiPanel();
+    } catch(e) {
+      showToast('Error: '+e.message, true);
+      spanEl.style.display = ''; input.remove();
+    }
+  }
+  input.addEventListener('blur', guardar);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { guardado = true; spanEl.style.display = ''; input.remove(); }
+  });
+  spanEl.style.display = 'none';
+  spanEl.parentNode.insertBefore(input, spanEl);
+  input.focus();
+  if (input.select) input.select();
+}
+
+async function mpEliminarPpto(pId) {
+  const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto || !ppto.origen || !ppto.origen.startsWith('comercial_david')) return;
+  const nro = (ppto.numero && !String(ppto.numero).startsWith('HIST-')) ? ppto.numero : '—';
+  if (!confirm('¿Eliminar el presupuesto de ' + (ppto.cliente_nombre||'?') + ' N°' + nro + '?\nNo se puede deshacer.')) return;
+  try {
+    await api('presupuestos?id=eq.'+pId, {method:'DELETE', headers:{...H}});
+    showToast('Presupuesto eliminado','success');
+    cargarDatosMiPanel();
+  } catch(e) {
+    showToast('Error al eliminar: '+e.message, true);
+  }
+}
+
+async function mpToggleControlado(pId) {
+  const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto) return;
+  try {
+    await api('presupuestos?id=eq.'+pId, {
+      method:'PATCH',
+      body: JSON.stringify({controlado: !ppto.controlado}),
+      headers: {...H, 'Prefer':'return=minimal'}
+    });
+    cargarDatosMiPanel();
+  } catch(e) {
+    showToast('Error: '+e.message, true);
+  }
+}
+
 function renderPlanillaMiPanel() {
   const el = document.getElementById('mpPlanilla');
   if (!el) return;
@@ -6483,16 +6552,18 @@ function renderPlanillaMiPanel() {
   const ESPERA = ['enviado','en_revision'];
 
   let filtrados = todos;
-  if (_mpFiltro === 'perseguir') filtrados = todos.filter(p => ESPERA.includes(p.estado_flujo));
-  else if (_mpFiltro === 'aprobados') filtrados = todos.filter(p => p.estado_flujo === 'aprobado_cliente');
+  if (_mpFiltro === 'perseguir')   filtrados = todos.filter(p => ESPERA.includes(p.estado_flujo));
+  else if (_mpFiltro === 'aprobados')  filtrados = todos.filter(p => p.estado_flujo === 'aprobado_cliente');
+  else if (_mpFiltro === 'borradores') filtrados = todos.filter(p => p.estado_flujo === 'borrador');
 
   const esperan  = filtrados.filter(p => ESPERA.includes(p.estado_flujo))
     .sort((a,b) => (calcularDiasSinRespuesta(b)??-1) - (calcularDiasSinRespuesta(a)??-1));
   const resto    = filtrados.filter(p => !ESPERA.includes(p.estado_flujo));
   const ordenados = [...esperan, ...resto];
 
-  const cntPerseguir = todos.filter(p => ESPERA.includes(p.estado_flujo)).length;
-  const cntAprobados = todos.filter(p => p.estado_flujo === 'aprobado_cliente').length;
+  const cntPerseguir  = todos.filter(p => ESPERA.includes(p.estado_flujo)).length;
+  const cntAprobados  = todos.filter(p => p.estado_flujo === 'aprobado_cliente').length;
+  const cntBorradores = todos.filter(p => p.estado_flujo === 'borrador').length;
 
   function btnCls(f) {
     const base = 'padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);font-family:inherit;transition:all 0.15s;';
@@ -6507,6 +6578,7 @@ function renderPlanillaMiPanel() {
     + '<button style="' + btnCls('todos') + '" onclick="_mpFiltro=\'todos\';renderPlanillaMiPanel()">Todos (' + todos.length + ')</button>'
     + '<button style="' + btnCls('perseguir') + '" onclick="_mpFiltro=\'perseguir\';renderPlanillaMiPanel()">🔔 A perseguir (' + cntPerseguir + ')</button>'
     + '<button style="' + btnCls('aprobados') + '" onclick="_mpFiltro=\'aprobados\';renderPlanillaMiPanel()">✅ Aprobados (' + cntAprobados + ')</button>'
+    + '<button style="' + btnCls('borradores') + '" onclick="_mpFiltro=\'borradores\';renderPlanillaMiPanel()">📝 Borradores (' + cntBorradores + ')</button>'
     + '</div>';
 
   if (!ordenados.length) {
@@ -6516,7 +6588,9 @@ function renderPlanillaMiPanel() {
   } else {
     html += '<div class="table-wrap"><table>'
       + '<thead><tr>'
+      + '<th style="width:28px;text-align:center;">✓</th>'
       + '<th>Cliente / Trabajo</th><th>N°</th><th>Monto</th><th>Estado</th><th>Días sin resp.</th>'
+      + '<th style="width:36px;"></th>'
       + '</tr></thead><tbody>'
       + ordenados.map(p => {
           const dias = calcularDiasSinRespuesta(p);
@@ -6531,12 +6605,19 @@ function renderPlanillaMiPanel() {
             ? '<div class="td-dim" style="font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">'
               + p.detalle_trabajos + '</div>'
             : '';
+          const ctrl = !!p.controlado;
+          const ctrlIcon = ctrl
+            ? '<span style="color:var(--green);font-weight:700;font-size:15px;line-height:1;">✓</span>'
+            : '<span style="color:var(--text-muted);font-size:15px;line-height:1;">○</span>';
+          const editStyle = 'cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;';
           return '<tr>'
+            + '<td style="text-align:center;cursor:pointer;" onclick="mpToggleControlado(\'' + p.id + '\')" title="Marcar como controlado / verificado">' + ctrlIcon + '</td>'
             + '<td><div class="td-name">' + (p.cliente_nombre||'—') + '</div>' + detalle + '</td>'
-            + '<td class="td-mono" style="font-size:11px;">' + nro + '</td>'
-            + '<td class="td-mono">' + monto + '</td>'
+            + '<td class="td-mono" style="font-size:11px;"><span style="' + editStyle + '" onclick="mpEditarCampo(\'numero\',\'' + p.id + '\',this)" title="Click para editar">' + nro + '</span></td>'
+            + '<td class="td-mono"><span style="' + editStyle + '" onclick="mpEditarCampo(\'precio_total\',\'' + p.id + '\',this)" title="Click para editar">' + monto + '</span></td>'
             + '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;' + estStyle + '">' + estLabel + '</span></td>'
             + '<td style="font-weight:700;color:' + cd.color + ';font-family:\'IBM Plex Mono\',monospace;font-size:12px;">' + diasTxt + '</td>'
+            + '<td style="text-align:center;"><button onclick="mpEliminarPpto(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px;border-radius:4px;line-height:1;" title="Eliminar">🗑️</button></td>'
             + '</tr>';
         }).join('')
       + '</tbody></table></div>';
