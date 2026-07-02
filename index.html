@@ -1453,6 +1453,7 @@ tbody tr:hover{background:#f8faff;}
   <div class="panel-header">
     <div><div class="panel-title">💼 Presupuestos</div><div class="panel-count" id="pptoCount">—</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <input type="text" id="buscarPptoNumero" class="search-box" placeholder="Buscar por N°…" oninput="renderPresupuestos()" style="width:130px;"/>
       <select class="search-box" style="width:auto;" onchange="filtroPptoEstado=this.value;renderPresupuestos()">
         <option value="">Todos</option>
         <option value="borrador">📝 Borrador</option>
@@ -1849,6 +1850,7 @@ tbody tr:hover{background:#f8faff;}
       <button class="btn-primary" onclick="guardarPptoComercial()">💾 Guardar presupuesto</button>
     </div>
   </div>
+  <div id="mpGraficos" style="padding:0 16px 8px;"></div>
   <div id="mpPlanilla" style="padding:0 16px 24px;"></div>
 </div>
 
@@ -6057,7 +6059,9 @@ async function loadPresupuestos(){
 }
 
 function renderPresupuestos(){
-  const lista=filtroPptoEstado?presupuestos.filter(p=>p.estado_flujo===filtroPptoEstado):presupuestos;
+  const _buscarNro=(document.getElementById('buscarPptoNumero')?.value||'').trim().toLowerCase();
+  let lista=filtroPptoEstado?presupuestos.filter(p=>p.estado_flujo===filtroPptoEstado):presupuestos;
+  if(_buscarNro) lista=lista.filter(p=>(p.numero||'').toLowerCase().includes(_buscarNro));
   document.getElementById('pptoCount').textContent=lista.length+' presupuesto(s)';
   const tb=document.getElementById('pptoBody');
   if(!lista.length){
@@ -6568,6 +6572,25 @@ async function mpPasarAEnviado(pId) {
   }
 }
 
+async function mpAdjuntarPdf(pId) {
+  const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto) return;
+  if (ppto.pdf_url) { window.open(ppto.pdf_url, '_blank'); return; }
+  const url = prompt('Pegá el link del PDF (Google Drive, Dropbox, etc.):', '');
+  if (!url || !url.trim()) return;
+  try {
+    await api('presupuestos?id=eq.'+pId, {
+      method:'PATCH',
+      body: JSON.stringify({pdf_url: url.trim()}),
+      headers: {...H, 'Prefer':'return=minimal'}
+    });
+    showToast('✅ Link de PDF guardado', 'success');
+    cargarDatosMiPanel();
+  } catch(e) {
+    showToast('Error: '+e.message, true);
+  }
+}
+
 function renderPlanillaMiPanel() {
   const el = document.getElementById('mpPlanilla');
   if (!el) return;
@@ -6642,6 +6665,7 @@ function renderPlanillaMiPanel() {
             + '<td style="font-weight:700;color:' + cd.color + ';font-family:\'IBM Plex Mono\',monospace;font-size:12px;">' + diasTxt + '</td>'
             + '<td><div style="display:flex;gap:4px;align-items:center;justify-content:center;">'
             + (flujo === 'borrador' ? '<button onclick="mpPasarAEnviado(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--accent);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como enviado">📤 Enviar</button>' : '')
+            + '<button onclick="mpAdjuntarPdf(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (p.pdf_url ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;line-height:1;" title="' + (p.pdf_url ? 'Ver PDF' : 'Adjuntar link de PDF') + '">📎</button>'
             + '<button onclick="mpEliminarPpto(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px;border-radius:4px;line-height:1;" title="Eliminar">🗑️</button>'
             + '</div></td>'
             + '</tr>';
@@ -6651,6 +6675,76 @@ function renderPlanillaMiPanel() {
 
   html += '</div>';
   el.innerHTML = html;
+}
+
+function renderGraficosMiPanel() {
+  var el = document.getElementById('mpGraficos');
+  if (!el) return;
+  var pptos = window._miPanelPptos || [];
+  if (!pptos.length) { el.innerHTML = ''; return; }
+
+  var ESTADOS = ['borrador','enviado','en_revision','aprobado_cliente','en_ejecucion','finalizado','rechazado'];
+  var COLORES = {
+    'borrador':         '#d97706',
+    'enviado':          '#2860f5',
+    'en_revision':      '#7c3aed',
+    'aprobado_cliente': '#059669',
+    'en_ejecucion':     '#0891b2',
+    'finalizado':       '#9ca3af',
+    'rechazado':        '#dc2626'
+  };
+  var LABELS = {
+    'borrador':'Borrador','enviado':'Enviado','en_revision':'En revisión',
+    'aprobado_cliente':'Aprobado','en_ejecucion':'En ejecución',
+    'finalizado':'Finalizado','rechazado':'Rechazado'
+  };
+
+  var conteos = {};
+  ESTADOS.forEach(function(e){ conteos[e] = pptos.filter(function(p){ return p.estado_flujo === e; }).length; });
+  var maxCnt = Math.max(1, Math.max.apply(null, ESTADOS.map(function(e){ return conteos[e]; })));
+
+  var W = 320, labelW = 100, barMaxW = 150, rowH = 22, padTop = 2;
+  var svgH = ESTADOS.length * rowH + padTop + 4;
+  var bars = '';
+  ESTADOS.forEach(function(e, i) {
+    var cnt = conteos[e];
+    var bw = cnt ? Math.max(4, Math.round((cnt / maxCnt) * barMaxW)) : 0;
+    var y = padTop + i * rowH;
+    var col = COLORES[e];
+    bars += '<text x="0" y="' + (y+14) + '" font-size="10" fill="var(--text-dim)" font-family="inherit" font-weight="600">' + LABELS[e] + '</text>';
+    if (cnt > 0) bars += '<rect x="' + labelW + '" y="' + (y+4) + '" width="' + bw + '" height="13" rx="3" fill="' + col + '" opacity="0.85"/>';
+    bars += '<text x="' + (labelW + bw + 6) + '" y="' + (y+14) + '" font-size="10" fill="' + col + '" font-family="inherit" font-weight="700">' + cnt + '</text>';
+  });
+  var barSvg = '<svg width="' + W + '" height="' + svgH + '" viewBox="0 0 ' + W + ' ' + svgH + '" style="display:block;">' + bars + '</svg>';
+
+  var ganados  = pptos.filter(function(p){ return ['aprobado_cliente','en_ejecucion','finalizado'].includes(p.estado_flujo); }).length;
+  var rechazados = pptos.filter(function(p){ return p.estado_flujo === 'rechazado'; }).length;
+  var totalConv = ganados + rechazados;
+  var pctG = totalConv ? Math.round(ganados / totalConv * 100) : 0;
+  var TW = 240;
+  var bgG = totalConv ? Math.round((ganados / totalConv) * TW) : 0;
+  var convHtml = '';
+  if (totalConv) {
+    convHtml = '<div style="min-width:190px;">'
+      + '<div style="font-size:10px;letter-spacing:0.5px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:8px;">Conversión</div>'
+      + '<svg width="' + TW + '" height="20" viewBox="0 0 ' + TW + ' 20" style="display:block;">'
+      + '<rect x="0" y="4" width="' + TW + '" height="12" rx="6" fill="var(--bg4)"/>'
+      + (ganados   ? '<rect x="0" y="4" width="' + bgG + '" height="12" rx="6" fill="#059669"/>' : '')
+      + (rechazados ? '<rect x="' + bgG + '" y="4" width="' + (TW-bgG) + '" height="12" rx="6" fill="#dc2626"/>' : '')
+      + '</svg>'
+      + '<div style="display:flex;gap:10px;margin-top:6px;font-size:10px;font-weight:700;">'
+      + '<span style="color:#059669;">✓ ' + ganados + ' (' + pctG + '%)</span>'
+      + '<span style="color:#dc2626;">✗ ' + rechazados + ' (' + (100-pctG) + '%)</span>'
+      + '</div>'
+      + '</div>';
+  }
+
+  el.innerHTML = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 20px 12px;max-width:640px;margin-bottom:4px;">'
+    + '<div class="dash-section-title" style="margin-bottom:12px;">📊 Distribución por estado</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;">'
+    + '<div>' + barSvg + '</div>'
+    + convHtml
+    + '</div></div>';
 }
 
 async function cargarDatosMiPanel() {
@@ -6666,6 +6760,7 @@ async function cargarDatosMiPanel() {
       if (row.clave === 'cheque') { _mpChequeActivo = !!row.activo; _mpChequeTasa = row.alicuota || 0; }
     });
     renderKpisMiPanel();
+    try { renderGraficosMiPanel(); } catch(eg) { console.warn('[Mi Panel Gráficos]', eg); }
     renderPlanillaMiPanel();
   } catch(e) {
     console.error('[Mi Panel KPIs]', e);
