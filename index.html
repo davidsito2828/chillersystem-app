@@ -1809,8 +1809,8 @@ tbody tr:hover{background:#f8faff;}
         <input class="form-input" id="mpFecha" type="date"/>
       </div>
       <div class="form-group">
-        <label class="form-label">N° Presupuesto *</label>
-        <input class="form-input" id="mpNumero" placeholder="Ej: 42426SO/2026"/>
+        <label class="form-label">N° Presupuesto</label>
+        <input class="form-input" id="mpNumero" placeholder="Opcional — se completa al enviar"/>
       </div>
       <div class="form-group full">
         <label class="form-label">Cliente *</label>
@@ -6545,6 +6545,29 @@ async function mpToggleControlado(pId) {
   }
 }
 
+async function mpPasarAEnviado(pId) {
+  const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto) return;
+  const extra = {};
+  if (!ppto.numero) {
+    const nroInput = prompt('N° de presupuesto (podés dejarlo vacío y completarlo después):', '');
+    if (nroInput && nroInput.trim()) extra.numero = nroInput.trim();
+  }
+  const hoy = new Date().toISOString().split('T')[0];
+  const historial = [...(ppto.historial_estados || []), {estado:'enviado', fecha:hoy, usuario:usuarioActual.nombre}];
+  try {
+    await api('presupuestos?id=eq.'+pId, {
+      method:'PATCH',
+      body: JSON.stringify({estado_flujo:'enviado', estado:'enviado', historial_estados:historial, ...extra}),
+      headers: {...H, 'Prefer':'return=minimal'}
+    });
+    showToast('Marcado como enviado ✓', 'success');
+    cargarDatosMiPanel();
+  } catch(e) {
+    showToast('Error: '+e.message, true);
+  }
+}
+
 function renderPlanillaMiPanel() {
   const el = document.getElementById('mpPlanilla');
   if (!el) return;
@@ -6617,7 +6640,10 @@ function renderPlanillaMiPanel() {
             + '<td class="td-mono"><span style="' + editStyle + '" onclick="mpEditarCampo(\'precio_total\',\'' + p.id + '\',this)" title="Click para editar">' + monto + '</span></td>'
             + '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;' + estStyle + '">' + estLabel + '</span></td>'
             + '<td style="font-weight:700;color:' + cd.color + ';font-family:\'IBM Plex Mono\',monospace;font-size:12px;">' + diasTxt + '</td>'
-            + '<td style="text-align:center;"><button onclick="mpEliminarPpto(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px;border-radius:4px;line-height:1;" title="Eliminar">🗑️</button></td>'
+            + '<td><div style="display:flex;gap:4px;align-items:center;justify-content:center;">'
+            + (flujo === 'borrador' ? '<button onclick="mpPasarAEnviado(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--accent);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como enviado">📤 Enviar</button>' : '')
+            + '<button onclick="mpEliminarPpto(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px;border-radius:4px;line-height:1;" title="Eliminar">🗑️</button>'
+            + '</div></td>'
             + '</tr>';
         }).join('')
       + '</tbody></table></div>';
@@ -6650,13 +6676,12 @@ async function guardarPptoComercial(){
   const numero=document.getElementById('mpNumero').value.trim();
   const cliente=document.getElementById('mpCliente').value.trim();
   const detalle=document.getElementById('mpDetalle').value.trim();
-  if(!numero){showToast('N° de presupuesto obligatorio',true);return;}
   if(!cliente){showToast('Cliente obligatorio',true);return;}
   if(!detalle){showToast('Descripción obligatoria',true);return;}
   const _mpEstVal=document.getElementById('mpEstado').value;
   const data={
     origen:'comercial_david',
-    numero,
+    numero: numero || null,
     cliente_nombre:cliente,
     referencia:document.getElementById('mpSector').value.trim()||null,
     detalle_trabajos:detalle,
