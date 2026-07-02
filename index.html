@@ -6591,6 +6591,28 @@ async function mpAdjuntarPdf(pId) {
   }
 }
 
+async function mpCambiarEstado(pId, nuevoEstado) {
+  const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto || !(ppto.origen||'').startsWith('comercial_david')) return;
+  const etiq = {'aprobado_cliente':'Aprobado por cliente','en_ejecucion':'En ejecución','finalizado':'Finalizado','rechazado':'Rechazado por cliente'};
+  if (nuevoEstado === 'rechazado' || nuevoEstado === 'finalizado') {
+    if (!confirm('¿Marcar como "' + (etiq[nuevoEstado]||nuevoEstado) + '" el presupuesto de ' + (ppto.cliente_nombre||'este cliente') + '?')) return;
+  }
+  const hoy = new Date().toISOString().split('T')[0];
+  const historial = [...(ppto.historial_estados||[]), {estado:nuevoEstado, fecha:hoy, usuario:usuarioActual.nombre}];
+  try {
+    await api('presupuestos?id=eq.'+pId, {
+      method:'PATCH',
+      body: JSON.stringify({estado_flujo:nuevoEstado, estado:nuevoEstado, historial_estados:historial}),
+      headers: {...H, 'Prefer':'return=minimal'}
+    });
+    showToast('Estado actualizado ✓', 'success');
+    cargarDatosMiPanel();
+  } catch(e) {
+    showToast('Error: '+e.message, true);
+  }
+}
+
 function renderPlanillaMiPanel() {
   const el = document.getElementById('mpPlanilla');
   if (!el) return;
@@ -6663,8 +6685,13 @@ function renderPlanillaMiPanel() {
             + '<td class="td-mono"><span style="' + editStyle + '" onclick="mpEditarCampo(\'precio_total\',\'' + p.id + '\',this)" title="Click para editar">' + monto + '</span></td>'
             + '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;' + estStyle + '">' + estLabel + '</span></td>'
             + '<td style="font-weight:700;color:' + cd.color + ';font-family:\'IBM Plex Mono\',monospace;font-size:12px;">' + diasTxt + '</td>'
-            + '<td><div style="display:flex;gap:4px;align-items:center;justify-content:center;">'
+            + '<td><div style="display:flex;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap;">'
             + (flujo === 'borrador' ? '<button onclick="mpPasarAEnviado(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--accent);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como enviado">📤 Enviar</button>' : '')
+            + ((flujo === 'enviado' || flujo === 'en_revision') ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'aprobado_cliente\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--green);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como aprobado">✅ Aprobado</button>' : '')
+            + ((flujo === 'enviado' || flujo === 'en_revision') ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'rechazado\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--red);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como rechazado">❌ Rechazado</button>' : '')
+            + (flujo === 'aprobado_cliente' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'en_ejecucion\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--accent);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Pasar a en ejecución">⚙️ Ejecución</button>' : '')
+            + (flujo === 'aprobado_cliente' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'rechazado\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--red);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como rechazado">❌ Rechazado</button>' : '')
+            + (flujo === 'en_ejecucion' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'finalizado\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--green);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como finalizado">🏁 Finalizado</button>' : '')
             + '<button onclick="mpAdjuntarPdf(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (p.pdf_url ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;line-height:1;" title="' + (p.pdf_url ? 'Ver PDF' : 'Adjuntar link de PDF') + '">📎</button>'
             + '<button onclick="mpEliminarPpto(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px;border-radius:4px;line-height:1;" title="Eliminar">🗑️</button>'
             + '</div></td>'
