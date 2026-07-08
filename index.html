@@ -6459,6 +6459,7 @@ function renderKpisMiPanel() {
 
 // ── MI PANEL · PLANILLA ──────────────────────────────────────────────────────
 let _mpFiltro = 'todos';
+let _mpBuscarNro = '';
 
 function calcularDiasSinRespuesta(ppto) {
   if (!['enviado','en_revision'].includes(ppto.estado_flujo)) return null;
@@ -6624,6 +6625,12 @@ function renderPlanillaMiPanel() {
   else if (_mpFiltro === 'aprobados')  filtrados = todos.filter(p => p.estado_flujo === 'aprobado_cliente');
   else if (_mpFiltro === 'borradores') filtrados = todos.filter(p => p.estado_flujo === 'borrador');
 
+  const _buscarTxt = (_mpBuscarNro || '').trim().toLowerCase();
+  if (_buscarTxt) filtrados = filtrados.filter(p => (p.numero||'').toLowerCase().includes(_buscarTxt));
+
+  const _focoBuscar = document.activeElement && document.activeElement.id === 'mpBuscarNumero';
+  const _cursorPos = _focoBuscar ? document.activeElement.selectionStart : null;
+
   const esperan  = filtrados.filter(p => ESPERA.includes(p.estado_flujo))
     .sort((a,b) => (calcularDiasSinRespuesta(b)??-1) - (calcularDiasSinRespuesta(a)??-1));
   const resto    = filtrados.filter(p => !ESPERA.includes(p.estado_flujo));
@@ -6647,6 +6654,7 @@ function renderPlanillaMiPanel() {
     + '<button style="' + btnCls('perseguir') + '" onclick="_mpFiltro=\'perseguir\';renderPlanillaMiPanel()">🔔 A perseguir (' + cntPerseguir + ')</button>'
     + '<button style="' + btnCls('aprobados') + '" onclick="_mpFiltro=\'aprobados\';renderPlanillaMiPanel()">✅ Aprobados (' + cntAprobados + ')</button>'
     + '<button style="' + btnCls('borradores') + '" onclick="_mpFiltro=\'borradores\';renderPlanillaMiPanel()">📝 Borradores (' + cntBorradores + ')</button>'
+    + '<input type="text" id="mpBuscarNumero" class="search-box" placeholder="Buscar por N° de ppto..." value="' + _mpBuscarNro.replace(/"/g,'&quot;') + '" oninput="_mpBuscarNro=this.value;renderPlanillaMiPanel()" style="width:170px;"/>'
     + '</div>';
 
   if (!ordenados.length) {
@@ -6702,6 +6710,10 @@ function renderPlanillaMiPanel() {
 
   html += '</div>';
   el.innerHTML = html;
+  if (_focoBuscar) {
+    const inp = document.getElementById('mpBuscarNumero');
+    if (inp) { inp.focus(); if (_cursorPos !== null) inp.setSelectionRange(_cursorPos, _cursorPos); }
+  }
 }
 
 function renderGraficosMiPanel() {
@@ -7913,41 +7925,6 @@ function renderEstadisticas(){
     +'</div>'
     +'</div>'
     +'</div>';
-
-  // ── 4. Alertas accionables ──
-  const alertas=[];
-  eqVencidos.slice(0,8).forEach(function(eq){
-    const cli=clientes.find(function(c){return c.id===eq.cliente_id;})||{nombre:'—'};
-    const dias=Math.floor((hoy-new Date(eq.ultimo_preventivo))/(1000*60*60*24));
-    alertas.push({type:'critical',equipo:escapeHtml(eq.nombre),cliente:escapeHtml(cli.nombre),
-      reason:'Preventivo vencido hace '+dias+' días (frec. '+(eq.frecuencia_preventivo||30)+'d)',badge:'VENCIDO'});
-  });
-  corrAbiertos.slice(0,5).forEach(function(iv){
-    const eq=equipos.find(function(e){return e.id===iv.equipo_id;})||{nombre:'—'};
-    const cli=clientes.find(function(c){return c.id===eq.cliente_id;})||{nombre:'—'};
-    const dias=Math.floor((hoy-new Date(iv.fecha))/(1000*60*60*24));
-    alertas.push({type:'warning',equipo:escapeHtml(eq.nombre),cliente:escapeHtml(cli.nombre),
-      reason:iv.descripcion?escapeHtml(iv.descripcion.substring(0,80)):'Correctivo abierto hace '+dias+' días',badge:'PENDIENTE'});
-  });
-  if(alertas.length){
-    html+='<div>'
-      +'<div class="dash-section-title">Alertas que requieren atención</div>'
-      +'<div class="chart-card" style="padding:0;overflow:hidden;">'
-      +'<div class="alert-list">'
-      +alertas.map(function(a){
-        return '<div class="alert-row">'
-          +'<div class="alert-dot '+a.type+'"></div>'
-          +'<div class="alert-info">'
-          +'<div class="alert-equipo">'+a.equipo+' <span style="font-weight:400;color:var(--text-dim);">· '+a.cliente+'</span></div>'
-          +'<div class="alert-detail">'+a.reason+'</div>'
-          +'</div>'
-          +'<span class="alert-badge '+a.type+'">'+a.badge+'</span>'
-          +'</div>';
-      }).join('')
-      +'</div>'
-      +'</div>'
-      +'</div>';
-  }
 
   el.innerHTML=html;
   document.getElementById('dashLastUpdate').textContent=
