@@ -1334,6 +1334,46 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- MODAL EDITOR DE COSTOS DE TRABAJO (mano de obra + materiales) -->
+<div class="modal-overlay" id="mCostosTrabajo">
+  <div class="modal" style="max-width:680px;">
+    <button class="modal-close" onclick="cerrar('mCostosTrabajo')">✕</button>
+    <div class="modal-title">💲 Costos del trabajo</div>
+    <div style="padding:20px 20px 0;">
+      <div style="font-weight:700;color:var(--text);font-size:14px;" id="ctCliente">—</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:2px;" id="ctNumero">—</div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Mano de obra</label>
+        <div id="ctManoObraRows"></div>
+        <button class="btn-secondary" onclick="ctAgregarManoObra()" style="font-size:11px;padding:4px 10px;margin-top:4px;">＋ Agregar persona</button>
+        <div style="margin-top:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;">
+          <span style="font-weight:700;color:var(--text);">Total mano de obra:</span>
+          <span style="font-weight:900;color:var(--accent);font-family:'IBM Plex Mono',monospace;" id="ctTotalManoObra">$0</span>
+        </div>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Materiales</label>
+        <div id="ctMaterialesRows"></div>
+        <button class="btn-secondary" onclick="ctAgregarMaterial()" style="font-size:11px;padding:4px 10px;margin-top:4px;">＋ Agregar material</button>
+        <div style="margin-top:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;">
+          <span style="font-weight:700;color:var(--text);">Total materiales:</span>
+          <span style="font-weight:900;color:var(--accent);font-family:'IBM Plex Mono',monospace;" id="ctTotalMateriales">$0</span>
+        </div>
+      </div>
+      <div class="form-group full" style="padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:700;color:var(--text);">TOTAL:</span>
+        <span style="font-size:18px;font-weight:900;color:var(--green);font-family:'IBM Plex Mono',monospace;" id="ctTotalGeneral">$0</span>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mCostosTrabajo')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarCostosTrabajo()">💾 Guardar costos</button>
+    </div>
+  </div>
+</div>
+
 <!-- Panel de notificaciones -->
 <div id="panelNotif" style="display:none;position:fixed;top:52px;right:12px;z-index:9999;width:340px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-height:420px;overflow-y:auto;">
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
@@ -1843,6 +1883,13 @@ tbody tr:hover{background:#f8faff;}
           <option value="en_ejecucion">⚙️ En ejecución</option>
           <option value="finalizado">🏁 Finalizado / Facturado</option>
           <option value="rechazado">❌ Rechazado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Empresa *</label>
+        <select class="form-select" id="mpEmpresa">
+          <option value="ChillerService">🟣 ChillerService (Service)</option>
+          <option value="ChillerSystem">🔵 ChillerSystem (System)</option>
         </select>
       </div>
     </div>
@@ -6700,6 +6747,7 @@ function renderPlanillaMiPanel() {
             + (flujo === 'aprobado_cliente' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'en_ejecucion\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--accent);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Pasar a en ejecución">⚙️ Ejecución</button>' : '')
             + (flujo === 'aprobado_cliente' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'rechazado\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--red);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como rechazado">❌ Rechazado</button>' : '')
             + (flujo === 'en_ejecucion' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'finalizado\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--green);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como finalizado">🏁 Finalizado</button>' : '')
+            + ((p.empresa === 'ChillerService' && flujo === 'finalizado') ? '<button onclick="abrirEditorCostos(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + ((window._mpCostosIds && window._mpCostosIds.has(p.id)) ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;line-height:1;" title="' + ((window._mpCostosIds && window._mpCostosIds.has(p.id)) ? 'Costos cargados · Editar' : 'Cargar costos del trabajo') + '">💲</button>' : '')
             + '<button onclick="mpAdjuntarPdf(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (p.pdf_url ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;line-height:1;" title="' + (p.pdf_url ? 'Ver PDF' : 'Adjuntar link de PDF') + '">📎</button>'
             + '<button onclick="mpEliminarPpto(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px;border-radius:4px;line-height:1;" title="Eliminar">🗑️</button>'
             + '</div></td>'
@@ -6798,11 +6846,174 @@ async function cargarDatosMiPanel() {
       if (row.clave === 'iibb')   { _mpIibbTasa   = row.activo ? (row.alicuota || 0) : 0; }
       if (row.clave === 'cheque') { _mpChequeActivo = !!row.activo; _mpChequeTasa = row.alicuota || 0; }
     });
+    try {
+      const costosIds = await api('costos_trabajo?select=presupuesto_id');
+      window._mpCostosIds = new Set((costosIds || []).map(c => c.presupuesto_id));
+    } catch (ec) { console.warn('[Mi Panel Costos]', ec); window._mpCostosIds = new Set(); }
     renderKpisMiPanel();
     try { renderGraficosMiPanel(); } catch(eg) { console.warn('[Mi Panel Gráficos]', eg); }
     renderPlanillaMiPanel();
   } catch(e) {
     console.error('[Mi Panel KPIs]', e);
+  }
+}
+
+// ── EDITOR DE COSTOS DE TRABAJO (mano de obra + materiales) ──────────────────
+// Reutilizable: se llama desde Mi Panel y (en otro lote) desde Estadísticas.
+let _ctPresupuestoId = null;
+let _ctCostosId = null;
+let _ctConfigHH = [];
+let _ctManoObra = [];
+let _ctMateriales = [];
+
+function ctValorHora(cfg, horario) {
+  if (!cfg) return 0;
+  if (horario === 'nocturno') return cfg.valor_nocturno || 0;
+  if (horario === 'no_laborable') return cfg.valor_no_laborable || 0;
+  return cfg.valor_diurno || 0;
+}
+function ctSubtotalManoObra(row) {
+  const cfg = _ctConfigHH.find(c => c.categoria === row.categoria);
+  return ctValorHora(cfg, row.horario) * (row.horas || 0);
+}
+
+async function abrirEditorCostos(presupuestoId) {
+  _ctPresupuestoId = presupuestoId;
+  _ctCostosId = null;
+  _ctConfigHH = [];
+  _ctManoObra = [];
+  _ctMateriales = [];
+  document.getElementById('ctCliente').textContent = 'Cargando...';
+  document.getElementById('ctNumero').textContent = '';
+  document.getElementById('ctManoObraRows').innerHTML = '';
+  document.getElementById('ctMaterialesRows').innerHTML = '';
+  document.getElementById('mCostosTrabajo').classList.add('open');
+  try {
+    const [pptoArr, configHH, costosArr] = await Promise.all([
+      api('presupuestos?id=eq.' + presupuestoId + '&select=cliente_nombre,numero'),
+      api('config_horas_hombre?select=*&order=orden'),
+      api('costos_trabajo?presupuesto_id=eq.' + presupuestoId)
+    ]);
+    const ppto = (pptoArr || [])[0] || {};
+    document.getElementById('ctCliente').textContent = ppto.cliente_nombre || '—';
+    document.getElementById('ctNumero').textContent = 'N° ' + (ppto.numero || '—');
+    _ctConfigHH = configHH || [];
+    const existente = (costosArr || [])[0] || null;
+    _ctCostosId = existente ? existente.id : null;
+    _ctManoObra = (existente && existente.mano_obra && existente.mano_obra.length) ? existente.mano_obra.map(r => ({...r})) : [];
+    _ctMateriales = (existente && existente.materiales && existente.materiales.length) ? existente.materiales.map(r => ({...r})) : [];
+    if (!_ctManoObra.length) ctAgregarManoObra();
+    if (!_ctMateriales.length) ctAgregarMaterial();
+    renderCostosManoObra();
+    renderCostosMateriales();
+  } catch (e) {
+    showToast('Error al cargar costos: ' + e.message, true);
+  }
+}
+
+function renderCostosManoObra() {
+  const cont = document.getElementById('ctManoObraRows');
+  if (!_ctConfigHH.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:8px;">No hay categorías configuradas en config_horas_hombre.</div>';
+  } else {
+    cont.innerHTML = _ctManoObra.map((row, i) => {
+      const catOpts = _ctConfigHH.map(c =>
+        '<option value="' + escapeHtml(c.categoria) + '"' + (row.categoria === c.categoria ? ' selected' : '') + '>' + escapeHtml(c.categoria) + '</option>'
+      ).join('');
+      return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+        + '<select class="form-select" style="flex:2;min-width:150px;" onchange="_ctManoObra[' + i + '].categoria=this.value;ctRecalcManoObra()">' + catOpts + '</select>'
+        + '<select class="form-select" style="flex:1;min-width:110px;" onchange="_ctManoObra[' + i + '].horario=this.value;ctRecalcManoObra()">'
+        + '<option value="diurno"' + (row.horario === 'diurno' ? ' selected' : '') + '>Diurno</option>'
+        + '<option value="nocturno"' + (row.horario === 'nocturno' ? ' selected' : '') + '>Nocturno</option>'
+        + '<option value="no_laborable"' + (row.horario === 'no_laborable' ? ' selected' : '') + '>No laborable</option>'
+        + '</select>'
+        + '<input class="form-input" type="number" min="0" step="0.5" style="width:80px;" value="' + (row.horas || '') + '" placeholder="Horas" oninput="_ctManoObra[' + i + '].horas=parseFloat(this.value)||0;ctRecalcManoObra()"/>'
+        + '<span id="ctMoSub' + i + '" style="font-size:12px;font-weight:700;color:var(--accent);font-family:\'IBM Plex Mono\',monospace;min-width:90px;text-align:right;">$' + ctSubtotalManoObra(row).toLocaleString('es-AR') + '</span>'
+        + (_ctManoObra.length > 1 ? '<button class="btn-danger" onclick="ctQuitarManoObra(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
+        + '</div>';
+    }).join('');
+  }
+  ctRecalcManoObra();
+}
+function ctAgregarManoObra() {
+  _ctManoObra.push({ categoria: (_ctConfigHH[0] || {}).categoria || '', horario: 'diurno', horas: 0 });
+  renderCostosManoObra();
+}
+function ctQuitarManoObra(i) {
+  _ctManoObra.splice(i, 1);
+  if (!_ctManoObra.length) ctAgregarManoObra();
+  renderCostosManoObra();
+}
+function ctRecalcManoObra() {
+  let total = 0;
+  _ctManoObra.forEach((row, i) => {
+    const sub = ctSubtotalManoObra(row);
+    total += sub;
+    const el = document.getElementById('ctMoSub' + i);
+    if (el) el.textContent = '$' + sub.toLocaleString('es-AR');
+  });
+  document.getElementById('ctTotalManoObra').textContent = '$' + total.toLocaleString('es-AR');
+  ctRecalcTotalGeneral();
+}
+
+function renderCostosMateriales() {
+  const cont = document.getElementById('ctMaterialesRows');
+  cont.innerHTML = _ctMateriales.map((row, i) =>
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+    + '<input class="form-input" style="flex:2;min-width:160px;" value="' + escapeHtml(row.descripcion || '') + '" placeholder="Descripción del material" oninput="_ctMateriales[' + i + '].descripcion=this.value"/>'
+    + '<input class="form-input" type="number" min="0" step="0.01" style="width:110px;" value="' + (row.costo || '') + '" placeholder="Costo $" oninput="_ctMateriales[' + i + '].costo=parseFloat(this.value)||0;ctRecalcMateriales()"/>'
+    + (_ctMateriales.length > 1 ? '<button class="btn-danger" onclick="ctQuitarMaterial(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
+    + '</div>'
+  ).join('');
+  ctRecalcMateriales();
+}
+function ctAgregarMaterial() {
+  _ctMateriales.push({ descripcion: '', costo: 0 });
+  renderCostosMateriales();
+}
+function ctQuitarMaterial(i) {
+  _ctMateriales.splice(i, 1);
+  if (!_ctMateriales.length) ctAgregarMaterial();
+  renderCostosMateriales();
+}
+function ctRecalcMateriales() {
+  const total = _ctMateriales.reduce((s, r) => s + (r.costo || 0), 0);
+  document.getElementById('ctTotalMateriales').textContent = '$' + total.toLocaleString('es-AR');
+  ctRecalcTotalGeneral();
+}
+
+function ctRecalcTotalGeneral() {
+  const totalMO = _ctManoObra.reduce((s, r) => s + ctSubtotalManoObra(r), 0);
+  const totalMat = _ctMateriales.reduce((s, r) => s + (r.costo || 0), 0);
+  document.getElementById('ctTotalGeneral').textContent = '$' + (totalMO + totalMat).toLocaleString('es-AR');
+}
+
+async function guardarCostosTrabajo() {
+  if (!_ctPresupuestoId) return;
+  const manoObra = _ctManoObra
+    .filter(r => r.categoria && r.horas > 0)
+    .map(r => ({ categoria: r.categoria, horario: r.horario, horas: r.horas }));
+  const materiales = _ctMateriales
+    .filter(r => r.descripcion && r.descripcion.trim())
+    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0 }));
+  const data = { presupuesto_id: _ctPresupuestoId, mano_obra: manoObra, materiales: materiales };
+  try {
+    if (_ctCostosId) {
+      await api('costos_trabajo?id=eq.' + _ctCostosId, {
+        method: 'PATCH', body: JSON.stringify(data), headers: { ...H, 'Prefer': 'return=minimal' }
+      });
+    } else {
+      await api('costos_trabajo', {
+        method: 'POST', body: JSON.stringify(data), headers: { ...H, 'Prefer': 'return=minimal' }
+      });
+    }
+    showToast('Costos guardados ✓', 'success');
+    cerrar('mCostosTrabajo');
+    if (!window._mpCostosIds) window._mpCostosIds = new Set();
+    window._mpCostosIds.add(_ctPresupuestoId);
+    renderPlanillaMiPanel();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
   }
 }
 
@@ -6823,6 +7034,7 @@ async function guardarPptoComercial(){
     incluye_iva:false,
     estado:_mpEstVal,
     estado_flujo:_mpEstVal,
+    empresa:document.getElementById('mpEmpresa').value,
     historial_estados:[{estado:_mpEstVal,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre}],
     creado_por:usuarioActual.nombre,
     fecha:document.getElementById('mpFecha').value||null,
@@ -6839,6 +7051,7 @@ async function guardarPptoComercial(){
     document.getElementById('mpMonto').value='';
     document.getElementById('mpTecnico').value='';
     document.getElementById('mpEstado').selectedIndex=0;
+    document.getElementById('mpEmpresa').selectedIndex=0;
     document.getElementById('mpFecha').value=new Date().toISOString().split('T')[0];
     cargarDatosMiPanel();
   }catch(e){
