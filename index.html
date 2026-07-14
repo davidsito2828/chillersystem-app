@@ -8139,9 +8139,118 @@ function renderEstadisticas(){
     +'</div>'
     +'</div>';
 
+  // ── 4. Balance Service (mano de obra / materiales / IIBB / margen) ──
+  html+='<div id="balanceService"></div>';
+
   el.innerHTML=html;
   document.getElementById('dashLastUpdate').textContent=
     'Actualizado: '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  try { renderBalanceService(); } catch(eb) { console.warn('[Balance Service]', eb); }
+}
+
+// ══════════════════════════════════════════
+//  BALANCE SERVICE — sección al final de Estadísticas
+// ══════════════════════════════════════════
+function calcularCostoManoObra(manoObraArray, tarifas) {
+  return (manoObraArray || []).reduce(function(total, item) {
+    const cfg = (tarifas || []).find(function(t) { return t.categoria === item.categoria; });
+    if (!cfg) return total;
+    let valor = cfg.costo_real_diurno;
+    if (item.horario === 'nocturno') valor = cfg.costo_real_nocturno;
+    else if (item.horario === 'no_laborable') valor = cfg.costo_real_no_laborable;
+    return total + (valor || 0) * (item.horas || 0);
+  }, 0);
+}
+
+function calcularBalanceTrabajo(ppto, costosDelTrabajo, tarifas, iibbTasa) {
+  const ingreso = ppto.precio_total || 0;
+  const manoObraArr = (costosDelTrabajo && costosDelTrabajo.mano_obra) || [];
+  const materialesArr = (costosDelTrabajo && costosDelTrabajo.materiales) || [];
+  const costoManoObra = calcularCostoManoObra(manoObraArr, tarifas);
+  const costoMateriales = materialesArr.reduce(function(s, m) { return s + (m.costo || 0); }, 0);
+  const iibb = ingreso * (iibbTasa || 0);
+  const margen = ingreso - costoManoObra - costoMateriales - iibb;
+  const tieneCostos = !!costosDelTrabajo && (manoObraArr.length > 0 || materialesArr.length > 0);
+  return { ingreso: ingreso, costoManoObra: costoManoObra, costoMateriales: costoMateriales, iibb: iibb, margen: margen, tieneCostos: tieneCostos };
+}
+
+function renderBalanceServiceContenido(trabajos) {
+  const fmt = function(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); };
+  const totalIngreso = trabajos.reduce(function(s, t) { return s + t.balance.ingreso; }, 0);
+  const totalMO = trabajos.reduce(function(s, t) { return s + t.balance.costoManoObra; }, 0);
+  const totalMat = trabajos.reduce(function(s, t) { return s + t.balance.costoMateriales; }, 0);
+  const totalIibb = trabajos.reduce(function(s, t) { return s + t.balance.iibb; }, 0);
+  const totalMargen = trabajos.reduce(function(s, t) { return s + t.balance.margen; }, 0);
+  const conCostos = trabajos.filter(function(t) { return t.balance.tieneCostos; }).length;
+  const totalTrabajos = trabajos.length;
+  const pctCargado = totalTrabajos ? Math.round((conCostos / totalTrabajos) * 100) : 0;
+
+  let html = '<div class="dash-section-title" style="margin-top:24px;">💰 Balance Service</div>';
+
+  html += '<div class="sparkline-kpi-grid" style="margin-bottom:14px;">'
+    + '<div class="kpi-spark-card" style="border-left-color:#2563eb"><div class="kpi-spark-top"><div class="kpi-spark-label">Total producido</div></div><div class="kpi-spark-num" style="color:#2563eb">' + fmt(totalIngreso) + '</div><div class="kpi-spark-sub">' + totalTrabajos + ' trabajo' + (totalTrabajos !== 1 ? 's' : '') + '</div></div>'
+    + '<div class="kpi-spark-card" style="border-left-color:#7c3aed"><div class="kpi-spark-top"><div class="kpi-spark-label">Mano de obra</div></div><div class="kpi-spark-num" style="color:#7c3aed">' + fmt(totalMO) + '</div></div>'
+    + '<div class="kpi-spark-card" style="border-left-color:#0891b2"><div class="kpi-spark-top"><div class="kpi-spark-label">Materiales</div></div><div class="kpi-spark-num" style="color:#0891b2">' + fmt(totalMat) + '</div></div>'
+    + '<div class="kpi-spark-card" style="border-left-color:var(--yellow)"><div class="kpi-spark-top"><div class="kpi-spark-label">IIBB</div></div><div class="kpi-spark-num" style="color:var(--yellow)">' + fmt(totalIibb) + '</div></div>'
+    + '<div class="kpi-spark-card" style="border-left-color:var(--green)"><div class="kpi-spark-top"><div class="kpi-spark-label">Ganancia neta</div></div><div class="kpi-spark-num" style="color:var(--green)">' + fmt(totalMargen) + '</div></div>'
+    + '</div>';
+
+  if (totalTrabajos > 0) {
+    const avisoColor = pctCargado < 50 ? 'var(--red)' : (pctCargado < 100 ? 'var(--yellow)' : 'var(--green)');
+    const avisoBg = pctCargado < 50 ? 'var(--red-bg)' : (pctCargado < 100 ? 'var(--yellow-bg)' : 'var(--green-bg)');
+    const avisoBorder = pctCargado < 50 ? 'var(--red-border)' : (pctCargado < 100 ? 'var(--yellow-border)' : 'var(--green-border)');
+    html += '<div style="padding:8px 14px;border-radius:8px;background:' + avisoBg + ';border:1px solid ' + avisoBorder + ';color:' + avisoColor + ';font-size:12px;font-weight:700;margin-bottom:14px;">'
+      + (pctCargado < 50 ? '⚠️ ' : 'ℹ️ ') + conCostos + ' de ' + totalTrabajos + ' trabajos con costos cargados (' + pctCargado + '%)'
+      + '</div>';
+  }
+
+  if (!totalTrabajos) {
+    html += '<div style="padding:32px;text-align:center;color:var(--text-dim);font-size:13px;">📭 No hay trabajos de Service finalizados en el período.</div>';
+  } else {
+    html += '<div class="table-wrap"><table>'
+      + '<thead><tr><th>Cliente</th><th>N°</th><th>Ingreso</th><th>M. Obra</th><th>Materiales</th><th>IIBB</th><th>Margen</th><th style="width:36px;"></th></tr></thead><tbody>'
+      + trabajos.map(function(t) {
+          const p = t.ppto, b = t.balance;
+          const margenColor = b.margen >= 0 ? 'var(--green)' : 'var(--red)';
+          return '<tr>'
+            + '<td class="td-name">' + escapeHtml(p.cliente_nombre || '—') + '</td>'
+            + '<td class="td-mono" style="font-size:11px;">' + escapeHtml(p.numero || '—') + '</td>'
+            + '<td class="td-mono">' + fmt(b.ingreso) + '</td>'
+            + '<td class="td-mono">' + fmt(b.costoManoObra) + '</td>'
+            + '<td class="td-mono">' + fmt(b.costoMateriales) + '</td>'
+            + '<td class="td-mono">' + fmt(b.iibb) + '</td>'
+            + '<td class="td-mono" style="font-weight:700;color:' + margenColor + ';">' + fmt(b.margen) + '</td>'
+            + '<td><button onclick="abrirEditorCostos(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (b.tieneCostos ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;" title="' + (b.tieneCostos ? 'Editar costos' : 'Cargar costos') + '">💲</button></td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  return html;
+}
+
+async function renderBalanceService() {
+  const el = document.getElementById('balanceService');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);">Calculando balance...</div>';
+  try {
+    const [pptos, costosArr, tarifas, impuestos] = await Promise.all([
+      api('presupuestos?select=*&empresa=eq.ChillerService&estado_flujo=eq.finalizado&origen=in.(comercial_david,comercial_david_historico)&fecha=gte.2026-06-30'),
+      api('costos_trabajo?select=*'),
+      api('config_horas_hombre?select=*'),
+      api('config_impuestos?select=*')
+    ]);
+    const costosPorPpto = {};
+    (costosArr || []).forEach(function(c) { costosPorPpto[c.presupuesto_id] = c; });
+    const iibbRow = (impuestos || []).find(function(r) { return r.clave === 'iibb'; });
+    const iibbTasa = (iibbRow && iibbRow.activo) ? (iibbRow.alicuota || 0) : 0;
+    const trabajos = (pptos || []).map(function(p) {
+      return { ppto: p, balance: calcularBalanceTrabajo(p, costosPorPpto[p.id] || null, tarifas || [], iibbTasa) };
+    });
+    el.innerHTML = renderBalanceServiceContenido(trabajos);
+  } catch (e) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:12px;">Error al calcular el balance: ' + escapeHtml(e.message) + '</div>';
+  }
 }
 
 // ── CONFIG. TAREAS (admin) ──
