@@ -8235,7 +8235,7 @@ async function renderBalanceService() {
   el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);">Calculando balance...</div>';
   try {
     const [pptos, costosArr, tarifas, impuestos] = await Promise.all([
-      api('presupuestos?select=*&empresa=eq.ChillerService&estado_flujo=eq.finalizado&origen=in.(comercial_david,comercial_david_historico)&fecha=gte.2026-06-30'),
+      api('presupuestos?select=*&empresa=eq.ChillerService&estado_flujo=eq.finalizado&origen=in.(comercial_david,comercial_david_historico)&fecha=gte.2026-07-01'),
       api('costos_trabajo?select=*'),
       api('config_horas_hombre?select=*'),
       api('config_impuestos?select=*')
