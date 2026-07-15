@@ -8386,7 +8386,8 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
   _bsExportData = {
     totalIngreso: totalIngreso, totalMO: totalMO, totalMat: totalMat,
     totalIibb: totalIibb, totalMargen: totalMargen,
-    gananciasTasa: gananciasTasa || 0, estimacionGanancias: estimacionGanancias
+    gananciasTasa: gananciasTasa || 0, estimacionGanancias: estimacionGanancias,
+    trabajos: trabajos
   };
 
   let html = '<div class="dash-section-title" style="margin-top:24px;">💰 Balance Service'
@@ -8474,6 +8475,7 @@ async function renderBalanceService() {
 function exportarBalanceExcel() {
   if (!_bsExportData) { showToast('No hay datos de balance para exportar', true); return; }
   const d = _bsExportData;
+  const NAVY = '#0A1F44', CYAN = '#1B9CE2', CYAN_LIGHT = '#D6EEFB', OFFWHITE = '#F5F7FA', BORDER = '1px solid #ddd';
   const fmtFecha = function(dt) {
     return String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0') + '/' + dt.getFullYear();
   };
@@ -8490,12 +8492,49 @@ function exportarBalanceExcel() {
   ];
   if (d.gananciasTasa > 0) filas.push(['Estimación Ganancias (informativo)', Math.round(d.estimacionGanancias)]);
 
-  const html = '<table border="1">'
-    + '<tr><td colspan="2"><b>Balance Service — ChillerService</b></td></tr>'
-    + '<tr><td colspan="2">Período: ' + desde + ' a ' + hasta + '</td></tr>'
-    + '<tr><td colspan="2"></td></tr>'
-    + '<tr><td><b>Concepto</b></td><td><b>Monto</b></td></tr>'
-    + filas.map(function(f) { return '<tr><td>' + escapeHtml(f[0]) + '</td><td>' + f[1] + '</td></tr>'; }).join('')
+  const mesesEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const porMes = {};
+  (d.trabajos || []).forEach(function(t) {
+    const f = t.ppto && t.ppto.fecha;
+    if (!f) return;
+    const partes = String(f).split('-');
+    if (partes.length < 2) return;
+    const anio = partes[0], mesIdx = parseInt(partes[1], 10) - 1;
+    if (mesIdx < 0 || mesIdx > 11) return;
+    const key = anio + '-' + partes[1];
+    if (!porMes[key]) porMes[key] = { label: mesesEs[mesIdx] + ' ' + anio, cantidad: 0, total: 0 };
+    porMes[key].cantidad += 1;
+    porMes[key].total += (t.ppto.precio_total || 0);
+  });
+  const mesesOrdenados = Object.keys(porMes).sort().map(function(k) { return porMes[k]; });
+  const maxTotalMes = mesesOrdenados.reduce(function(m, r) { return Math.max(m, r.total); }, 0);
+  const BARRA_MAX = 30;
+
+  const trStyle = function(i) { return 'background-color:' + (i % 2 === 0 ? '#ffffff' : OFFWHITE) + ';'; };
+  const tdStyle = 'border:' + BORDER + ';padding:4px 8px;';
+
+  const html = '<table border="1" cellspacing="0">'
+    + '<tr><td colspan="4" style="background-color:' + NAVY + ';color:#ffffff;font-size:16pt;font-weight:bold;padding:10px 8px;">Balance Service — ChillerService</td></tr>'
+    + '<tr><td colspan="4" style="background-color:' + OFFWHITE + ';color:' + CYAN + ';font-weight:bold;padding:6px 8px;">Período: ' + desde + ' a ' + hasta + '</td></tr>'
+    + '<tr><td colspan="4"></td></tr>'
+    + '<tr><td style="' + tdStyle + 'background-color:' + CYAN_LIGHT + ';color:' + NAVY + ';font-weight:bold;">Concepto</td><td style="' + tdStyle + 'background-color:' + CYAN_LIGHT + ';color:' + NAVY + ';font-weight:bold;">Monto</td></tr>'
+    + filas.map(function(f, i) { return '<tr style="' + trStyle(i) + '"><td style="' + tdStyle + '">' + escapeHtml(f[0]) + '</td><td style="' + tdStyle + '">' + f[1] + '</td></tr>'; }).join('')
+    + '<tr><td colspan="4"></td></tr>'
+    + '<tr><td colspan="4" style="background-color:' + NAVY + ';color:#ffffff;font-size:13pt;font-weight:bold;padding:8px;">Producción por mes</td></tr>'
+    + (mesesOrdenados.length
+        ? '<tr><td style="' + tdStyle + 'background-color:' + CYAN_LIGHT + ';color:' + NAVY + ';font-weight:bold;">Mes</td>'
+          + '<td style="' + tdStyle + 'background-color:' + CYAN_LIGHT + ';color:' + NAVY + ';font-weight:bold;">Trabajos</td>'
+          + '<td style="' + tdStyle + 'background-color:' + CYAN_LIGHT + ';color:' + NAVY + ';font-weight:bold;">Monto</td>'
+          + '<td style="' + tdStyle + 'background-color:' + CYAN_LIGHT + ';color:' + NAVY + ';font-weight:bold;">Producción</td></tr>'
+          + mesesOrdenados.map(function(r, i) {
+              const bloques = maxTotalMes > 0 ? Math.max(1, Math.round((r.total / maxTotalMes) * BARRA_MAX)) : 0;
+              const barra = '█'.repeat(bloques);
+              return '<tr style="' + trStyle(i) + '"><td style="' + tdStyle + '">' + escapeHtml(r.label) + '</td>'
+                + '<td style="' + tdStyle + '">' + r.cantidad + '</td>'
+                + '<td style="' + tdStyle + '">' + Math.round(r.total) + '</td>'
+                + '<td style="' + tdStyle + 'color:' + CYAN + ';font-family:monospace;letter-spacing:-1px;">' + barra + '</td></tr>';
+            }).join('')
+        : '<tr><td colspan="4" style="' + tdStyle + '">Sin trabajos con fecha en el período.</td></tr>')
     + '</table>';
 
   const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
