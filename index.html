@@ -1634,6 +1634,14 @@ tbody tr:hover{background:#f8faff;}
           <option value="USD">U$D Dólar (USD)</option>
         </select>
       </div>
+      <div class="form-group full" style="margin-top:4px;"><label class="form-label" style="color:var(--text-dim);">2do precio (opcional)</label></div>
+      <div class="form-group"><label class="form-label">Monto opcional</label><input class="form-input" id="cpMontoOpcional" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+      <div class="form-group"><label class="form-label">Moneda opcional</label>
+        <select class="form-select" id="cpMonedaOpcional">
+          <option value="ARS">$ Pesos (ARS)</option>
+          <option value="USD">U$D Dólar (USD)</option>
+        </select>
+      </div>
       <div class="form-group full"><label class="form-label">Referencia</label><input class="form-input" id="cpReferencia" placeholder="Descripción breve del trabajo"/></div>
       <div class="form-group"><label class="form-label">Estado inicial</label>
         <select class="form-select" id="cpEstado">
@@ -1895,6 +1903,27 @@ tbody tr:hover{background:#f8faff;}
       <div class="form-group">
         <label class="form-label">Monto neto sin IVA *</label>
         <input class="form-input" id="mpMonto" type="number" min="0" step="0.01" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Moneda</label>
+        <select class="form-select" id="mpMoneda">
+          <option value="ARS">$ Pesos (ARS)</option>
+          <option value="USD">U$D Dólar (USD)</option>
+        </select>
+      </div>
+      <div class="form-group full" style="margin-top:4px;">
+        <label class="form-label" style="color:var(--text-dim);">2do precio (opcional)</label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Monto opcional</label>
+        <input class="form-input" id="mpMontoOpcional" type="number" min="0" step="0.01" placeholder="0.00"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Moneda opcional</label>
+        <select class="form-select" id="mpMonedaOpcional">
+          <option value="ARS">$ Pesos (ARS)</option>
+          <option value="USD">U$D Dólar (USD)</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Estado *</label>
@@ -7180,6 +7209,7 @@ async function guardarPptoComercial(){
   if(!cliente){showToast('Cliente obligatorio',true);return;}
   if(!detalle){showToast('Descripción obligatoria',true);return;}
   const _mpEstVal=document.getElementById('mpEstado').value;
+  const _mpMontoOpcional=document.getElementById('mpMontoOpcional').value;
   const data={
     origen:'comercial_david',
     numero: numero || null,
@@ -7194,7 +7224,9 @@ async function guardarPptoComercial(){
     historial_estados:[{estado:_mpEstVal,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre}],
     creado_por:usuarioActual.nombre,
     fecha:document.getElementById('mpFecha').value||null,
-    moneda:'ARS'
+    moneda:document.getElementById('mpMoneda').value||'ARS',
+    precio_opcional: _mpMontoOpcional ? parseFloat(_mpMontoOpcional) : null,
+    moneda_opcional: _mpMontoOpcional ? (document.getElementById('mpMonedaOpcional').value||'ARS') : null
   };
   try{
     await api('presupuestos',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
@@ -7205,6 +7237,9 @@ async function guardarPptoComercial(){
     document.getElementById('mpSector').value='';
     document.getElementById('mpDetalle').value='';
     document.getElementById('mpMonto').value='';
+    document.getElementById('mpMontoOpcional').value='';
+    document.getElementById('mpMonedaOpcional').selectedIndex=0;
+    document.getElementById('mpMoneda').selectedIndex=0;
     document.getElementById('mpTecnico').value='';
     document.getElementById('mpEstado').selectedIndex=0;
     document.getElementById('mpEmpresa').selectedIndex=0;
@@ -7252,9 +7287,10 @@ function cpHandleDrop(files){
 }
 
 function abrirModalCargarPpto(){
-  ['cpNumero','cpClienteNombre','cpReferencia','cpMonto'].forEach(x=>document.getElementById(x).value='');
+  ['cpNumero','cpClienteNombre','cpReferencia','cpMonto','cpMontoOpcional'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('cpFecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('cpMoneda').value='ARS';
+  document.getElementById('cpMonedaOpcional').value='ARS';
   document.getElementById('cpEstado').value='borrador';
   document.getElementById('cpArchivo').value='';
   document.getElementById('cpArchivoPreview').style.display='none';
@@ -7291,6 +7327,7 @@ async function guardarCargarPpto(){
   let pdfUrl;
   try{pdfUrl=await subirArchivoPpto(archivo);}
   catch(e){showToast('Error al subir archivo: '+e.message,true);return;}
+  const montoOpcional=document.getElementById('cpMontoOpcional').value;
   const data={
     numero,
     empresa:document.getElementById('cpEmpresa').value,
@@ -7299,6 +7336,8 @@ async function guardarCargarPpto(){
     fecha,
     precio_total:parseFloat(monto),
     moneda:document.getElementById('cpMoneda').value||'ARS',
+    precio_opcional: montoOpcional ? parseFloat(montoOpcional) : null,
+    moneda_opcional: montoOpcional ? (document.getElementById('cpMonedaOpcional').value||'ARS') : null,
     referencia:document.getElementById('cpReferencia').value.trim()||null,
     estado:document.getElementById('cpEstado').value,
     pdf_url:pdfUrl,
@@ -8330,13 +8369,14 @@ function calcularBalanceTrabajo(ppto, costosDelTrabajo, tarifas, iibbTasa) {
   return { ingreso: ingreso, costoManoObra: costoManoObra, costoMateriales: costoMateriales, iibb: iibb, margen: margen, tieneCostos: tieneCostos };
 }
 
-function renderBalanceServiceContenido(trabajos) {
+function renderBalanceServiceContenido(trabajos, gananciasTasa) {
   const fmt = function(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); };
   const totalIngreso = trabajos.reduce(function(s, t) { return s + t.balance.ingreso; }, 0);
   const totalMO = trabajos.reduce(function(s, t) { return s + t.balance.costoManoObra; }, 0);
   const totalMat = trabajos.reduce(function(s, t) { return s + t.balance.costoMateriales; }, 0);
   const totalIibb = trabajos.reduce(function(s, t) { return s + t.balance.iibb; }, 0);
   const totalMargen = trabajos.reduce(function(s, t) { return s + t.balance.margen; }, 0);
+  const estimacionGanancias = totalMargen * (gananciasTasa || 0);
   const conCostos = trabajos.filter(function(t) { return t.balance.tieneCostos; }).length;
   const totalTrabajos = trabajos.length;
   const pctCargado = totalTrabajos ? Math.round((conCostos / totalTrabajos) * 100) : 0;
@@ -8351,6 +8391,15 @@ function renderBalanceServiceContenido(trabajos) {
     + '<div class="kpi-spark-card" style="border-left-color:#0891b2"><div class="kpi-spark-top"><div class="kpi-spark-label">Materiales</div></div><div class="kpi-spark-num" style="color:#0891b2">' + fmt(totalMat) + '</div></div>'
     + '<div class="kpi-spark-card" style="border-left-color:var(--yellow)"><div class="kpi-spark-top"><div class="kpi-spark-label">IIBB</div></div><div class="kpi-spark-num" style="color:var(--yellow)">' + fmt(totalIibb) + '</div></div>'
     + '<div class="kpi-spark-card" style="border-left-color:var(--green)"><div class="kpi-spark-top"><div class="kpi-spark-label">Ganancia neta</div></div><div class="kpi-spark-num" style="color:var(--green)">' + fmt(totalMargen) + '</div></div>'
+    + '</div>';
+
+  html += '<div style="margin-bottom:14px;padding:12px 14px;background:var(--bg3);border:1px dashed var(--border);border-radius:8px;display:flex;align-items:flex-start;gap:10px;">'
+    + '<div style="font-size:18px;line-height:1;">ℹ️</div>'
+    + '<div style="flex:1;min-width:0;">'
+    + '<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:4px;">Estimación Ganancias (informativo)</div>'
+    + '<div style="font-size:18px;font-weight:900;color:var(--text);font-family:\'IBM Plex Mono\',monospace;">' + fmt(estimacionGanancias) + '</div>'
+    + '<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">No se descuenta del margen por trabajo. Es una estimación sobre el total anual, confirmar con tu contador.</div>'
+    + '</div>'
     + '</div>';
 
   if (totalTrabajos > 0) {
@@ -8402,10 +8451,12 @@ async function renderBalanceService() {
     (costosArr || []).forEach(function(c) { costosPorPpto[c.presupuesto_id] = c; });
     const iibbRow = (impuestos || []).find(function(r) { return r.clave === 'iibb'; });
     const iibbTasa = (iibbRow && iibbRow.activo) ? (iibbRow.alicuota || 0) : 0;
+    const gananciasRow = (impuestos || []).find(function(r) { return r.clave === 'ganancias'; });
+    const gananciasTasa = (gananciasRow && gananciasRow.activo) ? (gananciasRow.alicuota || 0) : 0;
     const trabajos = (pptos || []).map(function(p) {
       return { ppto: p, balance: calcularBalanceTrabajo(p, costosPorPpto[p.id] || null, tarifas || [], iibbTasa) };
     });
-    el.innerHTML = renderBalanceServiceContenido(trabajos);
+    el.innerHTML = renderBalanceServiceContenido(trabajos, gananciasTasa);
   } catch (e) {
     el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:12px;">Error al calcular el balance: ' + escapeHtml(e.message) + '</div>';
   }
