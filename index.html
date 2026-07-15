@@ -1396,6 +1396,15 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- MODAL ELEGIR PRECIO (principal vs opcional) -->
+<div class="modal-overlay" id="mElegirPrecio">
+  <div class="modal" style="max-width:420px;">
+    <button class="modal-close" onclick="cerrar('mElegirPrecio')">✕</button>
+    <div class="modal-title">💲 ¿Qué opción eligió el cliente?</div>
+    <div id="epOpciones" style="padding:20px;display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+</div>
+
 <!-- Panel de notificaciones -->
 <div id="panelNotif" style="display:none;position:fixed;top:52px;right:12px;z-index:9999;width:340px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-height:420px;overflow-y:auto;">
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
@@ -6698,12 +6707,30 @@ async function mpCambiarEstado(pId, nuevoEstado) {
   if (nuevoEstado === 'rechazado' || nuevoEstado === 'finalizado') {
     if (!confirm('¿Marcar como "' + (etiq[nuevoEstado]||nuevoEstado) + '" el presupuesto de ' + (ppto.cliente_nombre||'este cliente') + '?')) return;
   }
+  if (nuevoEstado === 'aprobado_cliente' && ppto.precio_opcional != null) {
+    mElegirPrecio(ppto, function(opcionElegida) {
+      const extra = {};
+      if (opcionElegida === 'opcional') {
+        extra.precio_total = ppto.precio_opcional;
+        extra.moneda = ppto.moneda_opcional;
+        extra.opcion_elegida = 'opcional';
+      } else {
+        extra.opcion_elegida = 'principal';
+      }
+      _mpAplicarCambioEstado(pId, nuevoEstado, ppto, extra);
+    });
+    return;
+  }
+  _mpAplicarCambioEstado(pId, nuevoEstado, ppto, {});
+}
+
+async function _mpAplicarCambioEstado(pId, nuevoEstado, ppto, extra) {
   const hoy = new Date().toISOString().split('T')[0];
   const historial = [...(ppto.historial_estados||[]), {estado:nuevoEstado, fecha:hoy, usuario:usuarioActual.nombre}];
   try {
     await api('presupuestos?id=eq.'+pId, {
       method:'PATCH',
-      body: JSON.stringify({estado_flujo:nuevoEstado, estado:nuevoEstado, historial_estados:historial}),
+      body: JSON.stringify({estado_flujo:nuevoEstado, estado:nuevoEstado, historial_estados:historial, ...extra}),
       headers: {...H, 'Prefer':'return=minimal'}
     });
     showToast('Estado actualizado ✓', 'success');
@@ -7202,6 +7229,27 @@ async function guardarConfigTarifas() {
   }
 }
 
+// ── MODAL ELEGIR PRECIO (principal vs opcional, al aprobar un presupuesto) ──
+let _epCallback = null;
+
+function mElegirPrecio(ppto, callback) {
+  _epCallback = callback;
+  const fmtMonto = function(n) { return Number(n || 0).toLocaleString('es-AR'); };
+  const simPrincipal = ppto.moneda === 'USD' ? 'U$D ' : '$';
+  const simOpcional = ppto.moneda_opcional === 'USD' ? 'U$D ' : '$';
+  document.getElementById('epOpciones').innerHTML =
+    '<button class="btn-secondary" style="width:100%;padding:14px;font-size:14px;text-align:left;" onclick="_epElegir(\'principal\')">Principal — ' + simPrincipal + fmtMonto(ppto.precio_total) + '</button>'
+    + '<button class="btn-secondary" style="width:100%;padding:14px;font-size:14px;text-align:left;" onclick="_epElegir(\'opcional\')">Opcional — ' + simOpcional + fmtMonto(ppto.precio_opcional) + '</button>';
+  document.getElementById('mElegirPrecio').classList.add('open');
+}
+
+function _epElegir(opcion) {
+  cerrar('mElegirPrecio');
+  const cb = _epCallback;
+  _epCallback = null;
+  if (cb) cb(opcion);
+}
+
 async function guardarPptoComercial(){
   const numero=document.getElementById('mpNumero').value.trim();
   const cliente=document.getElementById('mpCliente').value.trim();
@@ -7378,6 +7426,23 @@ async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
     const nroInput=prompt('N° de presupuesto (opcional — dejá vacío para omitir):','');
     if(nroInput&&nroInput.trim()) extraPatch.numero=nroInput.trim();
   }
+  if(siguiente==='aprobado_cliente' && ppto && ppto.precio_opcional!=null){
+    mElegirPrecio(ppto, function(opcionElegida){
+      if(opcionElegida==='opcional'){
+        extraPatch.precio_total=ppto.precio_opcional;
+        extraPatch.moneda=ppto.moneda_opcional;
+        extraPatch.opcion_elegida='opcional';
+      } else {
+        extraPatch.opcion_elegida='principal';
+      }
+      _avanzarEstadoPptoAplicar(pId,siguiente,ppto,esComercial,extraPatch,monto,cliente,numero);
+    });
+    return;
+  }
+  _avanzarEstadoPptoAplicar(pId,siguiente,ppto,esComercial,extraPatch,monto,cliente,numero);
+}
+
+async function _avanzarEstadoPptoAplicar(pId,siguiente,ppto,esComercial,extraPatch,monto,cliente,numero){
   const historial=[...(ppto&&ppto.historial_estados||[])];
   historial.push({estado:siguiente,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
   try{
