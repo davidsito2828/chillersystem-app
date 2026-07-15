@@ -1374,6 +1374,28 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- MODAL CONFIGURACIÓN DE TARIFAS E IMPUESTOS -->
+<div class="modal-overlay" id="mConfigTarifas">
+  <div class="modal" style="max-width:720px;">
+    <button class="modal-close" onclick="cerrar('mConfigTarifas')">✕</button>
+    <div class="modal-title">⚙️ Tarifas hora-hombre e impuestos</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Tarifas hora-hombre</label>
+        <div id="cfgHHRows"></div>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Impuestos</label>
+        <div id="cfgImpRows"></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mConfigTarifas')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarConfigTarifas()">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- Panel de notificaciones -->
 <div id="panelNotif" style="display:none;position:fixed;top:52px;right:12px;z-index:9999;width:340px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.4);max-height:420px;overflow-y:auto;">
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
@@ -1841,6 +1863,7 @@ tbody tr:hover{background:#f8faff;}
       <div class="panel-title">🗂️ Mi Panel · Seguimiento de presupuestos</div>
       <div class="panel-count">Carga rápida de presupuestos comerciales</div>
     </div>
+    <button class="btn-secondary" onclick="abrirConfigTarifas()" title="Configurar tarifas e impuestos" style="font-size:11px;padding:5px 10px;">⚙️ Tarifas</button>
   </div>
   <div id="mpKpis" style="padding:16px 16px 0;"></div>
   <div style="padding:16px;max-width:700px;">
@@ -7024,6 +7047,132 @@ async function guardarCostosTrabajo() {
   }
 }
 
+// ── CONFIGURACIÓN DE TARIFAS HORA-HOMBRE E IMPUESTOS ──────────────────────
+// Reutilizable: se llama desde Mi Panel y desde Balance Service (Estadísticas).
+let _cfgHH = [];
+let _cfgHHOrig = [];
+let _cfgImp = [];
+let _cfgImpOrig = [];
+
+async function abrirConfigTarifas() {
+  document.getElementById('mConfigTarifas').classList.add('open');
+  document.getElementById('cfgHHRows').innerHTML = '<div style="padding:12px;color:var(--text-dim);font-size:12px;">Cargando...</div>';
+  document.getElementById('cfgImpRows').innerHTML = '';
+  try {
+    const [hh, imp] = await Promise.all([
+      api('config_horas_hombre?select=*&order=orden'),
+      api('config_impuestos?select=*')
+    ]);
+    _cfgHH = (hh || []).map(r => ({...r}));
+    _cfgHHOrig = JSON.parse(JSON.stringify(_cfgHH));
+    _cfgImp = (imp || []).map(r => ({...r}));
+    _cfgImpOrig = JSON.parse(JSON.stringify(_cfgImp));
+    renderConfigTarifasHH();
+    renderConfigImpuestos();
+  } catch (e) {
+    showToast('Error al cargar configuración: ' + e.message, true);
+  }
+}
+
+function cfgHHInput(i, campo, label) {
+  return '<div style="display:flex;flex-direction:column;gap:2px;">'
+    + '<span style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;">' + label + '</span>'
+    + '<input class="form-input" type="number" min="0" step="0.01" style="width:88px;" value="' + (_cfgHH[i][campo] ?? 0) + '" oninput="_cfgHH[' + i + '].' + campo + '=parseFloat(this.value)||0"/>'
+    + '</div>';
+}
+
+function renderConfigTarifasHH() {
+  const cont = document.getElementById('cfgHHRows');
+  if (!_cfgHH.length) {
+    cont.innerHTML = '<div style="padding:12px;color:var(--text-dim);font-size:12px;">No hay categorías configuradas en config_horas_hombre.</div>';
+    return;
+  }
+  cont.innerHTML = _cfgHH.map((row, i) =>
+    '<div style="padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">'
+    + '<div style="font-weight:700;color:var(--text);font-size:13px;margin-bottom:8px;">' + escapeHtml(row.categoria) + '</div>'
+    + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:230px;">'
+        + '<div style="font-size:10px;letter-spacing:1px;color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:6px;">Comercial</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+          + cfgHHInput(i, 'valor_diurno', 'Diurno')
+          + cfgHHInput(i, 'valor_nocturno', 'Nocturno')
+          + cfgHHInput(i, 'valor_no_laborable', 'No lab.')
+        + '</div>'
+      + '</div>'
+      + '<div style="flex:1;min-width:230px;">'
+        + '<div style="font-size:10px;letter-spacing:1px;color:var(--green);text-transform:uppercase;font-weight:700;margin-bottom:6px;">Costo real</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+          + cfgHHInput(i, 'costo_real_diurno', 'Diurno')
+          + cfgHHInput(i, 'costo_real_nocturno', 'Nocturno')
+          + cfgHHInput(i, 'costo_real_no_laborable', 'No lab.')
+        + '</div>'
+      + '</div>'
+    + '</div>'
+    + '</div>'
+  ).join('');
+}
+
+function renderConfigImpuestos() {
+  const cont = document.getElementById('cfgImpRows');
+  if (!_cfgImp.length) {
+    cont.innerHTML = '<div style="padding:12px;color:var(--text-dim);font-size:12px;">No hay impuestos configurados en config_impuestos.</div>';
+    return;
+  }
+  cont.innerHTML = _cfgImp.map((row, i) => {
+    const pct = Math.round((row.alicuota || 0) * 10000) / 100;
+    return '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">'
+      + '<div style="flex:1;min-width:100px;font-weight:700;color:var(--text);font-size:13px;">' + escapeHtml(row.nombre || row.clave) + '</div>'
+      + '<div style="display:flex;align-items:center;gap:4px;">'
+        + '<input class="form-input" type="number" min="0" step="0.01" style="width:75px;" value="' + pct + '" oninput="_cfgImp[' + i + '].alicuota=(parseFloat(this.value)||0)/100"/>'
+        + '<span style="font-size:12px;color:var(--text-dim);">%</span>'
+      + '</div>'
+      + '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-dim);cursor:pointer;">'
+        + '<input type="checkbox" ' + (row.activo ? 'checked' : '') + ' onchange="_cfgImp[' + i + '].activo=this.checked"/> Activo'
+      + '</label>'
+      + '</div>';
+  }).join('');
+}
+
+async function guardarConfigTarifas() {
+  try {
+    const camposHH = ['valor_diurno','valor_nocturno','valor_no_laborable','costo_real_diurno','costo_real_nocturno','costo_real_no_laborable'];
+    const patches = [];
+    _cfgHH.forEach((row, i) => {
+      const orig = _cfgHHOrig[i];
+      const cambios = {};
+      camposHH.forEach(c => { if (row[c] !== orig[c]) cambios[c] = row[c]; });
+      if (Object.keys(cambios).length) {
+        patches.push(api('config_horas_hombre?id=eq.' + row.id, {
+          method: 'PATCH', body: JSON.stringify(cambios), headers: { ...H, 'Prefer': 'return=minimal' }
+        }));
+      }
+    });
+    _cfgImp.forEach((row, i) => {
+      const orig = _cfgImpOrig[i];
+      const cambios = {};
+      if (row.alicuota !== orig.alicuota) cambios.alicuota = row.alicuota;
+      if (row.activo !== orig.activo) cambios.activo = row.activo;
+      if (Object.keys(cambios).length) {
+        patches.push(api('config_impuestos?id=eq.' + row.id, {
+          method: 'PATCH', body: JSON.stringify(cambios), headers: { ...H, 'Prefer': 'return=minimal' }
+        }));
+      }
+    });
+    if (!patches.length) {
+      showToast('No hay cambios para guardar');
+      cerrar('mConfigTarifas');
+      return;
+    }
+    await Promise.all(patches);
+    showToast('Configuración guardada ✓', 'success');
+    cerrar('mConfigTarifas');
+    try { cargarDatosMiPanel(); } catch (em) { console.warn('[Config Tarifas] Mi Panel', em); }
+    try { renderBalanceService(); } catch (eb) { console.warn('[Config Tarifas] Balance Service', eb); }
+  } catch (e) {
+    showToast('Error al guardar: ' + e.message, true);
+  }
+}
+
 async function guardarPptoComercial(){
   const numero=document.getElementById('mpNumero').value.trim();
   const cliente=document.getElementById('mpCliente').value.trim();
@@ -8192,7 +8341,9 @@ function renderBalanceServiceContenido(trabajos) {
   const totalTrabajos = trabajos.length;
   const pctCargado = totalTrabajos ? Math.round((conCostos / totalTrabajos) * 100) : 0;
 
-  let html = '<div class="dash-section-title" style="margin-top:24px;">💰 Balance Service</div>';
+  let html = '<div class="dash-section-title" style="margin-top:24px;">💰 Balance Service'
+    + '<button onclick="abrirConfigTarifas()" title="Configurar tarifas e impuestos" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;letter-spacing:0;text-transform:none;font-weight:700;">⚙️ Tarifas</button>'
+    + '</div>';
 
   html += '<div class="sparkline-kpi-grid" style="margin-bottom:14px;">'
     + '<div class="kpi-spark-card" style="border-left-color:#2563eb"><div class="kpi-spark-top"><div class="kpi-spark-label">Total producido</div></div><div class="kpi-spark-num" style="color:#2563eb">' + fmt(totalIngreso) + '</div><div class="kpi-spark-sub">' + totalTrabajos + ' trabajo' + (totalTrabajos !== 1 ? 's' : '') + '</div></div>'
