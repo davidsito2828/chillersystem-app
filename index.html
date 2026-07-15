@@ -8369,6 +8369,8 @@ function calcularBalanceTrabajo(ppto, costosDelTrabajo, tarifas, iibbTasa) {
   return { ingreso: ingreso, costoManoObra: costoManoObra, costoMateriales: costoMateriales, iibb: iibb, margen: margen, tieneCostos: tieneCostos };
 }
 
+let _bsExportData = null;
+
 function renderBalanceServiceContenido(trabajos, gananciasTasa) {
   const fmt = function(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); };
   const totalIngreso = trabajos.reduce(function(s, t) { return s + t.balance.ingreso; }, 0);
@@ -8381,8 +8383,15 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
   const totalTrabajos = trabajos.length;
   const pctCargado = totalTrabajos ? Math.round((conCostos / totalTrabajos) * 100) : 0;
 
+  _bsExportData = {
+    totalIngreso: totalIngreso, totalMO: totalMO, totalMat: totalMat,
+    totalIibb: totalIibb, totalMargen: totalMargen,
+    gananciasTasa: gananciasTasa || 0, estimacionGanancias: estimacionGanancias
+  };
+
   let html = '<div class="dash-section-title" style="margin-top:24px;">💰 Balance Service'
     + '<button onclick="abrirConfigTarifas()" title="Configurar tarifas e impuestos" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;letter-spacing:0;text-transform:none;font-weight:700;">⚙️ Tarifas</button>'
+    + '<button onclick="exportarBalanceExcel()" title="Exportar a Excel" style="background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;letter-spacing:0;text-transform:none;font-weight:700;">📥 Exportar</button>'
     + '</div>';
 
   html += '<div class="sparkline-kpi-grid" style="margin-bottom:14px;">'
@@ -8460,6 +8469,44 @@ async function renderBalanceService() {
   } catch (e) {
     el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:12px;">Error al calcular el balance: ' + escapeHtml(e.message) + '</div>';
   }
+}
+
+function exportarBalanceExcel() {
+  if (!_bsExportData) { showToast('No hay datos de balance para exportar', true); return; }
+  const d = _bsExportData;
+  const fmtFecha = function(dt) {
+    return String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0') + '/' + dt.getFullYear();
+  };
+  const hoy = new Date();
+  const desde = fmtFecha(new Date(2026, 6, 1));
+  const hasta = fmtFecha(hoy);
+
+  const filas = [
+    ['Total producido', Math.round(d.totalIngreso)],
+    ['Mano de obra', Math.round(d.totalMO)],
+    ['Materiales', Math.round(d.totalMat)],
+    ['IIBB', Math.round(d.totalIibb)],
+    ['Ganancia neta', Math.round(d.totalMargen)]
+  ];
+  if (d.gananciasTasa > 0) filas.push(['Estimación Ganancias (informativo)', Math.round(d.estimacionGanancias)]);
+
+  const html = '<table border="1">'
+    + '<tr><td colspan="2"><b>Balance Service — ChillerService</b></td></tr>'
+    + '<tr><td colspan="2">Período: ' + desde + ' a ' + hasta + '</td></tr>'
+    + '<tr><td colspan="2"></td></tr>'
+    + '<tr><td><b>Concepto</b></td><td><b>Monto</b></td></tr>'
+    + filas.map(function(f) { return '<tr><td>' + escapeHtml(f[0]) + '</td><td>' + f[1] + '</td></tr>'; }).join('')
+    + '</table>';
+
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'balance_service_' + hoy.toISOString().split('T')[0] + '.xls';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ── CONFIG. TAREAS (admin) ──
