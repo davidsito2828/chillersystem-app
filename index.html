@@ -517,6 +517,17 @@ tbody tr:hover{background:#f8faff;}
   transition:all 0.15s;z-index:1;
 }
 .modal-close:hover{background:rgba(255,255,255,0.2);color:#fff;}
+
+/* Modal: ver descripción completa (Mi Panel) */
+#mVerDescripcion .modal{max-width:480px;}
+#mVerDescripcion .modal-title{padding:20px 52px 18px 22px;border-bottom:1px solid var(--border);}
+#mVerDescripcion .modal-close{width:32px;height:32px;top:13px;right:14px;font-size:15px;}
+#mVerDescripcion .mvd-body{padding:24px 22px;font-size:15px;line-height:1.6;color:var(--text);white-space:pre-wrap;}
+@media(max-width:700px){
+  #mVerDescripcion.modal-overlay{padding:16px;}
+  #mVerDescripcion .modal{margin:0;}
+}
+
 /* Contenido del modal */
 .modal .form-grid{padding:20px 20px 0;}
 .modal>.form-grid{padding:20px 20px 0;}
@@ -1336,10 +1347,10 @@ tbody tr:hover{background:#f8faff;}
 
 <!-- MODAL VER DESCRIPCIÓN COMPLETA (Mi Panel) -->
 <div class="modal-overlay" id="mVerDescripcion">
-  <div class="modal" style="max-width:480px;">
+  <div class="modal">
     <button class="modal-close" onclick="cerrar('mVerDescripcion')">✕</button>
     <div class="modal-title" id="vdCliente">—</div>
-    <div style="white-space:pre-wrap;font-size:13px;color:var(--text);line-height:1.5;" id="vdDetalle"></div>
+    <div class="mvd-body" id="vdDetalle"></div>
   </div>
 </div>
 
