@@ -1334,6 +1334,15 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- MODAL VER DESCRIPCIÓN COMPLETA (Mi Panel) -->
+<div class="modal-overlay" id="mVerDescripcion">
+  <div class="modal" style="max-width:480px;">
+    <button class="modal-close" onclick="cerrar('mVerDescripcion')">✕</button>
+    <div class="modal-title" id="vdCliente">—</div>
+    <div style="white-space:pre-wrap;font-size:13px;color:var(--text);line-height:1.5;" id="vdDetalle"></div>
+  </div>
+</div>
+
 <!-- MODAL EDITOR DE COSTOS DE TRABAJO (mano de obra + materiales) -->
 <div class="modal-overlay" id="mCostosTrabajo">
   <div class="modal" style="max-width:680px;">
@@ -6681,6 +6690,14 @@ async function mpPasarAEnviado(pId) {
   }
 }
 
+function mpVerDescripcionCompleta(pId) {
+  const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto || !ppto.detalle_trabajos) return;
+  document.getElementById('vdCliente').textContent = ppto.cliente_nombre || '—';
+  document.getElementById('vdDetalle').textContent = ppto.detalle_trabajos;
+  document.getElementById('mVerDescripcion').classList.add('open');
+}
+
 async function mpAdjuntarPdf(pId) {
   const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
   if (!ppto) return;
@@ -6811,7 +6828,7 @@ function renderPlanillaMiPanel() {
           const nro = (p.numero && !String(p.numero).startsWith('HIST-')) ? p.numero : '—';
           const monto = p.precio_total ? '$' + Number(p.precio_total).toLocaleString('es-AR') : '—';
           const detalle = p.detalle_trabajos
-            ? '<div class="td-dim" style="font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">'
+            ? '<div class="td-dim" style="font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;cursor:pointer;" onclick="mpVerDescripcionCompleta(\'' + p.id + '\')" title="Ver descripción completa">'
               + p.detalle_trabajos + '</div>'
             : '';
           const ctrl = !!p.controlado;
