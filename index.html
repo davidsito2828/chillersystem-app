@@ -6612,18 +6612,38 @@ function colorDias(dias) {
 async function mpEditarCampo(campo, pId, spanEl) {
   const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
   if (!ppto) return;
-  const valorActual = campo === 'precio_total' ? (ppto.precio_total || 0) : (ppto.numero || '');
-  const input = document.createElement('input');
-  input.type = campo === 'precio_total' ? 'number' : 'text';
-  input.value = String(valorActual);
-  input.style.cssText = 'width:80px;font-family:inherit;font-size:inherit;border:1px solid var(--accent);border-radius:4px;padding:2px 4px;background:var(--bg2);color:var(--text);min-width:60px;';
+  const esObs = campo === 'observaciones';
+  const valorActual = campo === 'precio_total' ? (ppto.precio_total || 0) : (ppto[campo] || '');
+  let el, contenedor;
+  if (esObs) {
+    el = document.createElement('textarea');
+    el.value = String(valorActual);
+    el.style.cssText = 'width:200px;min-height:56px;font-family:inherit;font-size:11px;border:1px solid var(--accent);border-radius:4px;padding:4px 6px;background:var(--bg2);color:var(--text);resize:vertical;vertical-align:top;';
+    contenedor = document.createElement('span');
+    contenedor.style.cssText = 'display:inline-flex;gap:4px;align-items:flex-start;';
+    const btnOk = document.createElement('button');
+    btnOk.type = 'button';
+    btnOk.textContent = '✓';
+    btnOk.title = 'Guardar';
+    btnOk.style.cssText = 'background:var(--accent);color:#fff;border:none;border-radius:4px;width:22px;height:22px;flex-shrink:0;cursor:pointer;font-size:11px;line-height:1;';
+    btnOk.addEventListener('mousedown', e => e.preventDefault());
+    btnOk.addEventListener('click', () => guardar());
+    contenedor.appendChild(el);
+    contenedor.appendChild(btnOk);
+  } else {
+    el = document.createElement('input');
+    el.type = campo === 'precio_total' ? 'number' : 'text';
+    el.value = String(valorActual);
+    el.style.cssText = 'width:80px;font-family:inherit;font-size:inherit;border:1px solid var(--accent);border-radius:4px;padding:2px 4px;background:var(--bg2);color:var(--text);min-width:60px;';
+    contenedor = el;
+  }
   let guardado = false;
   async function guardar() {
     if (guardado) return;
     guardado = true;
-    const raw = campo === 'precio_total' ? parseFloat(input.value) : input.value.trim();
+    const raw = campo === 'precio_total' ? parseFloat(el.value) : el.value.trim();
     if (raw === valorActual || (campo === 'precio_total' && isNaN(raw))) {
-      spanEl.style.display = ''; input.remove(); return;
+      spanEl.style.display = ''; contenedor.remove(); return;
     }
     try {
       await api('presupuestos?id=eq.'+pId, {
@@ -6635,18 +6655,18 @@ async function mpEditarCampo(campo, pId, spanEl) {
       cargarDatosMiPanel();
     } catch(e) {
       showToast('Error: '+e.message, true);
-      spanEl.style.display = ''; input.remove();
+      spanEl.style.display = ''; contenedor.remove();
     }
   }
-  input.addEventListener('blur', guardar);
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
-    if (e.key === 'Escape') { guardado = true; spanEl.style.display = ''; input.remove(); }
+  el.addEventListener('blur', guardar);
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { guardado = true; spanEl.style.display = ''; contenedor.remove(); return; }
+    if (!esObs && e.key === 'Enter') { e.preventDefault(); el.blur(); }
   });
   spanEl.style.display = 'none';
-  spanEl.parentNode.insertBefore(input, spanEl);
-  input.focus();
-  if (input.select) input.select();
+  spanEl.parentNode.insertBefore(contenedor, spanEl);
+  el.focus();
+  if (el.select) el.select();
 }
 
 async function mpEliminarPpto(pId) {
@@ -6826,7 +6846,7 @@ function renderPlanillaMiPanel() {
     html += '<div class="table-wrap"><table>'
       + '<thead><tr>'
       + '<th style="width:28px;text-align:center;">✓</th>'
-      + '<th>Cliente / Trabajo</th><th>N°</th><th>Monto</th><th>Estado</th><th>Días sin resp.</th>'
+      + '<th>Cliente / Trabajo</th><th>N°</th><th>Monto</th><th>Estado</th><th>Días sin resp.</th><th>Observaciones</th>'
       + '<th style="width:36px;"></th>'
       + '</tr></thead><tbody>'
       + ordenados.map(p => {
@@ -6847,6 +6867,10 @@ function renderPlanillaMiPanel() {
             ? '<span style="color:var(--green);font-weight:700;font-size:15px;line-height:1;">✓</span>'
             : '<span style="color:var(--text-muted);font-size:15px;line-height:1;">○</span>';
           const editStyle = 'cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;';
+          const obsTxt = (p.observaciones || '').trim();
+          const obsCell = obsTxt
+            ? '<span style="' + editStyle + '" onclick="mpEditarCampo(\'observaciones\',\'' + p.id + '\',this)" title="Click para editar">' + (obsTxt.length > 40 ? obsTxt.slice(0,40) + '…' : obsTxt) + '</span>'
+            : '<span style="' + editStyle + ' color:var(--text-muted);font-style:italic;" onclick="mpEditarCampo(\'observaciones\',\'' + p.id + '\',this)" title="Click para agregar nota">+ agregar nota</span>';
           return '<tr>'
             + '<td style="text-align:center;cursor:pointer;" onclick="mpToggleControlado(\'' + p.id + '\')" title="Marcar como controlado / verificado">' + ctrlIcon + '</td>'
             + '<td><div class="td-name">' + (p.cliente_nombre||'—') + '</div>' + detalle + '</td>'
@@ -6854,6 +6878,7 @@ function renderPlanillaMiPanel() {
             + '<td class="td-mono"><span style="' + editStyle + '" onclick="mpEditarCampo(\'precio_total\',\'' + p.id + '\',this)" title="Click para editar">' + monto + '</span></td>'
             + '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;' + estStyle + '">' + estLabel + '</span></td>'
             + '<td style="font-weight:700;color:' + cd.color + ';font-family:\'IBM Plex Mono\',monospace;font-size:12px;">' + diasTxt + '</td>'
+            + '<td style="font-size:11px;max-width:160px;">' + obsCell + '</td>'
             + '<td><div style="display:flex;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap;">'
             + (flujo === 'borrador' ? '<button onclick="mpPasarAEnviado(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--accent);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como enviado">📤 Enviar</button>' : '')
             + ((flujo === 'enviado' || flujo === 'en_revision') ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'aprobado_cliente\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--green);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como aprobado">✅ Aprobado</button>' : '')
