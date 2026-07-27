@@ -6748,6 +6748,30 @@ async function mpAdjuntarPdf(pId) {
   }
 }
 
+async function mCargarTipoCambio(pId) {
+  let ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
+  if (!ppto && window._bsExportData) ppto = (window._bsExportData.trabajos||[]).map(t => t.ppto).find(p => p.id === pId);
+  if (!ppto) return;
+  const val = prompt('Tipo de cambio para este trabajo (1 USD = $ ARS):', ppto.tipo_cambio ? String(ppto.tipo_cambio) : '');
+  if (val === null) return;
+  const num = parseFloat(val);
+  if (!val.trim() || isNaN(num) || num <= 0) { showToast('Tipo de cambio inválido', true); return; }
+  try {
+    await api('presupuestos?id=eq.'+pId, {
+      method:'PATCH',
+      body: JSON.stringify({tipo_cambio: num}),
+      headers: {...H, 'Prefer':'return=minimal'}
+    });
+    showToast('✅ Tipo de cambio guardado', 'success');
+    const tabMP = document.getElementById('tab-mipanel');
+    const tabEst = document.getElementById('tab-estadisticas');
+    if (tabMP && tabMP.style.display !== 'none') cargarDatosMiPanel();
+    if (tabEst && tabEst.style.display !== 'none') renderBalanceService();
+  } catch(e) {
+    showToast('Error: '+e.message, true);
+  }
+}
+
 async function mpCambiarEstado(pId, nuevoEstado) {
   const ppto = (window._miPanelPptos||[]).find(p => p.id === pId);
   if (!ppto || !(ppto.origen||'').startsWith('comercial_david')) return;
@@ -6847,7 +6871,7 @@ function renderPlanillaMiPanel() {
       + '<thead><tr>'
       + '<th style="width:28px;text-align:center;">✓</th>'
       + '<th>Cliente / Trabajo</th><th>N°</th><th>Monto</th><th>Estado</th><th>Días sin resp.</th><th style="width:140px;">Observaciones</th>'
-      + '<th style="width:280px;"></th>'
+      + '<th style="width:300px;"></th>'
       + '</tr></thead><tbody>'
       + ordenados.map(p => {
           const dias = calcularDiasSinRespuesta(p);
@@ -6887,6 +6911,7 @@ function renderPlanillaMiPanel() {
             + (flujo === 'aprobado_cliente' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'rechazado\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--red);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como rechazado">❌ Rechazado</button>' : '')
             + (flujo === 'en_ejecucion' ? '<button onclick="mpCambiarEstado(\'' + p.id + '\',\'finalizado\')" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:700;color:var(--green);padding:2px 5px;border-radius:4px;line-height:1;font-family:inherit;white-space:nowrap;" title="Marcar como finalizado">🏁 Finalizado</button>' : '')
             + ((p.empresa === 'ChillerService' && flujo === 'finalizado') ? '<button onclick="abrirEditorCostos(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + ((window._mpCostosIds && window._mpCostosIds.has(p.id)) ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;line-height:1;" title="' + ((window._mpCostosIds && window._mpCostosIds.has(p.id)) ? 'Costos cargados · Editar' : 'Cargar costos del trabajo') + '">💲</button>' : '')
+            + (p.moneda === 'USD' ? '<button onclick="mCargarTipoCambio(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (p.tipo_cambio ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;line-height:1;" title="' + (p.tipo_cambio ? 'Tipo de cambio cargado · Editar' : 'Cargar tipo de cambio') + '">💱</button>' : '')
             + '<button onclick="mpAdjuntarPdf(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (p.pdf_url ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;line-height:1;" title="' + (p.pdf_url ? 'Ver PDF' : 'Adjuntar link de PDF') + '">📎</button>'
             + '<button onclick="mpEliminarPpto(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-muted);padding:2px 4px;border-radius:4px;line-height:1;" title="Eliminar">🗑️</button>'
             + '</div></td>'
@@ -8476,30 +8501,40 @@ function calcularCostoManoObra(manoObraArray, tarifas) {
 }
 
 function calcularBalanceTrabajo(ppto, costosDelTrabajo, tarifas, iibbTasa) {
-  const ingreso = ppto.precio_total || 0;
+  const moneda = ppto.moneda === 'USD' ? 'USD' : 'ARS';
+  const tipoCambio = ppto.tipo_cambio || null;
+  const faltaTipoCambio = moneda === 'USD' && !tipoCambio;
+  const ingreso = moneda === 'USD'
+    ? (tipoCambio ? (ppto.precio_total || 0) * tipoCambio : null)
+    : (ppto.precio_total || 0);
   const manoObraArr = (costosDelTrabajo && costosDelTrabajo.mano_obra) || [];
   const materialesArr = (costosDelTrabajo && costosDelTrabajo.materiales) || [];
   const costoManoObra = calcularCostoManoObra(manoObraArr, tarifas);
   const costoMateriales = materialesArr.reduce(function(s, m) { return s + (m.costo || 0); }, 0);
-  const iibb = ingreso * (iibbTasa || 0);
-  const margen = ingreso - costoManoObra - costoMateriales - iibb;
+  const iibb = ingreso !== null ? ingreso * (iibbTasa || 0) : null;
+  const margen = ingreso !== null ? (ingreso - costoManoObra - costoMateriales - iibb) : null;
   const tieneCostos = !!costosDelTrabajo && (manoObraArr.length > 0 || materialesArr.length > 0);
-  return { ingreso: ingreso, costoManoObra: costoManoObra, costoMateriales: costoMateriales, iibb: iibb, margen: margen, tieneCostos: tieneCostos };
+  return {
+    ingreso: ingreso, costoManoObra: costoManoObra, costoMateriales: costoMateriales, iibb: iibb, margen: margen, tieneCostos: tieneCostos,
+    moneda: moneda, tipoCambio: tipoCambio, faltaTipoCambio: faltaTipoCambio
+  };
 }
 
 let _bsExportData = null;
 
 function renderBalanceServiceContenido(trabajos, gananciasTasa) {
-  const fmt = function(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); };
-  const totalIngreso = trabajos.reduce(function(s, t) { return s + t.balance.ingreso; }, 0);
-  const totalMO = trabajos.reduce(function(s, t) { return s + t.balance.costoManoObra; }, 0);
-  const totalMat = trabajos.reduce(function(s, t) { return s + t.balance.costoMateriales; }, 0);
-  const totalIibb = trabajos.reduce(function(s, t) { return s + t.balance.iibb; }, 0);
-  const totalMargen = trabajos.reduce(function(s, t) { return s + t.balance.margen; }, 0);
+  const fmt = function(n) { return n === null ? '—' : '$' + Math.round(n || 0).toLocaleString('es-AR'); };
+  const trabajosConMargen = trabajos.filter(function(t) { return t.balance.margen !== null; });
+  const totalIngreso = trabajosConMargen.reduce(function(s, t) { return s + t.balance.ingreso; }, 0);
+  const totalMO = trabajosConMargen.reduce(function(s, t) { return s + t.balance.costoManoObra; }, 0);
+  const totalMat = trabajosConMargen.reduce(function(s, t) { return s + t.balance.costoMateriales; }, 0);
+  const totalIibb = trabajosConMargen.reduce(function(s, t) { return s + t.balance.iibb; }, 0);
+  const totalMargen = trabajosConMargen.reduce(function(s, t) { return s + t.balance.margen; }, 0);
   const estimacionGanancias = totalMargen * (gananciasTasa || 0);
   const conCostos = trabajos.filter(function(t) { return t.balance.tieneCostos; }).length;
   const totalTrabajos = trabajos.length;
   const pctCargado = totalTrabajos ? Math.round((conCostos / totalTrabajos) * 100) : 0;
+  const usdSinTC = trabajos.filter(function(t) { return t.balance.faltaTipoCambio; }).length;
 
   _bsExportData = {
     totalIngreso: totalIngreso, totalMO: totalMO, totalMat: totalMat,
@@ -8539,23 +8574,38 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
       + '</div>';
   }
 
+  if (usdSinTC > 0) {
+    html += '<div style="padding:8px 14px;border-radius:8px;background:var(--yellow-bg);border:1px solid var(--yellow-border);color:var(--yellow);font-size:12px;font-weight:700;margin-bottom:14px;">'
+      + '⚠️ ' + usdSinTC + ' trabajo' + (usdSinTC !== 1 ? 's' : '') + ' en USD sin tipo de cambio cargado (no incluido' + (usdSinTC !== 1 ? 's' : '') + ' en el total hasta cargarlo)'
+      + '</div>';
+  }
+
   if (!totalTrabajos) {
     html += '<div style="padding:32px;text-align:center;color:var(--text-dim);font-size:13px;">📭 No hay trabajos de Service finalizados en el período.</div>';
   } else {
     html += '<div class="table-wrap"><table>'
-      + '<thead><tr><th>Cliente</th><th>N°</th><th>Ingreso</th><th>M. Obra</th><th>Materiales</th><th>IIBB</th><th>Margen</th><th style="width:36px;"></th></tr></thead><tbody>'
+      + '<thead><tr><th>Cliente</th><th>N°</th><th>Ingreso</th><th>M. Obra</th><th>Materiales</th><th>IIBB</th><th>Margen</th><th style="width:64px;"></th></tr></thead><tbody>'
       + trabajos.map(function(t) {
           const p = t.ppto, b = t.balance;
-          const margenColor = b.margen >= 0 ? 'var(--green)' : 'var(--red)';
+          const esUSD = b.moneda === 'USD';
+          const ingresoCell = esUSD
+            ? '<div>U$D ' + Number(p.precio_total || 0).toLocaleString('es-AR') + '</div>'
+              + (b.tipoCambio ? '<div style="font-size:10px;color:var(--text-dim);">≈ ' + fmt(b.ingreso) + '</div>' : '<div style="font-size:10px;color:var(--red);">falta TC</div>')
+            : fmt(b.ingreso);
+          const margenColor = b.margen === null ? 'var(--text-muted)' : (b.margen >= 0 ? 'var(--green)' : 'var(--red)');
+          const margenCell = b.margen === null ? '— falta TC' : fmt(b.margen);
+          const btnTC = esUSD
+            ? '<button onclick="mCargarTipoCambio(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (b.tipoCambio ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;" title="' + (b.tipoCambio ? 'Tipo de cambio cargado · Editar' : 'Cargar tipo de cambio') + '">💱</button>'
+            : '';
           return '<tr>'
             + '<td class="td-name">' + escapeHtml(p.cliente_nombre || '—') + '</td>'
             + '<td class="td-mono" style="font-size:11px;">' + escapeHtml(p.numero || '—') + '</td>'
-            + '<td class="td-mono">' + fmt(b.ingreso) + '</td>'
+            + '<td class="td-mono">' + ingresoCell + '</td>'
             + '<td class="td-mono">' + fmt(b.costoManoObra) + '</td>'
             + '<td class="td-mono">' + fmt(b.costoMateriales) + '</td>'
             + '<td class="td-mono">' + fmt(b.iibb) + '</td>'
-            + '<td class="td-mono" style="font-weight:700;color:' + margenColor + ';">' + fmt(b.margen) + '</td>'
-            + '<td><button onclick="abrirEditorCostos(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (b.tieneCostos ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;" title="' + (b.tieneCostos ? 'Editar costos' : 'Cargar costos') + '">💲</button></td>'
+            + '<td class="td-mono" style="font-weight:700;color:' + margenColor + ';">' + margenCell + '</td>'
+            + '<td><button onclick="abrirEditorCostos(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (b.tieneCostos ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;" title="' + (b.tieneCostos ? 'Editar costos' : 'Cargar costos') + '">💲</button>' + btnTC + '</td>'
             + '</tr>';
         }).join('')
       + '</tbody></table></div>';
