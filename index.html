@@ -329,6 +329,24 @@ body{
 .inicio-card-icon{font-size:24px;margin-bottom:6px;}
 .inicio-card-label{font-size:11px;font-weight:700;color:var(--text);}
 
+/* ── SPLASH DE BIENVENIDA (overlay, capa visual encima de la app ya inicializada) ── */
+#inicioSplash{
+  display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;
+  background:var(--bg-header);z-index:9999;
+  align-items:center;justify-content:center;
+  padding:20px;box-sizing:border-box;
+}
+#inicioSplash.visible{display:flex;}
+.inicio-splash-content{max-width:640px;width:100%;text-align:center;}
+.inicio-splash-title{color:#fff;font-size:20px;font-weight:800;margin-bottom:6px;}
+.inicio-splash-subtitle{color:rgba(255,255,255,0.7);font-size:13px;margin-bottom:28px;}
+.inicio-splash-content .inicio-empresa-cards{max-width:none;}
+.inicio-splash-content .inicio-empresa-card{padding:36px 20px;}
+.inicio-splash-content .inicio-empresa-card-icon{font-size:44px;}
+.inicio-splash-content .inicio-empresa-card-label{font-size:15px;}
+.inicio-splash-content .inicio-menu-clasico{color:rgba(255,255,255,0.7);margin-top:24px;}
+.inicio-splash-content .inicio-menu-clasico:hover{color:#fff;}
+
 /* ── PANEL ── */
 .panel{
   margin:0 20px 24px;
@@ -706,6 +724,10 @@ tbody tr:hover{background:#f8faff;}
   .inicio-body{padding:16px 14px;}
   .inicio-empresa-card{padding:20px 12px;}
   .inicio-grid{grid-template-columns:repeat(auto-fit,minmax(85px,1fr));gap:8px;}
+  .inicio-splash-content .inicio-empresa-cards{grid-template-columns:1fr;gap:12px;}
+  .inicio-splash-content .inicio-empresa-card{padding:24px 14px;}
+  .inicio-splash-content .inicio-empresa-card-icon{font-size:36px;}
+  .inicio-splash-title{font-size:17px;}
 }
 @media(max-width:400px){
   .nav-btn{font-size:10px;padding:5px 8px;}
@@ -978,6 +1000,25 @@ tbody tr:hover{background:#f8faff;}
 <!-- ══════════ APP ══════════ -->
 <div id="appScreen">
 
+<!-- SPLASH DE BIENVENIDA (overlay a pantalla completa, se muestra una vez por sesión) -->
+<div id="inicioSplash">
+  <div class="inicio-splash-content">
+    <div class="inicio-splash-title">🏠 Bienvenido a ChillerSystem · Gestión</div>
+    <div class="inicio-splash-subtitle">¿Con qué empresa querés trabajar?</div>
+    <div class="inicio-empresa-cards">
+      <div class="inicio-empresa-card inicio-empresa-card-cs" onclick="inicioSplashElegirEmpresa('ChillerSystem')">
+        <div class="inicio-empresa-card-icon">🏭</div>
+        <div class="inicio-empresa-card-label">ChillerSystem</div>
+      </div>
+      <div class="inicio-empresa-card inicio-empresa-card-cv" onclick="inicioSplashElegirEmpresa('ChillerService')">
+        <div class="inicio-empresa-card-icon">🔧</div>
+        <div class="inicio-empresa-card-label">ChillerService</div>
+      </div>
+    </div>
+    <div class="inicio-menu-clasico" onclick="inicioSplashMenuClasico()">Seguir con el menú clásico →</div>
+  </div>
+</div>
+
 <!-- HEADER -->
 <div class="header">
   <div class="logo-row">
@@ -1066,11 +1107,11 @@ tbody tr:hover{background:#f8faff;}
       <div class="inicio-subtitle">¿Con qué empresa querés trabajar?</div>
       <div class="inicio-empresa-cards">
         <div class="inicio-empresa-card inicio-empresa-card-cs" onclick="inicioElegirEmpresa('ChillerSystem')">
-          <div class="inicio-empresa-card-icon">🔵</div>
+          <div class="inicio-empresa-card-icon">🏭</div>
           <div class="inicio-empresa-card-label">ChillerSystem</div>
         </div>
         <div class="inicio-empresa-card inicio-empresa-card-cv" onclick="inicioElegirEmpresa('ChillerService')">
-          <div class="inicio-empresa-card-icon">🟣</div>
+          <div class="inicio-empresa-card-icon">🔧</div>
           <div class="inicio-empresa-card-label">ChillerService</div>
         </div>
       </div>
@@ -2875,6 +2916,12 @@ async function iniciarApp(){
     restaurarEstadoService();
   }catch(e){setStatus(false);showToast('Error de conexión',true);}
   iniciarRealtime();
+
+  // ── SPLASH DE BIENVENIDA (capa visual encima, no altera nada de lo configurado arriba) ──
+  if(!sessionStorage.getItem('inicioSplashVisto')){
+    const splash=document.getElementById('inicioSplash');
+    if(splash) splash.classList.add('visible');
+  }
 }
 
 let camaraStream=null;
@@ -5934,7 +5981,7 @@ function showTab(id,btn){
 function inicioElegirEmpresa(empresa){
   const pill=[...document.querySelectorAll('.empresa-pill')].find(b=>(b.getAttribute('onclick')||'').includes("setFiltro('"+empresa+"'"));
   if(pill) pill.click();
-  const icono=empresa==='ChillerSystem'?'🔵':'🟣';
+  const icono=empresa==='ChillerSystem'?'🏭':'🔧';
   document.getElementById('inicioEmpresaPill').textContent=icono+' '+empresa;
   renderInicioGrid();
   document.getElementById('inicioEstadoA').style.display='none';
@@ -5964,6 +6011,22 @@ function renderInicioGrid(){
       +'<div class="inicio-card-label">'+label+'</div>'
       +'</div>';
   }).join('');
+}
+
+// ── SPLASH DE BIENVENIDA — reusa inicioElegirEmpresa, no duplica lógica ──
+function inicioSplashCerrar(){
+  sessionStorage.setItem('inicioSplashVisto','1');
+  const splash=document.getElementById('inicioSplash');
+  if(splash) splash.classList.remove('visible');
+}
+
+function inicioSplashElegirEmpresa(empresa){
+  inicioElegirEmpresa(empresa);
+  inicioSplashCerrar();
+}
+
+function inicioSplashMenuClasico(){
+  inicioSplashCerrar();
 }
 
 
