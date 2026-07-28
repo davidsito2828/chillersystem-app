@@ -213,21 +213,23 @@ body{
 /* ── ALERTAS BANNER ── */
 .alertas-banner{
   margin:12px 20px 0;display:none;
-  display:none;flex-direction:column;gap:6px;
+  flex-direction:column;
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;
 }
 .alertas-banner.visible{display:flex;}
-.alarma-sec{
-  border-radius:var(--r);padding:9px 14px;
+.alerta-header{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:10px 14px;cursor:pointer;user-select:none;
+  font-size:12px;font-weight:700;color:var(--text);
 }
-.alarma-sec-critico{
-  background:var(--red-bg);border:1px solid var(--red-border);border-left:3px solid var(--red);
-}
-.alarma-sec-urgente{
-  background:var(--yellow-bg);border:1px solid var(--yellow-border);border-left:3px solid var(--yellow);
-}
-.alarma-sec-aviso{
-  background:#eff6ff;border:1px solid #bfdbfe;border-left:3px solid var(--accent);
-}
+.alerta-header:hover{background:var(--bg3);}
+.alerta-header-arrow{font-size:9px;color:var(--text-dim);width:10px;text-align:center;flex-shrink:0;}
+.alerta-header-counts{display:flex;gap:12px;flex-wrap:wrap;margin-left:2px;font-size:11px;font-weight:600;color:var(--text-dim);}
+.alerta-count{display:inline-flex;align-items:center;gap:5px;}
+.alerta-body{border-top:1px solid var(--border);padding:2px 14px 6px;}
+.alarma-sec{padding:8px 0;}
+.alarma-sec+.alarma-sec{border-top:1px solid var(--border-dim);}
 .alarma-sec-title{
   font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;margin-bottom:6px;
 }
@@ -235,11 +237,25 @@ body{
 .alarma-sec-urgente .alarma-sec-title{color:var(--yellow);}
 .alarma-sec-aviso   .alarma-sec-title{color:var(--accent);}
 .alerta-item{
-  display:flex;align-items:center;gap:8px;padding:4px 0;
-  font-size:12px;flex-wrap:wrap;
+  display:flex;align-items:center;gap:8px;padding:5px 0;
+  font-size:12px;flex-wrap:nowrap;
   border-bottom:1px solid rgba(0,0,0,0.05);
 }
 .alerta-item:last-child{border-bottom:none;padding-bottom:0;}
+.alerta-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.alerta-dot-critico{background:var(--red);}
+.alerta-dot-critico-leve{background:var(--red);opacity:.5;}
+.alerta-dot-urgente{background:var(--yellow);}
+.alerta-dot-aviso{background:var(--accent);}
+.alerta-item-cliente{font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+.alerta-item-detalle{color:var(--text-dim);white-space:nowrap;flex-shrink:0;}
+.alerta-item-actions{display:flex;gap:2px;align-items:center;margin-left:auto;flex-shrink:0;}
+.alerta-icon-btn{
+  background:none;border:none;cursor:pointer;color:var(--text-dim);
+  font-size:13px;padding:4px 6px;border-radius:6px;line-height:1;flex-shrink:0;
+}
+.alerta-icon-btn:hover{background:var(--bg3);color:var(--text);}
+.alerta-icon-btn-x{font-size:11px;color:var(--text-muted);}
 /* Cliente card con alarma crítica */
 .cliente-card.card-alarm-critico>.cliente-row{border-left:3px solid var(--red);}
 .cliente-card.card-alarm-urgente>.cliente-row{border-left:3px solid var(--yellow);}
@@ -627,6 +643,9 @@ tbody tr:hover{background:#f8faff;}
   .empresa-filter,.nav{padding-left:10px;padding-right:10px;}
   .panel{margin-left:8px;margin-right:8px;border-radius:0 var(--r) var(--r) var(--r);}
   .alertas-banner{margin:8px 8px 0;}
+  .alerta-item-cliente{max-width:120px;}
+  .alerta-item-detalle{display:none;}
+  .alerta-header-counts{gap:8px;}
   .form-grid{grid-template-columns:1fr;padding:14px;}
   .search-box{width:100%;}
   .panel-header{flex-direction:column;align-items:flex-start;}
@@ -954,17 +973,24 @@ tbody tr:hover{background:#f8faff;}
 
 <!-- ALERTAS -->
 <div class="alertas-banner" id="alertasBanner">
-  <div class="alarma-sec alarma-sec-critico" id="secCritico" style="display:none;">
-    <div class="alarma-sec-title">🔴 Crítico — requiere atención inmediata</div>
-    <div id="listaCritico"></div>
+  <div class="alerta-header" id="alertaHeader" onclick="toggleAlertasBanner()">
+    <span class="alerta-header-arrow" id="alertaHeaderArrow">▸</span>
+    <span>Necesita atención</span>
+    <span class="alerta-header-counts" id="alertaHeaderCounts"></span>
   </div>
-  <div class="alarma-sec alarma-sec-urgente" id="secUrgente" style="display:none;">
-    <div class="alarma-sec-title">🟡 Urgente — preventivo próximo a vencer</div>
-    <div id="listaUrgente"></div>
-  </div>
-  <div class="alarma-sec alarma-sec-aviso" id="secAviso" style="display:none;">
-    <div class="alarma-sec-title">🔵 Aviso — correctivo pendiente sin resolver</div>
-    <div id="listaAviso"></div>
+  <div class="alerta-body" id="alertaBody" style="display:none;">
+    <div class="alarma-sec alarma-sec-critico" id="secCritico" style="display:none;">
+      <div class="alarma-sec-title">🔴 Crítico — requiere atención inmediata</div>
+      <div id="listaCritico"></div>
+    </div>
+    <div class="alarma-sec alarma-sec-urgente" id="secUrgente" style="display:none;">
+      <div class="alarma-sec-title">🟡 Urgente — preventivo próximo a vencer</div>
+      <div id="listaUrgente"></div>
+    </div>
+    <div class="alarma-sec alarma-sec-aviso" id="secAviso" style="display:none;">
+      <div class="alarma-sec-title">🔵 Aviso — correctivo pendiente sin resolver</div>
+      <div id="listaAviso"></div>
+    </div>
   </div>
 </div>
 
@@ -3263,6 +3289,23 @@ function diasHabilesHasta(fecha){
 }
 
 // ── ALERTAS ──
+function toggleAlertasBanner(){
+  const body=document.getElementById('alertaBody');
+  const arrow=document.getElementById('alertaHeaderArrow');
+  const abierto=body.style.display!=='none';
+  body.style.display=abierto?'none':'block';
+  arrow.textContent=abierto?'▸':'▾';
+}
+
+function alertaBannerCall(fn){
+  try{
+    const r=fn();
+    if(r&&typeof r.catch==='function') r.catch(e=>showToast('Error al abrir: '+e.message,true));
+  }catch(e){
+    showToast('Error al abrir: '+e.message,true);
+  }
+}
+
 function calcAlertas(){
   const criticos=[],urgentes=[],avisos=[];
 
@@ -3322,6 +3365,13 @@ function calcAlertas(){
   const urgentesFilt=urgentes.filter(a=>!dismissedAlertas.has('u-'+a.eq.id));
   const avisosFilt=avisos.filter(a=>!dismissedAlertas.has('a-'+a.i.id));
 
+  // Conteos del encabezado colapsable
+  const countsHtml=[];
+  if(criticosFilt.length) countsHtml.push('<span class="alerta-count"><span class="alerta-dot alerta-dot-critico"></span>'+criticosFilt.length+' crítica'+(criticosFilt.length!==1?'s':'')+'</span>');
+  if(urgentesFilt.length) countsHtml.push('<span class="alerta-count"><span class="alerta-dot alerta-dot-urgente"></span>'+urgentesFilt.length+' urgente'+(urgentesFilt.length!==1?'s':'')+'</span>');
+  if(avisosFilt.length) countsHtml.push('<span class="alerta-count"><span class="alerta-dot alerta-dot-aviso"></span>'+avisosFilt.length+' aviso'+(avisosFilt.length!==1?'s':'')+'</span>');
+  document.getElementById('alertaHeaderCounts').innerHTML=countsHtml.join('');
+
   // Agrupar críticos por cliente
   const criticosPorCliente={};
   criticosFilt.forEach(a=>{
@@ -3348,12 +3398,13 @@ function calcAlertas(){
     const nombre=g.cli?g.cli.nombre:'Sin cliente';
     const eqIds=g.items.map(a=>a.eq.id);
     return `<div class="alerta-item">
-      <span style="color:var(--red);font-weight:700;">${label}</span>
-      <span style="font-weight:700;color:var(--text);">${nombre}</span>
-      <span style="color:var(--text-dim);">· ${n} equipo(s) requieren preventivo</span>
-      <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--red);border-color:var(--red);"
-        onclick="abrirHistCliente('${g.cli?g.cli.id:''}')">Ver cliente</button>
-      <button onclick="descartarAlarmaGrupo(${JSON.stringify(eqIds)})" title="Silenciar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
+      <span class="alerta-dot ${tieneFuera?'alerta-dot-critico':'alerta-dot-critico-leve'}" title="${label}"></span>
+      <span class="alerta-item-cliente">${nombre}</span>
+      <span class="alerta-item-detalle">${n} equipo${n!==1?'s':''}${tieneFuera?' · fuera de servicio':' · vencido'}</span>
+      <span class="alerta-item-actions">
+        <button class="alerta-icon-btn" title="Ver cliente" onclick="alertaBannerCall(()=>abrirHistCliente('${g.cli?g.cli.id:''}'))">👁️</button>
+        <button class="alerta-icon-btn alerta-icon-btn-x" title="Silenciar" onclick="alertaBannerCall(()=>descartarAlarmaGrupo(${JSON.stringify(eqIds).replace(/"/g,'&quot;')}))">✕</button>
+      </span>
     </div>`;
   }).join(''));
 
@@ -3365,24 +3416,26 @@ function calcAlertas(){
     const nombre=g.cli?g.cli.nombre:'Sin cliente';
     const eqIds=g.items.map(a=>a.eq.id);
     return `<div class="alerta-item">
-      <span style="color:var(--yellow);font-weight:700;">${label}</span>
-      <span style="font-weight:700;color:var(--text);">${nombre}</span>
-      <span style="color:var(--text-dim);">· ${n} equipo(s) requieren preventivo</span>
-      <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;background:var(--yellow);border-color:var(--yellow);"
-        onclick="abrirHistCliente('${g.cli?g.cli.id:''}')">Ver cliente</button>
-      <button onclick="descartarAlarmaGrupo(${JSON.stringify(eqIds)})" title="Silenciar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
+      <span class="alerta-dot alerta-dot-urgente" title="${label}"></span>
+      <span class="alerta-item-cliente">${nombre}</span>
+      <span class="alerta-item-detalle">${n} equipo${n!==1?'s':''}${tieneVencido?' · vencido':' · próximo a vencer'}</span>
+      <span class="alerta-item-actions">
+        <button class="alerta-icon-btn" title="Ver cliente" onclick="alertaBannerCall(()=>abrirHistCliente('${g.cli?g.cli.id:''}'))">👁️</button>
+        <button class="alerta-icon-btn alerta-icon-btn-x" title="Silenciar" onclick="alertaBannerCall(()=>descartarAlarmaGrupo(${JSON.stringify(eqIds).replace(/"/g,'&quot;')}))">✕</button>
+      </span>
     </div>`;
   }).join(''));
 
   seccion('secAviso',avisosFilt,avisosFilt.map(a=>{
     const key='a-'+a.i.id;
     return `<div class="alerta-item">
-      <span style="color:var(--accent);font-weight:700;">🔵 Hace ${a.diasHab}dh sin resolver</span>
-      <span style="font-weight:700;color:var(--text);">${a.eq?a.eq.nombre:'Sin equipo'}</span>
-      <span style="color:var(--text-dim);">${a.cli?'· '+a.cli.nombre:''}</span>
-      <button class="btn-primary" style="margin-left:auto;padding:3px 9px;font-size:11px;"
-        onclick="abrirResolverCorrectivo('${a.i.id}')">Ver correctivo</button>
-      <button onclick="dismissAlerta('${key}')" title="Descartar" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:15px;padding:0 4px;line-height:1;">✕</button>
+      <span class="alerta-dot alerta-dot-aviso" title="Hace ${a.diasHab}dh sin resolver"></span>
+      <span class="alerta-item-cliente">${a.cli?a.cli.nombre:'Sin cliente'}</span>
+      <span class="alerta-item-detalle">${a.eq?a.eq.nombre+' · ':''}${a.diasHab}dh sin resolver</span>
+      <span class="alerta-item-actions">
+        <button class="alerta-icon-btn" title="Ver correctivo" onclick="alertaBannerCall(()=>abrirResolverCorrectivo('${a.i.id}'))">👁️</button>
+        <button class="alerta-icon-btn alerta-icon-btn-x" title="Descartar" onclick="dismissAlerta('${key}')">✕</button>
+      </span>
     </div>`;
   }).join(''));
 }
@@ -3827,8 +3880,9 @@ function filtrarHistClientes(q){
 let histClienteActual=null;
 
 async function abrirHistCliente(cliId){
-  histClienteActual=cliId;
   const c=clientes.find(x=>x.id===cliId);
+  if(!c){showToast('No se encontró el cliente asociado a este equipo',true);return;}
+  histClienteActual=cliId;
   const eqs=equipos.filter(e=>e.cliente_id===cliId);
   document.getElementById('histClienteNombre').textContent=c.nombre;
   document.getElementById('histClienteMeta').textContent=[c.direccion,c.telefono].filter(Boolean).join(' · ')||'Sin datos';
