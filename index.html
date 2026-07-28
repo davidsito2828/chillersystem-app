@@ -294,6 +294,41 @@ body{
 }
 .nav-btn.hidden{display:none;}
 
+/* ── INICIO (dashboard opcional, delega en botones reales) ── */
+.inicio-hero{background:var(--bg-header);color:#fff;padding:16px 20px;font-size:14px;font-weight:800;}
+.inicio-body{padding:24px 20px;}
+.inicio-subtitle{font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:12px;}
+.inicio-empresa-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;max-width:600px;}
+.inicio-empresa-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:26px 18px;text-align:center;cursor:pointer;
+  box-shadow:var(--shadow);transition:box-shadow 0.2s,transform 0.15s;
+}
+.inicio-empresa-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.inicio-empresa-card-icon{font-size:32px;margin-bottom:8px;}
+.inicio-empresa-card-label{font-size:13px;font-weight:800;}
+.inicio-empresa-card-cs{border-top:4px solid var(--accent);}
+.inicio-empresa-card-cs .inicio-empresa-card-label{color:var(--accent);}
+.inicio-empresa-card-cv{border-top:4px solid #7c3aed;}
+.inicio-empresa-card-cv .inicio-empresa-card-label{color:#7c3aed;}
+.inicio-menu-clasico{display:inline-block;margin-top:16px;font-size:11px;color:var(--text-dim);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;}
+.inicio-menu-clasico:hover{color:var(--text);}
+.inicio-empresa-pill-actual{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+}
+.inicio-cambiar-empresa{font-size:11px;color:var(--accent);cursor:pointer;font-weight:700;text-decoration:underline dotted;text-underline-offset:3px;}
+.inicio-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;}
+.inicio-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:16px 8px;text-align:center;cursor:pointer;
+  box-shadow:var(--shadow);transition:box-shadow 0.2s,transform 0.15s;
+}
+.inicio-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:var(--accent);}
+.inicio-card-icon{font-size:24px;margin-bottom:6px;}
+.inicio-card-label{font-size:11px;font-weight:700;color:var(--text);}
+
 /* ── PANEL ── */
 .panel{
   margin:0 20px 24px;
@@ -668,6 +703,9 @@ tbody tr:hover{background:#f8faff;}
   .user-info{gap:5px;}
   .user-badge{font-size:11px;padding:3px 8px;}
   .equipo-header{flex-wrap:wrap;gap:6px;}
+  .inicio-body{padding:16px 14px;}
+  .inicio-empresa-card{padding:20px 12px;}
+  .inicio-grid{grid-template-columns:repeat(auto-fit,minmax(85px,1fr));gap:8px;}
 }
 @media(max-width:400px){
   .nav-btn{font-size:10px;padding:5px 8px;}
@@ -1003,6 +1041,7 @@ tbody tr:hover{background:#f8faff;}
 
 <!-- TABS -->
 <div class="nav" id="navBar">
+  <button class="nav-btn" id="tabInicio" onclick="showTab('inicio',this)">🏠 Inicio</button>
   <button class="nav-btn active" id="tabCli" onclick="showTab('clientes',this)">🏢 Clientes</button>
   <button class="nav-btn" id="tabEq" onclick="showTab('equipos',this)">⚙️ Equipos</button>
   <button class="nav-btn" id="tabHist" onclick="showTab('historial',this)">📋 Historial</button>
@@ -1017,6 +1056,34 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn" id="tabEstadisticas" onclick="showTab('estadisticas',this)">📊 Estadísticas</button>
   <button class="nav-btn admin-only" id="tabFichajes" onclick="showTab('fichajes',this)">📍 Tiempos/Rutas</button>
   <button class="nav-btn" id="tabMiPanel" onclick="showTab('mipanel',this)" style="display:none;">🗂️ Mi Panel</button>
+</div>
+
+<!-- ═══ INICIO (dashboard opcional) ═══ -->
+<div id="tab-inicio" class="panel" style="display:none;">
+  <div class="inicio-hero">🏠 Inicio</div>
+  <div class="inicio-body">
+    <div id="inicioEstadoA" style="display:block;">
+      <div class="inicio-subtitle">¿Con qué empresa querés trabajar?</div>
+      <div class="inicio-empresa-cards">
+        <div class="inicio-empresa-card inicio-empresa-card-cs" onclick="inicioElegirEmpresa('ChillerSystem')">
+          <div class="inicio-empresa-card-icon">🔵</div>
+          <div class="inicio-empresa-card-label">ChillerSystem</div>
+        </div>
+        <div class="inicio-empresa-card inicio-empresa-card-cv" onclick="inicioElegirEmpresa('ChillerService')">
+          <div class="inicio-empresa-card-icon">🟣</div>
+          <div class="inicio-empresa-card-label">ChillerService</div>
+        </div>
+      </div>
+      <div class="inicio-menu-clasico" onclick="inicioMenuClasico()">Seguir con el menú clásico →</div>
+    </div>
+    <div id="inicioEstadoB" style="display:none;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <span class="inicio-empresa-pill-actual" id="inicioEmpresaPill">—</span>
+        <span class="inicio-cambiar-empresa" onclick="inicioVolverEstadoA()">Cambiar empresa</span>
+      </div>
+      <div class="inicio-grid" id="inicioGrid"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ CLIENTES ═══ -->
@@ -5848,7 +5915,7 @@ function setFiltro(v,btn){
 function puedeVerGaleria(){return !esTecnico();}
 function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
-  ['clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
@@ -5861,6 +5928,42 @@ function showTab(id,btn){
   if(id==='galeria'){renderGaleria();}
   if(id==='estadisticas'){renderEstadisticas();}
   if(id==='mipanel'){const f=document.getElementById('mpFecha');if(f&&!f.value)f.value=new Date().toISOString().split('T')[0];cargarDatosMiPanel();}
+}
+
+// ── INICIO (dashboard opcional) — delega 100% en los botones reales, sin lógica de roles propia ──
+function inicioElegirEmpresa(empresa){
+  const pill=[...document.querySelectorAll('.empresa-pill')].find(b=>(b.getAttribute('onclick')||'').includes("setFiltro('"+empresa+"'"));
+  if(pill) pill.click();
+  const icono=empresa==='ChillerSystem'?'🔵':'🟣';
+  document.getElementById('inicioEmpresaPill').textContent=icono+' '+empresa;
+  renderInicioGrid();
+  document.getElementById('inicioEstadoA').style.display='none';
+  document.getElementById('inicioEstadoB').style.display='block';
+}
+
+function inicioVolverEstadoA(){
+  document.getElementById('inicioEstadoB').style.display='none';
+  document.getElementById('inicioEstadoA').style.display='block';
+}
+
+function inicioMenuClasico(){
+  const primero=[...document.querySelectorAll('.nav-btn')].find(b=>b.id!=='tabInicio'&&getComputedStyle(b).display!=='none');
+  if(primero) primero.click();
+}
+
+function renderInicioGrid(){
+  const cont=document.getElementById('inicioGrid');
+  const botones=[...document.querySelectorAll('.nav-btn')].filter(b=>b.id!=='tabInicio'&&getComputedStyle(b).display!=='none');
+  cont.innerHTML=botones.map(function(b){
+    const txt=b.textContent.trim();
+    const sp=txt.indexOf(' ');
+    const emoji=sp>-1?txt.slice(0,sp):txt;
+    const label=sp>-1?txt.slice(sp+1):txt;
+    return '<div class="inicio-card" onclick="document.getElementById(\''+b.id+'\').click()">'
+      +'<div class="inicio-card-icon">'+emoji+'</div>'
+      +'<div class="inicio-card-label">'+label+'</div>'
+      +'</div>';
+  }).join('');
 }
 
 
