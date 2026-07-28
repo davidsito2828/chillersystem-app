@@ -3855,7 +3855,7 @@ function renderHistClientes(lista){
     const intervs=intervenciones.filter(i=>eqs.some(e=>e.id===i.equipo_id)||i.cliente_id===c.id);
     const isCS=c.empresa==='ChillerSystem';
     const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-    const tieneCorrectivo=intervs.some(i=>i.necesita_correctivo);
+    const tieneCorrectivo=intervs.some(i=>i.necesita_correctivo && !i.correctivo_resuelto);
     const ultInterv=intervs.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))[0];
     return `<div class="cliente-card">
       <div class="cliente-row" onclick="abrirHistCliente('${c.id}')">
