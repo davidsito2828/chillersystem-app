@@ -5963,6 +5963,8 @@ function puedeVerGaleria(){return !esTecnico();}
 function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
   ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  const navBar=document.getElementById('navBar');
+  if(navBar) navBar.style.display=id==='inicio'?'none':'flex';
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(id==='service') mostrarTabService();
