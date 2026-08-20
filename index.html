@@ -2360,6 +2360,8 @@ function debug(...args){if(localStorage.getItem('debug')==='1') console.log(...a
 const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
 const AUTH_DOMAIN='chillersystem.app';
+const DAVID_USER_ID='6c2c577e-89f2-4fc4-9824-f21d40cb17f0';
+// Mi Panel es el pipeline comercial personal de David — NO es un permiso por rol, es exclusivo de esta persona.
 // ══ SESIÓN JWT ══ La anon key es pública por diseño; las políticas RLS la protegen.
 let _authToken=null; let _refreshToken=null; let _tokenExpiry=null;
 const H={'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY};
@@ -2838,7 +2840,7 @@ async function iniciarApp(){
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
   document.getElementById('tabGaleria').style.display=puedeVerGaleria()?'':'none';
   document.getElementById('tabEstadisticas').style.display=puedeVerEstadisticas()?'':'none';
-  document.getElementById('tabMiPanel').style.display=(usuarioActual.rol==='admin')?'':'none';
+  document.getElementById('tabMiPanel').style.display=(usuarioActual.id===DAVID_USER_ID)?'':'none';
   
   // Excepción exclusiva: Fichajes sí lo ve gerencia
   const tabFichajes = document.getElementById('tabFichajes');
@@ -5962,6 +5964,7 @@ function setFiltro(v,btn){
 function puedeVerGaleria(){return !esTecnico();}
 function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
+  if(id==='mipanel'&&(!usuarioActual||usuarioActual.id!==DAVID_USER_ID)){showToast('No tenés acceso a esta sección',true);return;}
   ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   const navBar=document.getElementById('navBar');
   if(navBar) navBar.style.display=id==='inicio'?'none':'flex';
