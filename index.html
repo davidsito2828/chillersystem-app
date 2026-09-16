@@ -957,6 +957,35 @@ tbody tr:hover{background:#f8faff;}
   .ppto-card-footer{flex-direction:column;align-items:flex-start;}
   .ppto-actions{width:100%;}
 }
+
+/* ══ ANIMACIONES (CSS puro, livianas; se apagan solas con "reducir movimiento") ══ */
+@keyframes cardIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+#pptoBody>.ppto-card,#clientesList>.cliente-card,#eventualList .cliente-card{animation:cardIn .3s ease both;animation-delay:.32s;}
+#pptoBody>.ppto-card:nth-child(1),#clientesList>.cliente-card:nth-child(1),#eventualList .cliente-card:nth-child(1){animation-delay:.03s;}
+#pptoBody>.ppto-card:nth-child(2),#clientesList>.cliente-card:nth-child(2),#eventualList .cliente-card:nth-child(2){animation-delay:.07s;}
+#pptoBody>.ppto-card:nth-child(3),#clientesList>.cliente-card:nth-child(3),#eventualList .cliente-card:nth-child(3){animation-delay:.11s;}
+#pptoBody>.ppto-card:nth-child(4),#clientesList>.cliente-card:nth-child(4),#eventualList .cliente-card:nth-child(4){animation-delay:.15s;}
+#pptoBody>.ppto-card:nth-child(5),#clientesList>.cliente-card:nth-child(5),#eventualList .cliente-card:nth-child(5){animation-delay:.19s;}
+#pptoBody>.ppto-card:nth-child(6),#clientesList>.cliente-card:nth-child(6),#eventualList .cliente-card:nth-child(6){animation-delay:.23s;}
+#pptoBody>.ppto-card:nth-child(7),#clientesList>.cliente-card:nth-child(7),#eventualList .cliente-card:nth-child(7){animation-delay:.27s;}
+#pptoBody>.ppto-card:nth-child(8),#clientesList>.cliente-card:nth-child(8),#eventualList .cliente-card:nth-child(8){animation-delay:.31s;}
+.ppto-card,.cliente-card{transition:transform .18s ease,box-shadow .18s ease;}
+.ppto-card:hover,.cliente-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);}
+.btn-primary,.btn-secondary,.btn-danger,.btn-edit,.btn-green,.btn-add-eq{transition:transform .1s ease,background .15s,box-shadow .15s,border-color .15s,color .15s;}
+.btn-primary:active,.btn-secondary:active,.btn-danger:active,.btn-edit:active,.btn-green:active,.btn-add-eq:active{transform:scale(.96);}
+@keyframes tabIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.panel{animation:tabIn .22s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px);}to{opacity:1;transform:none;}}
+.modal-overlay.open .modal{animation:modalIn .22s cubic-bezier(.2,.9,.3,1.15);}
+@keyframes skelShimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.skel-bar{height:13px;border-radius:6px;margin-bottom:8px;background:linear-gradient(90deg,#e8edf5 25%,#f5f8fd 50%,#e8edf5 75%);background-size:800px 100%;animation:skelShimmer 1.3s infinite linear;}
+.skel-w40{width:40%}.skel-w60{width:60%}.skel-w80{width:80%}
+@keyframes tlPulso{0%{box-shadow:0 0 0 4px #bfdbfe,0 0 0 4px rgba(40,96,245,.35);}70%{box-shadow:0 0 0 4px #bfdbfe,0 0 0 12px rgba(40,96,245,0);}100%{box-shadow:0 0 0 4px #bfdbfe,0 0 0 4px rgba(40,96,245,0);}}
+.ppto-tl-cur{animation:tlPulso 2s infinite;}
+@media (prefers-reduced-motion:reduce){
+  #pptoBody>.ppto-card,#clientesList>.cliente-card,#eventualList .cliente-card,.panel,.modal-overlay.open .modal,.ppto-tl-cur,.skel-bar{animation:none !important;}
+  .ppto-card,.cliente-card,.btn-primary,.btn-secondary,.btn-danger,.btn-edit,.btn-green,.btn-add-eq{transition:none !important;}
+}
 </style>
 </head>
 <body>
@@ -6720,7 +6749,41 @@ async function exportarSeguimientoExcel(){
   }
 }
 
+// Contador animado para KPIs (sube de 0 al valor real). Si el texto no es un número, no toca nada.
+function animarContadores(contenedor){
+  if(!contenedor) return;
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  contenedor.querySelectorAll('.kpi-spark-num').forEach(function(el){
+    const txt=el.textContent||'';
+    const limpio=txt.replace(/[^0-9,.-]/g,'').replace(/\./g,'').replace(',','.');
+    const fin=parseFloat(limpio);
+    if(isNaN(fin)||!isFinite(fin)||fin===0) return;
+    const prefijo=txt.trim().charAt(0)==='$'?'$':'';
+    const sufijo=txt.trim().slice(-1)==='%'?'%':'';
+    const decimales=(txt.indexOf(',')!==-1&&sufijo==='%')?1:0;
+    const pasos=28, dur=700;
+    let paso=0;
+    const timer=setInterval(function(){
+      paso++;
+      const t=paso/pasos;
+      const val=fin*(1-Math.pow(1-t,3));
+      el.textContent=prefijo+val.toLocaleString('es-AR',{minimumFractionDigits:decimales,maximumFractionDigits:decimales})+sufijo;
+      if(paso>=pasos){ el.textContent=txt; clearInterval(timer); }
+    }, dur/pasos);
+  });
+}
+
+function pptoSkeleton(n){
+  let h='';
+  for(let i=0;i<(n||4);i++){
+    h+='<div class="ppto-card"><div class="skel-bar skel-w40"></div><div class="skel-bar skel-w60"></div><div class="skel-bar skel-w80"></div></div>';
+  }
+  return h;
+}
+
 async function loadPresupuestos(){
+  const _tb=document.getElementById('pptoBody');
+  if(_tb&&!_tb.children.length) _tb.innerHTML=pptoSkeleton(4);
   presupuestos=await api('presupuestos?select=*&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.desc.nullslast,created_at.desc');
   try {
     const costosIds = await api('costos_trabajo?select=presupuesto_id');
@@ -7120,6 +7183,7 @@ function renderKpisMiPanel() {
       ).join('')
     + '</div>'
     + '</div>';
+  try { animarContadores(el); } catch(ec) { console.warn('[contadores]', ec); }
 }
 
 // ── MI PANEL · PLANILLA ──────────────────────────────────────────────────────
@@ -9127,6 +9191,7 @@ function renderEstadisticas(){
   html+='<div id="balanceService"></div>';
 
   el.innerHTML=html;
+  try { animarContadores(el); } catch(ec) { console.warn('[contadores]', ec); }
   document.getElementById('dashLastUpdate').textContent=
     'Actualizado: '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
   try { renderBalanceService(); } catch(eb) { console.warn('[Balance Service]', eb); }
@@ -9286,6 +9351,7 @@ async function renderBalanceService() {
       return { ppto: p, balance: calcularBalanceTrabajo(p, costosPorPpto[p.id] || null, tarifas || [], iibbTasa) };
     });
     el.innerHTML = renderBalanceServiceContenido(trabajos, gananciasTasa);
+    try { animarContadores(el); } catch(ec) { console.warn('[contadores]', ec); }
   } catch (e) {
     el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:12px;">Error al calcular el balance: ' + escapeHtml(e.message) + '</div>';
   }
