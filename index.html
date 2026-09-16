@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
    CHILLERSYSTEM — CORPORATE LIGHT UI
@@ -1492,10 +1493,11 @@ tbody tr:hover{background:#f8faff;}
 <div class="modal-overlay" id="mCostosTrabajo">
   <div class="modal" style="max-width:680px;">
     <button class="modal-close" onclick="cerrar('mCostosTrabajo')">✕</button>
-    <div class="modal-title">💲 Costos del trabajo</div>
+    <div class="modal-title">💲 Planilla del trabajo — costos y rentabilidad</div>
     <div style="padding:20px 20px 0;">
       <div style="font-weight:700;color:var(--text);font-size:14px;" id="ctCliente">—</div>
       <div style="font-size:12px;color:var(--text-dim);margin-top:2px;" id="ctNumero">—</div>
+      <div style="font-size:13px;color:var(--text);margin-top:2px;font-weight:700;" id="ctMonto">—</div>
     </div>
     <div class="form-grid">
       <div class="form-group full">
@@ -1525,46 +1527,37 @@ tbody tr:hover{background:#f8faff;}
           <span style="font-weight:900;color:var(--accent);font-family:'IBM Plex Mono',monospace;" id="ctTotalOtrosGastos">$0</span>
         </div>
       </div>
-      <div class="form-group full" style="padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-weight:700;color:var(--text);">TOTAL:</span>
-        <span style="font-size:18px;font-weight:900;color:var(--green);font-family:'IBM Plex Mono',monospace;" id="ctTotalGeneral">$0</span>
+      <div class="form-group full" style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">
+        <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--text-dim);margin-bottom:8px;">Resultado del trabajo (en vivo)</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px;">
+          <span style="color:var(--text);">Ingreso del presupuesto:</span>
+          <span style="font-weight:700;font-family:'IBM Plex Mono',monospace;" id="ctResIngreso">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px;">
+          <span style="color:var(--text);">Total gastos (M.O. + Mat. + Otros):</span>
+          <span style="font-weight:700;font-family:'IBM Plex Mono',monospace;" id="ctTotalGeneral">$0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;">
+          <span style="color:var(--text);">IIBB (automático):</span>
+          <span style="font-weight:700;font-family:'IBM Plex Mono',monospace;" id="ctResIibb">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;">
+          <span style="font-weight:900;color:var(--text);">MARGEN:</span>
+          <span style="font-size:18px;font-weight:900;font-family:'IBM Plex Mono',monospace;" id="ctResMargen">—</span>
+        </div>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Factura vinculada</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="form-input" id="ctFacturaUrl" placeholder="Link de la factura (Drive, Dropbox, etc.)" style="flex:1;"/>
+          <button class="btn-primary" onclick="ctGuardarFactura()" style="padding:8px 12px;">💾</button>
+        </div>
+        <div id="ctFacturaLink" style="margin-top:4px;font-size:11px;"></div>
       </div>
     </div>
     <div class="form-actions">
       <button class="btn-secondary" onclick="cerrar('mCostosTrabajo')">Cancelar</button>
       <button class="btn-primary" onclick="guardarCostosTrabajo()">💾 Guardar costos</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL FICHA DEL TRABAJO — resumen consolidado por presupuesto (costos, rentabilidad, factura, facturación) -->
-<div class="modal-overlay" id="mFichaTrabajo">
-  <div class="modal" style="max-width:720px;">
-    <button class="modal-close" onclick="cerrar('mFichaTrabajo')">✕</button>
-    <div class="modal-title">📋 Ficha del trabajo</div>
-    <div style="padding:20px 20px 0;">
-      <div style="font-weight:700;color:var(--text);font-size:15px;" id="fchCliente">—</div>
-      <div style="font-size:12px;color:var(--text-dim);margin-top:2px;" id="fchNumero">—</div>
-      <div style="font-size:13px;color:var(--text-dim);margin-top:2px;font-weight:700;" id="fchTotal">—</div>
-    </div>
-    <div class="form-grid">
-      <div class="form-group full">
-        <label class="form-label">Costos y rentabilidad</label>
-        <div id="fchRentabilidad" style="padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-dim);">Cargando...</div>
-        <button class="btn-secondary" onclick="abrirEditorCostos(_fchPresupuestoId)" style="font-size:11px;padding:4px 10px;margin-top:8px;">💲 Cargar / editar costos</button>
-      </div>
-      <div class="form-group full">
-        <label class="form-label">Factura</label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input class="form-input" id="fchFacturaUrl" placeholder="Link de la factura (Drive, Dropbox, etc.)" style="flex:1;"/>
-          <button class="btn-primary" onclick="guardarFacturaFicha()" style="padding:8px 12px;">💾</button>
-        </div>
-        <div id="fchFacturaLink" style="margin-top:4px;font-size:11px;"></div>
-      </div>
-      <div class="form-group full" id="fchFacturacionWrap"></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn-secondary" onclick="cerrar('mFichaTrabajo')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1732,6 +1725,7 @@ tbody tr:hover{background:#f8faff;}
       </select>
       <button class="btn-primary" onclick="abrirModalPpto()">＋ Nuevo presupuesto</button>
       <button class="btn-secondary" onclick="abrirModalCargarPpto()">📎 Cargar presupuesto</button>
+      <button class="btn-secondary" onclick="exportarSeguimientoExcel()">📊 Exportar Balance</button>
     </div>
   </div>
   <div id="pptoBody" class="ppto-cards-container"></div>
@@ -6480,6 +6474,252 @@ function renderFacturacionBand(p){
   return badgeFacturacion;
 }
 
+// ══════════════════════════════════════════
+//  SEGUIMIENTO DE PRESUPUESTOS — exportación Excel por empresa, con estilos (ExcelJS)
+//  Reutiliza calcularBalanceTrabajo() (definida junto a Balance Service, más abajo)
+// ══════════════════════════════════════════
+const FECHA_INICIO_SEGUIMIENTO = '2026-07-01';
+const MESES_SEG = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const EMP_PALETAS = {
+  'ChillerSystem':  { tag:'SYSTEM',  titulo:'FF0A1F44', seccionBg:'FFD6EEFB', seccionTx:'FF0A1F44', headerBg:'FF1B9CE2', headerTx:'FFFFFFFF' },
+  'ChillerService': { tag:'SERVICE', titulo:'FF4C1D95', seccionBg:'FFEDE9FE', seccionTx:'FF4C1D95', headerBg:'FF7C3AED', headerTx:'FFFFFFFF' }
+};
+const FMT_MONTO = '#,##0';
+const FMT_PCT = '0.0%';
+
+function segPeriodoMensual(f){ const p=f.split('-'); return {key:p[0]+'-'+p[1], label:MESES_SEG[parseInt(p[1],10)-1]+' '+p[0]}; }
+function segPeriodoTrimestral(f){ const p=f.split('-'); const q=Math.ceil(parseInt(p[1],10)/3); return {key:p[0]+'-Q'+q, label:q+'° trimestre '+p[0]}; }
+function segPeriodoSemestral(f){ const p=f.split('-'); const s=parseInt(p[1],10)<=6?1:2; return {key:p[0]+'-S'+s, label:s+'° semestre '+p[0]}; }
+function segPeriodoAnual(f){ const p=f.split('-'); return {key:p[0], label:p[0]}; }
+
+function segMontoArs(p){ return p.moneda==='USD' ? (p.tipo_cambio ? p.precio_total*p.tipo_cambio : null) : (p.precio_total||0); }
+
+function segCalcularEmbudo(pptos){
+  const noBorrador = pptos.filter(function(p){ return p.estado_flujo !== 'borrador'; });
+  const aprobados = noBorrador.filter(function(p){ return ['aprobado_cliente','en_ejecucion','finalizado'].indexOf(p.estado_flujo) !== -1; });
+  const rechazados = noBorrador.filter(function(p){ return p.estado_flujo === 'rechazado'; });
+  const pendientes = noBorrador.filter(function(p){ return ['en_revision','enviado'].indexOf(p.estado_flujo) !== -1; });
+  const sum = function(arr){ return arr.reduce(function(s,p){ return s+(segMontoArs(p)||0); },0); };
+  const total = noBorrador.length, totalMonto = sum(noBorrador);
+  return { total: total, totalMonto: totalMonto,
+    aprobados: aprobados.length, aprobadosMonto: sum(aprobados),
+    rechazados: rechazados.length, rechazadosMonto: sum(rechazados),
+    pendientes: pendientes.length, pendientesMonto: sum(pendientes),
+    tasaConversionCantidad: total ? aprobados.length/total : 0,
+    tasaConversionMonto: totalMonto ? sum(aprobados)/totalMonto : 0 };
+}
+
+function segAgregarPorPeriodo(items, periodoFn){
+  const map = {};
+  items.forEach(function(item){
+    const p = item.ppto, b = item.balance;
+    if (!p.fecha) return;
+    const per = periodoFn(p.fecha);
+    if (!map[per.key]) map[per.key] = {label:per.label, cantidad:0, monto:0, costos:0, margen:0, conCosteo:0, sinTC:0, facturadosMismoPeriodo:0};
+    const row = map[per.key];
+    row.cantidad += 1;
+    if (b.ingreso !== null) row.monto += b.ingreso; else row.sinTC += 1;
+    if (b.tieneCostos && !b.faltaTipoCambio){
+      row.conCosteo += 1;
+      row.costos += (b.costoManoObra + b.costoMateriales + b.costoOtros + (b.iibb||0));
+      row.margen += (b.margen || 0);
+    }
+    const eventos = (p.historial_estados||[]).filter(function(h){ return (h.estado==='facturacion_inicial'||h.estado==='facturacion_final') && h.accion==='facturado'; });
+    if (eventos.some(function(h){ return periodoFn(h.fecha).key === per.key; })) row.facturadosMismoPeriodo += 1;
+  });
+  return Object.keys(map).sort().map(function(k){ return map[k]; });
+}
+
+// ── Helpers de estilo para ExcelJS ──
+function xlsTitulo(ws, texto, nCols, pal){
+  const row = ws.addRow([texto]);
+  ws.mergeCells(row.number, 1, row.number, nCols);
+  const cell = row.getCell(1);
+  cell.font = { bold:true, size:14, color:{argb:'FFFFFFFF'} };
+  cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:pal.titulo} };
+  row.height = 22;
+}
+function xlsSeccion(ws, texto, nCols, pal){
+  const row = ws.addRow([texto]);
+  ws.mergeCells(row.number, 1, row.number, nCols);
+  const cell = row.getCell(1);
+  cell.font = { bold:true, size:11, color:{argb:pal.seccionTx} };
+  cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:pal.seccionBg} };
+}
+function xlsHeader(ws, cols, pal){
+  const row = ws.addRow(cols);
+  row.eachCell(function(cell){
+    cell.font = { bold:true, color:{argb:pal.headerTx} };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:pal.headerBg} };
+  });
+}
+function xlsFila(ws, valores, formatos){
+  const row = ws.addRow(valores);
+  if (formatos) Object.keys(formatos).forEach(function(c){ row.getCell(parseInt(c,10)).numFmt = formatos[c]; });
+  return row;
+}
+function xlsAnchos(ws, anchos){ anchos.forEach(function(w,i){ ws.getColumn(i+1).width = w; }); }
+
+function segConstruirHojasEmpresa(wb, empresaKey, itemsEmp, generadoStr){
+  const pal = EMP_PALETAS[empresaKey];
+  const pptosEmp = itemsEmp.map(function(t){ return t.ppto; });
+  const aprobados = itemsEmp.filter(function(t){ return ['aprobado_cliente','en_ejecucion','finalizado'].indexOf(t.ppto.estado_flujo)!==-1; });
+  const rechazados = itemsEmp.filter(function(t){ return t.ppto.estado_flujo==='rechazado'; });
+  const conCosteo = aprobados.filter(function(t){ return t.balance.tieneCostos && !t.balance.faltaTipoCambio; });
+  const embudo = segCalcularEmbudo(pptosEmp);
+  const fmt = function(n){ return (n===null||n===undefined)?'':Math.round(n); };
+
+  // ── BALANCE ──
+  const facturacionCC = conCosteo.reduce(function(s,t){ return s+(t.balance.ingreso||0); },0);
+  const moT = conCosteo.reduce(function(s,t){ return s+t.balance.costoManoObra; },0);
+  const matT = conCosteo.reduce(function(s,t){ return s+t.balance.costoMateriales; },0);
+  const otrT = conCosteo.reduce(function(s,t){ return s+t.balance.costoOtros; },0);
+  const iibbT = conCosteo.reduce(function(s,t){ return s+(t.balance.iibb||0); },0);
+  const gasT = moT+matT+otrT;
+  const netoT = conCosteo.reduce(function(s,t){ return s+t.balance.margen; },0);
+  const rentPond = facturacionCC ? netoT/facturacionCC : 0;
+  const rentProm = conCosteo.length ? (conCosteo.reduce(function(s,t){ return s+(t.balance.ingreso?t.balance.margen/t.balance.ingreso:0); },0)/conCosteo.length) : 0;
+  const cumpl = aprobados.reduce(function(acc,t){
+    const p=t.ppto;
+    const ev=(p.historial_estados||[]).filter(function(h){ return (h.estado==='facturacion_inicial'||h.estado==='facturacion_final')&&h.accion==='facturado'; });
+    if (!ev.length) return acc;
+    acc.conEvento++;
+    if (ev.some(function(h){ return segPeriodoMensual(h.fecha).key===segPeriodoMensual(p.fecha).key; })) acc.mismoMes++;
+    return acc;
+  }, {conEvento:0, mismoMes:0});
+
+  const wsB = wb.addWorksheet('BALANCE ' + pal.tag);
+  xlsTitulo(wsB, 'BALANCE — ' + empresaKey, 5, pal);
+  xlsFila(wsB, [generadoStr + ' · Incluye presupuestos desde ' + FECHA_INICIO_SEGUIMIENTO]);
+  wsB.addRow([]);
+  xlsSeccion(wsB, 'EMBUDO COMERCIAL — todos los presupuestos del rango (excluye borradores)', 5, pal);
+  xlsFila(wsB, ['Total de presupuestos', embudo.total, '', 'Monto total cotizado', fmt(embudo.totalMonto)], {5:FMT_MONTO});
+  xlsFila(wsB, ['Aprobados — cantidad', embudo.aprobados, '', 'Aprobados — monto', fmt(embudo.aprobadosMonto)], {5:FMT_MONTO});
+  xlsFila(wsB, ['Rechazados — cantidad', embudo.rechazados, '', 'Rechazados — monto', fmt(embudo.rechazadosMonto)], {5:FMT_MONTO});
+  xlsFila(wsB, ['Pendientes (en curso)', embudo.pendientes, '', 'Pendientes — monto', fmt(embudo.pendientesMonto)], {5:FMT_MONTO});
+  xlsFila(wsB, ['Tasa conversión (cantidad)', embudo.tasaConversionCantidad, '', 'Tasa conversión (monto)', embudo.tasaConversionMonto], {2:FMT_PCT, 5:FMT_PCT});
+  wsB.addRow([]);
+  xlsSeccion(wsB, 'COSTOS Y RENTABILIDAD REAL — trabajos aprobados con costeo cargado', 5, pal);
+  xlsFila(wsB, ['Cantidad con costeo', conCosteo.length, '', 'Facturación de esos trabajos', fmt(facturacionCC)], {5:FMT_MONTO});
+  xlsFila(wsB, ['Costo mano de obra', fmt(moT), '', 'Costo materiales', fmt(matT)], {2:FMT_MONTO, 5:FMT_MONTO});
+  xlsFila(wsB, ['Otros gastos', fmt(otrT), '', 'Total gastos', fmt(gasT)], {2:FMT_MONTO, 5:FMT_MONTO});
+  xlsFila(wsB, ['IIBB', fmt(iibbT), '', 'Resultado neto total', fmt(netoT)], {2:FMT_MONTO, 5:FMT_MONTO});
+  xlsFila(wsB, ['Rentabilidad ponderada', rentPond, '', 'Rentabilidad promedio simple', rentProm], {2:FMT_PCT, 5:FMT_PCT});
+  wsB.addRow([]);
+  xlsSeccion(wsB, 'CUMPLIMIENTO: "facturar el mismo mes del presupuesto"', 5, pal);
+  xlsFila(wsB, ['Aprobados con algún registro de facturación', cumpl.conEvento]);
+  xlsFila(wsB, ['De esos, facturados en el mismo mes', cumpl.mismoMes]);
+  xlsFila(wsB, ['% de cumplimiento', cumpl.conEvento ? cumpl.mismoMes/cumpl.conEvento : 0], {2:FMT_PCT});
+  xlsAnchos(wsB, [40,16,3,32,16]);
+
+  // ── PERIODOS ──
+  const wsP = wb.addWorksheet('PERIODOS ' + pal.tag);
+  xlsTitulo(wsP, 'RESUMEN POR PERÍODO — ' + empresaKey + ' (aprobados / en ejecución / finalizados)', 7, pal);
+  wsP.addRow([]);
+  [['MENSUAL', segPeriodoMensual], ['TRIMESTRAL', segPeriodoTrimestral], ['SEMESTRAL', segPeriodoSemestral], ['ANUAL', segPeriodoAnual]].forEach(function(par){
+    xlsSeccion(wsP, par[0], 7, pal);
+    xlsHeader(wsP, ['Período','Trabajos','Monto presupuestado','Costos','Margen','% Rentabilidad','Facturados mismo período'], pal);
+    segAgregarPorPeriodo(aprobados, par[1]).forEach(function(r){
+      xlsFila(wsP, [r.label, r.cantidad, Math.round(r.monto), Math.round(r.costos), Math.round(r.margen), r.monto? r.margen/r.monto : 0, r.facturadosMismoPeriodo+' de '+r.cantidad], {3:FMT_MONTO,4:FMT_MONTO,5:FMT_MONTO,6:FMT_PCT});
+    });
+    wsP.addRow([]);
+  });
+  xlsAnchos(wsP, [22,10,20,15,15,15,24]);
+
+  // ── TRABAJOS ──
+  const wsT = wb.addWorksheet('TRABAJOS ' + pal.tag);
+  xlsTitulo(wsT, 'TRABAJOS — ' + empresaKey + ' (todos los presupuestos del rango)', 11, pal);
+  xlsHeader(wsT, ['Fecha','N°','Cliente','Contacto','Referencia','Moneda','Monto original','Monto ARS','Estado','Tiene costos','Tiene factura'], pal);
+  itemsEmp.forEach(function(t){
+    const p=t.ppto, b=t.balance;
+    xlsFila(wsT, [p.fecha, p.numero||'', p.cliente_nombre||'', p.cliente_contacto||'', p.referencia||'', p.moneda, p.precio_total, fmt(b.ingreso), p.estado_flujo, b.tieneCostos?'Sí':'No', p.factura_url?'Sí':'No'], {7:FMT_MONTO, 8:FMT_MONTO});
+  });
+  xlsAnchos(wsT, [12,9,22,16,28,9,15,15,16,12,12]);
+
+  // ── GASTOS ──
+  const wsG = wb.addWorksheet('GASTOS ' + pal.tag);
+  xlsTitulo(wsG, 'GASTOS — ' + empresaKey + ' (costeo real, solo trabajos con costos cargados)', 11, pal);
+  xlsHeader(wsG, ['Fecha','N°','Cliente','Facturación','Costo M.O.','Materiales','Otros gastos','Total gastos','IIBB','Resultado neto','% Rentabilidad'], pal);
+  conCosteo.forEach(function(t){
+    const p=t.ppto, b=t.balance;
+    xlsFila(wsG, [p.fecha, p.numero||'', p.cliente_nombre||'', fmt(b.ingreso), fmt(b.costoManoObra), fmt(b.costoMateriales), fmt(b.costoOtros), fmt(b.costoManoObra+b.costoMateriales+b.costoOtros), fmt(b.iibb), fmt(b.margen), b.ingreso? b.margen/b.ingreso : 0], {4:FMT_MONTO,5:FMT_MONTO,6:FMT_MONTO,7:FMT_MONTO,8:FMT_MONTO,9:FMT_MONTO,10:FMT_MONTO,11:FMT_PCT});
+  });
+  xlsAnchos(wsG, [12,9,22,14,13,13,13,14,12,14,14]);
+
+  // ── APROBADOS ──
+  const wsA = wb.addWorksheet('APROBADOS ' + pal.tag);
+  xlsTitulo(wsA, 'APROBADOS — ' + empresaKey, 9, pal);
+  xlsHeader(wsA, ['Fecha','N°','Cliente','Moneda','Monto original','Monto ARS','Estado','Tiene costos','Margen'], pal);
+  aprobados.forEach(function(t){
+    const p=t.ppto, b=t.balance;
+    xlsFila(wsA, [p.fecha, p.numero||'', p.cliente_nombre||'', p.moneda, p.precio_total, fmt(b.ingreso), p.estado_flujo, b.tieneCostos?'Sí':'No', b.tieneCostos?fmt(b.margen):'Pendiente costeo'], {5:FMT_MONTO,6:FMT_MONTO,9:FMT_MONTO});
+  });
+  xlsAnchos(wsA, [12,9,22,9,15,15,16,12,17]);
+
+  // ── RECHAZADOS ──
+  const wsR = wb.addWorksheet('RECHAZADOS ' + pal.tag);
+  xlsTitulo(wsR, 'RECHAZADOS — ' + empresaKey, 6, pal);
+  xlsHeader(wsR, ['Fecha','N°','Cliente','Moneda','Monto original','Monto ARS'], pal);
+  rechazados.forEach(function(t){
+    const p=t.ppto;
+    xlsFila(wsR, [p.fecha, p.numero||'', p.cliente_nombre||'', p.moneda, p.precio_total, fmt(t.balance.ingreso)], {5:FMT_MONTO,6:FMT_MONTO});
+  });
+  xlsAnchos(wsR, [12,9,22,9,15,15]);
+}
+
+async function exportarSeguimientoExcel(){
+  if (typeof ExcelJS === 'undefined') { showToast('No se pudo cargar la librería de Excel. Revisá tu conexión e intentá de nuevo.', true); return; }
+  showToast('Generando reporte, puede tardar unos segundos...', 'success');
+  try {
+    const [pptos, costosArr, tarifas, impuestos] = await Promise.all([
+      api('presupuestos?select=*&fecha=gte.' + FECHA_INICIO_SEGUIMIENTO + '&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.asc'),
+      api('costos_trabajo?select=*'),
+      api('config_horas_hombre?select=*&order=orden'),
+      api('config_impuestos?select=*')
+    ]);
+    const costosPorPpto = {};
+    (costosArr||[]).forEach(function(c){ costosPorPpto[c.presupuesto_id] = c; });
+    const iibbRow = (impuestos||[]).find(function(r){ return r.clave==='iibb'; });
+    const iibbTasa = (iibbRow && iibbRow.activo) ? (iibbRow.alicuota||0) : 0;
+    const tarifasArr = tarifas || [];
+
+    const todos = (pptos||[]).map(function(p){
+      return { ppto: p, balance: calcularBalanceTrabajo(p, costosPorPpto[p.id]||null, tarifasArr, iibbTasa) };
+    });
+
+    const wb = new ExcelJS.Workbook();
+    const generadoStr = 'Generado: ' + new Date().toLocaleString('es-AR');
+    ['ChillerSystem','ChillerService'].forEach(function(emp){
+      const itemsEmp = todos.filter(function(t){ return t.ppto.empresa === emp; });
+      segConstruirHojasEmpresa(wb, emp, itemsEmp, generadoStr);
+    });
+
+    // ── PARÁMETROS (compartida — la config es una sola para las dos empresas) ──
+    const palN = EMP_PALETAS['ChillerSystem'];
+    const wsPar = wb.addWorksheet('PARAMETROS');
+    xlsTitulo(wsPar, 'Parámetros usados (configurables en ⚙️ Tarifas dentro de la app)', 4, palN);
+    wsPar.addRow([]);
+    xlsFila(wsPar, ['IIBB aplicado', iibbTasa], {2:FMT_PCT});
+    xlsHeader(wsPar, ['Categoría','Costo real diurno','Costo real nocturno','Costo real no laborable'], palN);
+    tarifasArr.forEach(function(t){ xlsFila(wsPar, [t.categoria, t.costo_real_diurno, t.costo_real_nocturno, t.costo_real_no_laborable], {2:FMT_MONTO,3:FMT_MONTO,4:FMT_MONTO}); });
+    xlsAnchos(wsPar, [30,20,20,24]);
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'seguimiento_presupuestos_' + new Date().toISOString().split('T')[0] + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✅ Reporte generado', 'success');
+  } catch (e) {
+    showToast('Error al generar el reporte: ' + e.message, true);
+  }
+}
+
 async function loadPresupuestos(){
   presupuestos=await api('presupuestos?select=*&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.desc.nullslast,created_at.desc');
   try {
@@ -6503,89 +6743,6 @@ async function adjuntarFactura(pId) {
     });
     showToast('✅ Link de factura guardado', 'success');
     loadPresupuestos();
-  } catch (e) {
-    showToast('Error: ' + e.message, true);
-  }
-}
-
-// ── FICHA DEL TRABAJO — vista consolidada de un presupuesto (costos, rentabilidad, factura, facturación) ──
-let _fchPresupuestoId = null;
-
-async function abrirFichaTrabajo(presupuestoId) {
-  _fchPresupuestoId = presupuestoId;
-  document.getElementById('fchCliente').textContent = 'Cargando...';
-  document.getElementById('fchNumero').textContent = '';
-  document.getElementById('fchTotal').textContent = '';
-  document.getElementById('fchRentabilidad').textContent = 'Cargando...';
-  document.getElementById('fchFacturaUrl').value = '';
-  document.getElementById('fchFacturaLink').innerHTML = '';
-  document.getElementById('fchFacturacionWrap').innerHTML = '';
-  document.getElementById('mFichaTrabajo').classList.add('open');
-  await renderFichaTrabajo();
-}
-
-async function renderFichaTrabajo() {
-  const pId = _fchPresupuestoId;
-  if (!pId) return;
-  try {
-    const [pptoArr, costosArr, tarifas, impuestos] = await Promise.all([
-      api('presupuestos?id=eq.' + pId + '&select=*'),
-      api('costos_trabajo?presupuesto_id=eq.' + pId),
-      api('config_horas_hombre?select=*'),
-      api('config_impuestos?select=*')
-    ]);
-    const p = (pptoArr || [])[0];
-    if (!p) { showToast('No se encontró el presupuesto', true); cerrar('mFichaTrabajo'); return; }
-    const monedaSim = p.moneda === 'USD' ? 'U$D ' : '$';
-    document.getElementById('fchCliente').textContent = p.cliente_nombre || '—';
-    document.getElementById('fchNumero').textContent = 'N° ' + (p.numero || '—') + ' · ' + (etiquetasFlujo[p.estado_flujo] || p.estado_flujo || '—');
-    document.getElementById('fchTotal').textContent = p.precio_total ? (monedaSim + Number(p.precio_total).toLocaleString('es-AR')) : '—';
-
-    const iibbRow = (impuestos || []).find(function(r) { return r.clave === 'iibb'; });
-    const iibbTasa = (iibbRow && iibbRow.activo) ? (iibbRow.alicuota || 0) : 0;
-    const costos = (costosArr || [])[0] || null;
-    const b = calcularBalanceTrabajo(p, costos, tarifas || [], iibbTasa);
-    const fmt = function(n) { return n === null ? '—' : '$' + Math.round(n || 0).toLocaleString('es-AR'); };
-    const rentEl = document.getElementById('fchRentabilidad');
-    if (!b.tieneCostos) {
-      rentEl.innerHTML = '<span style="color:var(--text-muted);">Todavía no cargaste costos para este trabajo.</span>';
-    } else if (b.faltaTipoCambio) {
-      rentEl.innerHTML = '<span style="color:var(--red);">Falta cargar el tipo de cambio (trabajo en USD) para calcular la rentabilidad. Usá 💲 para cargarlo.</span>';
-    } else {
-      rentEl.innerHTML =
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
-        + '<div>Mano de obra: <b>' + fmt(b.costoManoObra) + '</b></div>'
-        + '<div>Materiales: <b>' + fmt(b.costoMateriales) + '</b></div>'
-        + '<div>Otros gastos: <b>' + fmt(b.costoOtros) + '</b></div>'
-        + '<div>IIBB: <b>' + fmt(b.iibb) + '</b></div>'
-        + '</div>'
-        + '<div style="margin-top:8px;font-size:15px;font-weight:900;color:' + (b.margen >= 0 ? 'var(--green)' : 'var(--red)') + ';">Margen: ' + fmt(b.margen) + '</div>';
-    }
-
-    document.getElementById('fchFacturaUrl').value = p.factura_url || '';
-    document.getElementById('fchFacturaLink').innerHTML = p.factura_url
-      ? '<a href="' + p.factura_url + '" target="_blank" style="color:var(--accent);">Ver factura actual ↗</a>' : '';
-
-    document.getElementById('fchFacturacionWrap').innerHTML = renderFacturacionBand(p);
-  } catch (e) {
-    showToast('Error al cargar la ficha: ' + e.message, true);
-  }
-}
-
-async function guardarFacturaFicha() {
-  const pId = _fchPresupuestoId;
-  if (!pId) return;
-  const url = (document.getElementById('fchFacturaUrl').value || '').trim();
-  try {
-    await api('presupuestos?id=eq.' + pId, {
-      method: 'PATCH',
-      body: JSON.stringify({ factura_url: url || null }),
-      headers: { ...H, 'Prefer': 'return=minimal' }
-    });
-    showToast('✅ Factura guardada', 'success');
-    renderFichaTrabajo();
-    const tabPp = document.getElementById('tab-presupuestos');
-    if (tabPp && tabPp.style.display !== 'none') loadPresupuestos();
   } catch (e) {
     showToast('Error: ' + e.message, true);
   }
@@ -6670,7 +6827,6 @@ function renderPresupuestos(){
           ${btnPdf}
           ${btnCostos}
           ${btnFactura}
-          ${puedeVerPresupuestos()?`<button class="btn-edit" onclick="abrirFichaTrabajo('${p.id}')" title="Ver ficha completa del trabajo">📋</button>`:''}
           <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
           <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
           ${p.estado==='borrador'?'<button class="btn-green" onclick="aprobarPpto(\''+p.id+'\')">✅ OK</button>':''}
@@ -7411,6 +7567,8 @@ let _ctConfigHH = [];
 let _ctManoObra = [];
 let _ctMateriales = [];
 let _ctOtrosGastos = [];
+let _ctPpto = null;
+let _ctIibbTasa = 0;
 
 function ctValorHora(cfg, horario) {
   if (!cfg) return 0;
@@ -7430,21 +7588,35 @@ async function abrirEditorCostos(presupuestoId) {
   _ctManoObra = [];
   _ctMateriales = [];
   _ctOtrosGastos = [];
+  _ctPpto = null;
+  _ctIibbTasa = 0;
   document.getElementById('ctCliente').textContent = 'Cargando...';
   document.getElementById('ctNumero').textContent = '';
+  document.getElementById('ctMonto').textContent = '';
   document.getElementById('ctManoObraRows').innerHTML = '';
   document.getElementById('ctMaterialesRows').innerHTML = '';
   document.getElementById('ctOtrosGastosRows').innerHTML = '';
+  document.getElementById('ctFacturaUrl').value = '';
+  document.getElementById('ctFacturaLink').innerHTML = '';
   document.getElementById('mCostosTrabajo').classList.add('open');
   try {
-    const [pptoArr, configHH, costosArr] = await Promise.all([
-      api('presupuestos?id=eq.' + presupuestoId + '&select=cliente_nombre,numero'),
+    const [pptoArr, configHH, costosArr, impuestos] = await Promise.all([
+      api('presupuestos?id=eq.' + presupuestoId + '&select=cliente_nombre,numero,estado_flujo,precio_total,moneda,tipo_cambio,factura_url'),
       api('config_horas_hombre?select=*&order=orden'),
-      api('costos_trabajo?presupuesto_id=eq.' + presupuestoId)
+      api('costos_trabajo?presupuesto_id=eq.' + presupuestoId),
+      api('config_impuestos?select=*')
     ]);
     const ppto = (pptoArr || [])[0] || {};
+    _ctPpto = ppto;
+    const iibbRow = (impuestos || []).find(function(r) { return r.clave === 'iibb'; });
+    _ctIibbTasa = (iibbRow && iibbRow.activo) ? (iibbRow.alicuota || 0) : 0;
+    const monedaSim = ppto.moneda === 'USD' ? 'U$D ' : '$';
     document.getElementById('ctCliente').textContent = ppto.cliente_nombre || '—';
-    document.getElementById('ctNumero').textContent = 'N° ' + (ppto.numero || '—');
+    document.getElementById('ctNumero').textContent = 'N° ' + (ppto.numero || '—') + ' · ' + (etiquetasFlujo[ppto.estado_flujo] || ppto.estado_flujo || '—');
+    document.getElementById('ctMonto').textContent = ppto.precio_total ? (monedaSim + Number(ppto.precio_total).toLocaleString('es-AR')) : '—';
+    document.getElementById('ctFacturaUrl').value = ppto.factura_url || '';
+    document.getElementById('ctFacturaLink').innerHTML = ppto.factura_url
+      ? '<a href="' + ppto.factura_url + '" target="_blank" style="color:var(--accent);">Ver factura actual ↗</a>' : '';
     _ctConfigHH = configHH || [];
     const existente = (costosArr || [])[0] || null;
     _ctCostosId = existente ? existente.id : null;
@@ -7479,6 +7651,7 @@ function renderCostosManoObra() {
         + '<option value="no_laborable"' + (row.horario === 'no_laborable' ? ' selected' : '') + '>No laborable</option>'
         + '</select>'
         + '<input class="form-input" type="number" min="0" step="0.5" style="width:80px;" value="' + (row.horas || '') + '" placeholder="Horas" oninput="_ctManoObra[' + i + '].horas=parseFloat(this.value)||0;ctRecalcManoObra()"/>'
+        + '<span id="ctMoRate' + i + '" style="font-size:10px;color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;min-width:78px;text-align:right;">$' + ctValorHora(_ctConfigHH.find(c => c.categoria === row.categoria), row.horario).toLocaleString('es-AR') + '/h</span>'
         + '<span id="ctMoSub' + i + '" style="font-size:12px;font-weight:700;color:var(--accent);font-family:\'IBM Plex Mono\',monospace;min-width:90px;text-align:right;">$' + ctSubtotalManoObra(row).toLocaleString('es-AR') + '</span>'
         + (_ctManoObra.length > 1 ? '<button class="btn-danger" onclick="ctQuitarManoObra(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
         + '</div>';
@@ -7502,6 +7675,8 @@ function ctRecalcManoObra() {
     total += sub;
     const el = document.getElementById('ctMoSub' + i);
     if (el) el.textContent = '$' + sub.toLocaleString('es-AR');
+    const elRate = document.getElementById('ctMoRate' + i);
+    if (elRate) elRate.textContent = '$' + ctValorHora(_ctConfigHH.find(c => c.categoria === row.categoria), row.horario).toLocaleString('es-AR') + '/h';
   });
   document.getElementById('ctTotalManoObra').textContent = '$' + total.toLocaleString('es-AR');
   ctRecalcTotalGeneral();
@@ -7563,7 +7738,53 @@ function ctRecalcTotalGeneral() {
   const totalMO = _ctManoObra.reduce((s, r) => s + ctSubtotalManoObra(r), 0);
   const totalMat = _ctMateriales.reduce((s, r) => s + (r.costo || 0), 0);
   const totalOtros = _ctOtrosGastos.reduce((s, r) => s + (r.costo || 0), 0);
-  document.getElementById('ctTotalGeneral').textContent = '$' + (totalMO + totalMat + totalOtros).toLocaleString('es-AR');
+  const gastos = totalMO + totalMat + totalOtros;
+  document.getElementById('ctTotalGeneral').textContent = '$' + gastos.toLocaleString('es-AR');
+  // Resultado en vivo (ingreso, IIBB, margen)
+  const elIng = document.getElementById('ctResIngreso');
+  const elIibb = document.getElementById('ctResIibb');
+  const elMar = document.getElementById('ctResMargen');
+  if (!elIng || !elIibb || !elMar) return;
+  const p = _ctPpto;
+  let ingreso = null;
+  if (p) {
+    ingreso = (p.moneda === 'USD') ? (p.tipo_cambio ? (p.precio_total || 0) * p.tipo_cambio : null) : (p.precio_total || 0);
+  }
+  if (ingreso === null) {
+    elIng.textContent = p && p.moneda === 'USD' ? 'Falta tipo de cambio (usá 💱)' : '—';
+    elIng.style.color = 'var(--red)';
+    elIibb.textContent = '—';
+    elMar.textContent = '—';
+    elMar.style.color = 'var(--text-muted)';
+    return;
+  }
+  const iibb = ingreso * (_ctIibbTasa || 0);
+  const margen = ingreso - gastos - iibb;
+  elIng.textContent = '$' + Math.round(ingreso).toLocaleString('es-AR');
+  elIng.style.color = 'var(--text)';
+  elIibb.textContent = '$' + Math.round(iibb).toLocaleString('es-AR');
+  elMar.textContent = '$' + Math.round(margen).toLocaleString('es-AR');
+  elMar.style.color = margen >= 0 ? 'var(--green)' : 'var(--red)';
+}
+
+async function ctGuardarFactura() {
+  if (!_ctPresupuestoId) return;
+  const url = (document.getElementById('ctFacturaUrl').value || '').trim();
+  try {
+    await api('presupuestos?id=eq.' + _ctPresupuestoId, {
+      method: 'PATCH',
+      body: JSON.stringify({ factura_url: url || null }),
+      headers: { ...H, 'Prefer': 'return=minimal' }
+    });
+    if (_ctPpto) _ctPpto.factura_url = url || null;
+    document.getElementById('ctFacturaLink').innerHTML = url
+      ? '<a href="' + url + '" target="_blank" style="color:var(--accent);">Ver factura actual ↗</a>' : '';
+    showToast('✅ Factura guardada', 'success');
+    const tabPp = document.getElementById('tab-presupuestos');
+    if (tabPp && tabPp.style.display !== 'none') loadPresupuestos();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
+  }
 }
 
 async function guardarCostosTrabajo() {
@@ -7598,11 +7819,9 @@ async function guardarCostosTrabajo() {
     const tabMP = document.getElementById('tab-mipanel');
     const tabPp = document.getElementById('tab-presupuestos');
     const tabEst = document.getElementById('tab-estadisticas');
-    const fichaModal = document.getElementById('mFichaTrabajo');
     if (tabMP && tabMP.style.display !== 'none') renderPlanillaMiPanel();
     if (tabPp && tabPp.style.display !== 'none') renderPresupuestos();
     if (tabEst && tabEst.style.display !== 'none') { try { renderBalanceService(); } catch (eb) {} }
-    if (fichaModal && fichaModal.classList.contains('open') && _fchPresupuestoId === _ctPresupuestoId) renderFichaTrabajo();
   } catch (e) {
     showToast('Error: ' + e.message, true);
   }
@@ -7997,8 +8216,6 @@ async function toggleFacturacion(pptoId,tipo,checked){
     showToast(checked?'✅ Facturación registrada':'Desmarcado','success');
     await loadPresupuestos();
     if(typeof loadNotificaciones==='function') await loadNotificaciones();
-    const fichaModal=document.getElementById('mFichaTrabajo');
-    if(fichaModal&&fichaModal.classList.contains('open')&&_fchPresupuestoId===pptoId) renderFichaTrabajo();
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
