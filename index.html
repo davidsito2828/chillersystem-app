@@ -6675,6 +6675,24 @@ function segConstruirHojasEmpresa(wb, empresaKey, itemsEmp, generadoStr){
   });
   xlsAnchos(wsG, [12,9,22,14,13,13,13,14,12,14,14]);
 
+  // ── COMPRAS (detalle línea por línea: material u otro gasto, con proveedor y N° de factura) ──
+  const wsC = wb.addWorksheet('COMPRAS ' + pal.tag);
+  xlsTitulo(wsC, 'DETALLE DE COMPRAS — ' + empresaKey + ' (materiales y otros gastos, con proveedor y factura)', 8, pal);
+  xlsHeader(wsC, ['Fecha','N° presupuesto','Cliente','Tipo','Descripción','Proveedor','N° factura de compra','Costo'], pal);
+  itemsEmp.forEach(function(t){
+    const p=t.ppto, c=t.costos;
+    if (!c) return;
+    (c.materiales||[]).forEach(function(m){
+      if (!m.descripcion) return;
+      xlsFila(wsC, [p.fecha, p.numero||'', p.cliente_nombre||'', 'Material', m.descripcion, m.proveedor||'', m.factura||'', fmt(m.costo)], {8:FMT_MONTO});
+    });
+    (c.otros_gastos||[]).forEach(function(m){
+      if (!m.descripcion) return;
+      xlsFila(wsC, [p.fecha, p.numero||'', p.cliente_nombre||'', 'Otro gasto', m.descripcion, m.proveedor||'', m.factura||'', fmt(m.costo)], {8:FMT_MONTO});
+    });
+  });
+  xlsAnchos(wsC, [12,14,22,12,26,18,20,13]);
+
   // ── APROBADOS ──
   const wsA = wb.addWorksheet('APROBADOS ' + pal.tag);
   xlsTitulo(wsA, 'APROBADOS — ' + empresaKey, 9, pal);
@@ -6713,7 +6731,7 @@ async function exportarSeguimientoExcel(){
     const tarifasArr = tarifas || [];
 
     const todos = (pptos||[]).map(function(p){
-      return { ppto: p, balance: calcularBalanceTrabajo(p, costosPorPpto[p.id]||null, tarifasArr, iibbTasa) };
+      return { ppto: p, balance: calcularBalanceTrabajo(p, costosPorPpto[p.id]||null, tarifasArr, iibbTasa), costos: costosPorPpto[p.id]||null };
     });
 
     const wb = new ExcelJS.Workbook();
@@ -7749,10 +7767,16 @@ function ctRecalcManoObra() {
 function renderCostosMateriales() {
   const cont = document.getElementById('ctMaterialesRows');
   cont.innerHTML = _ctMateriales.map((row, i) =>
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+    '<div style="margin-bottom:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
     + '<input class="form-input" style="flex:2;min-width:160px;" value="' + escapeHtml(row.descripcion || '') + '" placeholder="Descripción del material" oninput="_ctMateriales[' + i + '].descripcion=this.value"/>'
     + '<input class="form-input" type="number" min="0" step="0.01" style="width:110px;" value="' + (row.costo || '') + '" placeholder="Costo $" oninput="_ctMateriales[' + i + '].costo=parseFloat(this.value)||0;ctRecalcMateriales()"/>'
     + (_ctMateriales.length > 1 ? '<button class="btn-danger" onclick="ctQuitarMaterial(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:5px;">'
+    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.proveedor || '') + '" placeholder="Proveedor (opcional)" oninput="_ctMateriales[' + i + '].proveedor=this.value"/>'
+    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.factura || '') + '" placeholder="N° factura de compra (opcional)" oninput="_ctMateriales[' + i + '].factura=this.value"/>'
+    + '</div>'
     + '</div>'
   ).join('');
   ctRecalcMateriales();
@@ -7775,10 +7799,16 @@ function ctRecalcMateriales() {
 function renderCostosOtrosGastos() {
   const cont = document.getElementById('ctOtrosGastosRows');
   cont.innerHTML = _ctOtrosGastos.map((row, i) =>
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+    '<div style="margin-bottom:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
     + '<input class="form-input" style="flex:2;min-width:160px;" value="' + escapeHtml(row.descripcion || '') + '" placeholder="Descripción del gasto (ej: flete, alquiler de equipo)" oninput="_ctOtrosGastos[' + i + '].descripcion=this.value"/>'
     + '<input class="form-input" type="number" min="0" step="0.01" style="width:110px;" value="' + (row.costo || '') + '" placeholder="Costo $" oninput="_ctOtrosGastos[' + i + '].costo=parseFloat(this.value)||0;ctRecalcOtrosGastos()"/>'
     + (_ctOtrosGastos.length > 1 ? '<button class="btn-danger" onclick="ctQuitarOtroGasto(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:5px;">'
+    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.proveedor || '') + '" placeholder="Proveedor (opcional)" oninput="_ctOtrosGastos[' + i + '].proveedor=this.value"/>'
+    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.factura || '') + '" placeholder="N° factura de compra (opcional)" oninput="_ctOtrosGastos[' + i + '].factura=this.value"/>'
+    + '</div>'
     + '</div>'
   ).join('');
   ctRecalcOtrosGastos();
@@ -7858,10 +7888,10 @@ async function guardarCostosTrabajo() {
     .map(r => ({ categoria: r.categoria, horario: r.horario, horas: r.horas }));
   const materiales = _ctMateriales
     .filter(r => r.descripcion && r.descripcion.trim())
-    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0 }));
+    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0, proveedor: (r.proveedor || '').trim(), factura: (r.factura || '').trim() }));
   const otrosGastos = _ctOtrosGastos
     .filter(r => r.descripcion && r.descripcion.trim())
-    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0 }));
+    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0, proveedor: (r.proveedor || '').trim(), factura: (r.factura || '').trim() }));
   const data = { presupuesto_id: _ctPresupuestoId, mano_obra: manoObra, materiales: materiales, otros_gastos: otrosGastos };
   try {
     if (_ctCostosId) {
