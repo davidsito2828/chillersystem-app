@@ -1516,6 +1516,15 @@ tbody tr:hover{background:#f8faff;}
           <span style="font-weight:900;color:var(--accent);font-family:'IBM Plex Mono',monospace;" id="ctTotalMateriales">$0</span>
         </div>
       </div>
+      <div class="form-group full">
+        <label class="form-label">Otros gastos</label>
+        <div id="ctOtrosGastosRows"></div>
+        <button class="btn-secondary" onclick="ctAgregarOtroGasto()" style="font-size:11px;padding:4px 10px;margin-top:4px;">＋ Agregar gasto</button>
+        <div style="margin-top:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;">
+          <span style="font-weight:700;color:var(--text);">Total otros gastos:</span>
+          <span style="font-weight:900;color:var(--accent);font-family:'IBM Plex Mono',monospace;" id="ctTotalOtrosGastos">$0</span>
+        </div>
+      </div>
       <div class="form-group full" style="padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-weight:700;color:var(--text);">TOTAL:</span>
         <span style="font-size:18px;font-weight:900;color:var(--green);font-family:'IBM Plex Mono',monospace;" id="ctTotalGeneral">$0</span>
@@ -6408,7 +6417,30 @@ let preciosActuales={}; // {idx: precio}
 
 async function loadPresupuestos(){
   presupuestos=await api('presupuestos?select=*&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.desc.nullslast,created_at.desc');
+  try {
+    const costosIds = await api('costos_trabajo?select=presupuesto_id');
+    window._pptoCostosIds = new Set((costosIds || []).map(c => c.presupuesto_id));
+  } catch (ec) { console.warn('[Presupuestos Costos]', ec); window._pptoCostosIds = new Set(); }
   renderPresupuestos();
+}
+
+async function adjuntarFactura(pId) {
+  const ppto = presupuestos.find(p => p.id === pId);
+  if (!ppto) return;
+  if (ppto.factura_url) { window.open(ppto.factura_url, '_blank'); return; }
+  const url = prompt('Pegá el link de la factura (Google Drive, Dropbox, etc.):', '');
+  if (!url || !url.trim()) return;
+  try {
+    await api('presupuestos?id=eq.' + pId, {
+      method: 'PATCH',
+      body: JSON.stringify({ factura_url: url.trim() }),
+      headers: { ...H, 'Prefer': 'return=minimal' }
+    });
+    showToast('✅ Link de factura guardado', 'success');
+    loadPresupuestos();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
+  }
 }
 
 function renderPresupuestos(){
@@ -6447,6 +6479,8 @@ function renderPresupuestos(){
     const fechaMostrar=p.fecha?fmtF(p.fecha):(p.created_at?fmtF(p.created_at.split('T')[0]):'—');
     const badgeManual=p.origen==='manual'?'<span class="ppto-badge-manual">📎 Manual</span>':'';
     const btnPdf=p.pdf_url?`<a href="${p.pdf_url}" target="_blank" class="btn-edit" style="text-decoration:none;display:inline-flex;align-items:center;">📄</a>`:'';
+    const btnCostos=puedeVerPresupuestos()?`<button class="btn-edit" onclick="abrirEditorCostos('${p.id}')" title="${(window._pptoCostosIds&&window._pptoCostosIds.has(p.id))?'Costos cargados · Editar':'Cargar costos del trabajo'}" style="color:${(window._pptoCostosIds&&window._pptoCostosIds.has(p.id))?'var(--green)':''};">💲</button>`:'';
+    const btnFactura=puedeVerPresupuestos()?`<button class="btn-edit" onclick="adjuntarFactura('${p.id}')" title="${p.factura_url?'Ver factura · Editar':'Adjuntar link de factura'}" style="color:${p.factura_url?'var(--green)':''};">🧾</button>`:'';
     const borderColor=borderColorFlujoMap[flujo]||'#9ca3af';
     // Timeline
     const curIdx=flujoSeq.indexOf(flujo);
@@ -6515,6 +6549,8 @@ function renderPresupuestos(){
         <div class="ppto-responsable">${responsables[flujo]||''}</div>
         <div class="ppto-actions">
           ${btnPdf}
+          ${btnCostos}
+          ${btnFactura}
           <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
           <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
           ${p.estado==='borrador'?'<button class="btn-green" onclick="aprobarPpto(\''+p.id+'\')">✅ OK</button>':''}
@@ -7254,6 +7290,7 @@ let _ctCostosId = null;
 let _ctConfigHH = [];
 let _ctManoObra = [];
 let _ctMateriales = [];
+let _ctOtrosGastos = [];
 
 function ctValorHora(cfg, horario) {
   if (!cfg) return 0;
@@ -7272,10 +7309,12 @@ async function abrirEditorCostos(presupuestoId) {
   _ctConfigHH = [];
   _ctManoObra = [];
   _ctMateriales = [];
+  _ctOtrosGastos = [];
   document.getElementById('ctCliente').textContent = 'Cargando...';
   document.getElementById('ctNumero').textContent = '';
   document.getElementById('ctManoObraRows').innerHTML = '';
   document.getElementById('ctMaterialesRows').innerHTML = '';
+  document.getElementById('ctOtrosGastosRows').innerHTML = '';
   document.getElementById('mCostosTrabajo').classList.add('open');
   try {
     const [pptoArr, configHH, costosArr] = await Promise.all([
@@ -7291,10 +7330,13 @@ async function abrirEditorCostos(presupuestoId) {
     _ctCostosId = existente ? existente.id : null;
     _ctManoObra = (existente && existente.mano_obra && existente.mano_obra.length) ? existente.mano_obra.map(r => ({...r})) : [];
     _ctMateriales = (existente && existente.materiales && existente.materiales.length) ? existente.materiales.map(r => ({...r})) : [];
+    _ctOtrosGastos = (existente && existente.otros_gastos && existente.otros_gastos.length) ? existente.otros_gastos.map(r => ({...r})) : [];
     if (!_ctManoObra.length) ctAgregarManoObra();
     if (!_ctMateriales.length) ctAgregarMaterial();
+    if (!_ctOtrosGastos.length) ctAgregarOtroGasto();
     renderCostosManoObra();
     renderCostosMateriales();
+    renderCostosOtrosGastos();
   } catch (e) {
     showToast('Error al cargar costos: ' + e.message, true);
   }
@@ -7371,10 +7413,37 @@ function ctRecalcMateriales() {
   ctRecalcTotalGeneral();
 }
 
+function renderCostosOtrosGastos() {
+  const cont = document.getElementById('ctOtrosGastosRows');
+  cont.innerHTML = _ctOtrosGastos.map((row, i) =>
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+    + '<input class="form-input" style="flex:2;min-width:160px;" value="' + escapeHtml(row.descripcion || '') + '" placeholder="Descripción del gasto (ej: flete, alquiler de equipo)" oninput="_ctOtrosGastos[' + i + '].descripcion=this.value"/>'
+    + '<input class="form-input" type="number" min="0" step="0.01" style="width:110px;" value="' + (row.costo || '') + '" placeholder="Costo $" oninput="_ctOtrosGastos[' + i + '].costo=parseFloat(this.value)||0;ctRecalcOtrosGastos()"/>'
+    + (_ctOtrosGastos.length > 1 ? '<button class="btn-danger" onclick="ctQuitarOtroGasto(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
+    + '</div>'
+  ).join('');
+  ctRecalcOtrosGastos();
+}
+function ctAgregarOtroGasto() {
+  _ctOtrosGastos.push({ descripcion: '', costo: 0 });
+  renderCostosOtrosGastos();
+}
+function ctQuitarOtroGasto(i) {
+  _ctOtrosGastos.splice(i, 1);
+  if (!_ctOtrosGastos.length) ctAgregarOtroGasto();
+  renderCostosOtrosGastos();
+}
+function ctRecalcOtrosGastos() {
+  const total = _ctOtrosGastos.reduce((s, r) => s + (r.costo || 0), 0);
+  document.getElementById('ctTotalOtrosGastos').textContent = '$' + total.toLocaleString('es-AR');
+  ctRecalcTotalGeneral();
+}
+
 function ctRecalcTotalGeneral() {
   const totalMO = _ctManoObra.reduce((s, r) => s + ctSubtotalManoObra(r), 0);
   const totalMat = _ctMateriales.reduce((s, r) => s + (r.costo || 0), 0);
-  document.getElementById('ctTotalGeneral').textContent = '$' + (totalMO + totalMat).toLocaleString('es-AR');
+  const totalOtros = _ctOtrosGastos.reduce((s, r) => s + (r.costo || 0), 0);
+  document.getElementById('ctTotalGeneral').textContent = '$' + (totalMO + totalMat + totalOtros).toLocaleString('es-AR');
 }
 
 async function guardarCostosTrabajo() {
@@ -7385,7 +7454,10 @@ async function guardarCostosTrabajo() {
   const materiales = _ctMateriales
     .filter(r => r.descripcion && r.descripcion.trim())
     .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0 }));
-  const data = { presupuesto_id: _ctPresupuestoId, mano_obra: manoObra, materiales: materiales };
+  const otrosGastos = _ctOtrosGastos
+    .filter(r => r.descripcion && r.descripcion.trim())
+    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0 }));
+  const data = { presupuesto_id: _ctPresupuestoId, mano_obra: manoObra, materiales: materiales, otros_gastos: otrosGastos };
   try {
     if (_ctCostosId) {
       await api('costos_trabajo?id=eq.' + _ctCostosId, {
@@ -7400,7 +7472,13 @@ async function guardarCostosTrabajo() {
     cerrar('mCostosTrabajo');
     if (!window._mpCostosIds) window._mpCostosIds = new Set();
     window._mpCostosIds.add(_ctPresupuestoId);
-    renderPlanillaMiPanel();
+    // Refrescar solo la pantalla que esté activa (no tocar las demás)
+    const tabMP = document.getElementById('tab-mipanel');
+    const tabPp = document.getElementById('tab-presupuestos');
+    const tabEst = document.getElementById('tab-estadisticas');
+    if (tabMP && tabMP.style.display !== 'none') renderPlanillaMiPanel();
+    if (tabPp && tabPp.style.display !== 'none') renderPresupuestos();
+    if (tabEst && tabEst.style.display !== 'none') { try { renderBalanceService(); } catch (eb) {} }
   } catch (e) {
     showToast('Error: ' + e.message, true);
   }
@@ -8734,13 +8812,15 @@ function calcularBalanceTrabajo(ppto, costosDelTrabajo, tarifas, iibbTasa) {
     : (ppto.precio_total || 0);
   const manoObraArr = (costosDelTrabajo && costosDelTrabajo.mano_obra) || [];
   const materialesArr = (costosDelTrabajo && costosDelTrabajo.materiales) || [];
+  const otrosGastosArr = (costosDelTrabajo && costosDelTrabajo.otros_gastos) || [];
   const costoManoObra = calcularCostoManoObra(manoObraArr, tarifas);
   const costoMateriales = materialesArr.reduce(function(s, m) { return s + (m.costo || 0); }, 0);
+  const costoOtros = otrosGastosArr.reduce(function(s, m) { return s + (m.costo || 0); }, 0);
   const iibb = ingreso !== null ? ingreso * (iibbTasa || 0) : null;
-  const margen = ingreso !== null ? (ingreso - costoManoObra - costoMateriales - iibb) : null;
-  const tieneCostos = !!costosDelTrabajo && (manoObraArr.length > 0 || materialesArr.length > 0);
+  const margen = ingreso !== null ? (ingreso - costoManoObra - costoMateriales - costoOtros - iibb) : null;
+  const tieneCostos = !!costosDelTrabajo && (manoObraArr.length > 0 || materialesArr.length > 0 || otrosGastosArr.length > 0);
   return {
-    ingreso: ingreso, costoManoObra: costoManoObra, costoMateriales: costoMateriales, iibb: iibb, margen: margen, tieneCostos: tieneCostos,
+    ingreso: ingreso, costoManoObra: costoManoObra, costoMateriales: costoMateriales, costoOtros: costoOtros, iibb: iibb, margen: margen, tieneCostos: tieneCostos,
     moneda: moneda, tipoCambio: tipoCambio, faltaTipoCambio: faltaTipoCambio
   };
 }
@@ -8753,6 +8833,7 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
   const totalIngreso = trabajosConMargen.reduce(function(s, t) { return s + t.balance.ingreso; }, 0);
   const totalMO = trabajosConMargen.reduce(function(s, t) { return s + t.balance.costoManoObra; }, 0);
   const totalMat = trabajosConMargen.reduce(function(s, t) { return s + t.balance.costoMateriales; }, 0);
+  const totalOtros = trabajosConMargen.reduce(function(s, t) { return s + (t.balance.costoOtros || 0); }, 0);
   const totalIibb = trabajosConMargen.reduce(function(s, t) { return s + t.balance.iibb; }, 0);
   const totalMargen = trabajosConMargen.reduce(function(s, t) { return s + t.balance.margen; }, 0);
   const estimacionGanancias = totalMargen * (gananciasTasa || 0);
@@ -8762,7 +8843,7 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
   const usdSinTC = trabajos.filter(function(t) { return t.balance.faltaTipoCambio; }).length;
 
   _bsExportData = {
-    totalIngreso: totalIngreso, totalMO: totalMO, totalMat: totalMat,
+    totalIngreso: totalIngreso, totalMO: totalMO, totalMat: totalMat, totalOtros: totalOtros,
     totalIibb: totalIibb, totalMargen: totalMargen,
     gananciasTasa: gananciasTasa || 0, estimacionGanancias: estimacionGanancias,
     trabajos: trabajos
@@ -8777,6 +8858,7 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
     + '<div class="kpi-spark-card" style="border-left-color:#2563eb"><div class="kpi-spark-top"><div class="kpi-spark-label">Total producido</div></div><div class="kpi-spark-num" style="color:#2563eb">' + fmt(totalIngreso) + '</div><div class="kpi-spark-sub">' + totalTrabajos + ' trabajo' + (totalTrabajos !== 1 ? 's' : '') + '</div></div>'
     + '<div class="kpi-spark-card" style="border-left-color:#7c3aed"><div class="kpi-spark-top"><div class="kpi-spark-label">Mano de obra</div></div><div class="kpi-spark-num" style="color:#7c3aed">' + fmt(totalMO) + '</div></div>'
     + '<div class="kpi-spark-card" style="border-left-color:#0891b2"><div class="kpi-spark-top"><div class="kpi-spark-label">Materiales</div></div><div class="kpi-spark-num" style="color:#0891b2">' + fmt(totalMat) + '</div></div>'
+    + '<div class="kpi-spark-card" style="border-left-color:#0d9488"><div class="kpi-spark-top"><div class="kpi-spark-label">Otros gastos</div></div><div class="kpi-spark-num" style="color:#0d9488">' + fmt(totalOtros) + '</div></div>'
     + '<div class="kpi-spark-card" style="border-left-color:var(--yellow)"><div class="kpi-spark-top"><div class="kpi-spark-label">IIBB</div></div><div class="kpi-spark-num" style="color:var(--yellow)">' + fmt(totalIibb) + '</div></div>'
     + '<div class="kpi-spark-card" style="border-left-color:var(--green)"><div class="kpi-spark-top"><div class="kpi-spark-label">Ganancia neta</div></div><div class="kpi-spark-num" style="color:var(--green)">' + fmt(totalMargen) + '</div></div>'
     + '</div>';
@@ -8809,7 +8891,7 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
     html += '<div style="padding:32px;text-align:center;color:var(--text-dim);font-size:13px;">📭 No hay trabajos de Service finalizados en el período.</div>';
   } else {
     html += '<div class="table-wrap"><table>'
-      + '<thead><tr><th>Cliente</th><th>N°</th><th>Ingreso</th><th>M. Obra</th><th>Materiales</th><th>IIBB</th><th>Margen</th><th style="width:64px;"></th></tr></thead><tbody>'
+      + '<thead><tr><th>Cliente</th><th>N°</th><th>Ingreso</th><th>M. Obra</th><th>Materiales</th><th>Otros</th><th>IIBB</th><th>Margen</th><th style="width:64px;"></th></tr></thead><tbody>'
       + trabajos.map(function(t) {
           const p = t.ppto, b = t.balance;
           const esUSD = b.moneda === 'USD';
@@ -8828,6 +8910,7 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
             + '<td class="td-mono">' + ingresoCell + '</td>'
             + '<td class="td-mono">' + fmt(b.costoManoObra) + '</td>'
             + '<td class="td-mono">' + fmt(b.costoMateriales) + '</td>'
+            + '<td class="td-mono">' + fmt(b.costoOtros || 0) + '</td>'
             + '<td class="td-mono">' + fmt(b.iibb) + '</td>'
             + '<td class="td-mono" style="font-weight:700;color:' + margenColor + ';">' + margenCell + '</td>'
             + '<td><button onclick="abrirEditorCostos(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (b.tieneCostos ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;" title="' + (b.tieneCostos ? 'Editar costos' : 'Cargar costos') + '">💲</button>' + btnTC + '</td>'
@@ -8880,6 +8963,7 @@ function exportarBalanceExcel() {
     ['Total producido', Math.round(d.totalIngreso)],
     ['Mano de obra', Math.round(d.totalMO)],
     ['Materiales', Math.round(d.totalMat)],
+    ['Otros gastos', Math.round(d.totalOtros || 0)],
     ['IIBB', Math.round(d.totalIibb)],
     ['Ganancia neta', Math.round(d.totalMargen)]
   ];
