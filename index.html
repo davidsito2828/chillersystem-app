@@ -1537,6 +1537,38 @@ tbody tr:hover{background:#f8faff;}
   </div>
 </div>
 
+<!-- MODAL FICHA DEL TRABAJO — resumen consolidado por presupuesto (costos, rentabilidad, factura, facturación) -->
+<div class="modal-overlay" id="mFichaTrabajo">
+  <div class="modal" style="max-width:720px;">
+    <button class="modal-close" onclick="cerrar('mFichaTrabajo')">✕</button>
+    <div class="modal-title">📋 Ficha del trabajo</div>
+    <div style="padding:20px 20px 0;">
+      <div style="font-weight:700;color:var(--text);font-size:15px;" id="fchCliente">—</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:2px;" id="fchNumero">—</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:2px;font-weight:700;" id="fchTotal">—</div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Costos y rentabilidad</label>
+        <div id="fchRentabilidad" style="padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-dim);">Cargando...</div>
+        <button class="btn-secondary" onclick="abrirEditorCostos(_fchPresupuestoId)" style="font-size:11px;padding:4px 10px;margin-top:8px;">💲 Cargar / editar costos</button>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Factura</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="form-input" id="fchFacturaUrl" placeholder="Link de la factura (Drive, Dropbox, etc.)" style="flex:1;"/>
+          <button class="btn-primary" onclick="guardarFacturaFicha()" style="padding:8px 12px;">💾</button>
+        </div>
+        <div id="fchFacturaLink" style="margin-top:4px;font-size:11px;"></div>
+      </div>
+      <div class="form-group full" id="fchFacturacionWrap"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mFichaTrabajo')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONFIGURACIÓN DE TARIFAS E IMPUESTOS -->
 <div class="modal-overlay" id="mConfigTarifas">
   <div class="modal" style="max-width:720px;">
@@ -6415,6 +6447,39 @@ let filtroPptoEstado='';
 let seccionesActuales=[]; // [{titulo, items:[]}]
 let preciosActuales={}; // {idx: precio}
 
+function renderFacturacionBand(p){
+  const flujo=p.estado_flujo||'borrador';
+  if(!(puedeVerPresupuestos()&&(flujo==='en_ejecucion'||flujo==='finalizado'))) return '';
+  const facturado50i=p.facturado_50_inicial||false;
+  const facturado50f=p.facturado_50_final||false;
+  const histFact=p.historial_estados||[];
+  const regInicial=histFact.filter(h=>h.estado==='facturacion_inicial'&&h.accion==='facturado').pop();
+  const regFinal=histFact.filter(h=>h.estado==='facturacion_final'&&h.accion==='facturado').pop();
+  let badgeFacturacion='<div class="ppto-facturacion-band">';
+  badgeFacturacion+='<div>'+
+    '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
+    '<input type="checkbox" '+(facturado50i?'checked':'')+
+    ' onchange="toggleFacturacion(\''+p.id+'\',\'inicial\',this.checked)"'+
+    ' style="accent-color:#059669;width:14px;height:14px;"/>'+
+    '<span style="color:'+(facturado50i?'#059669':'#6b7280')+';font-weight:'+(facturado50i?'700':'400')+
+    ';">50% inicial facturado</span></label>'+
+    (regInicial?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regInicial.usuario+' — '+fmtF(regInicial.fecha)+'</div>':'')+
+    '</div>';
+  if(flujo==='finalizado'){
+    badgeFacturacion+='<div>'+
+      '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
+      '<input type="checkbox" '+(facturado50f?'checked':'')+
+      ' onchange="toggleFacturacion(\''+p.id+'\',\'final\',this.checked)"'+
+      ' style="accent-color:#059669;width:14px;height:14px;"/>'+
+      '<span style="color:'+(facturado50f?'#059669':'#6b7280')+';font-weight:'+(facturado50f?'700':'400')+
+      ';">50% final facturado</span></label>'+
+      (regFinal?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regFinal.usuario+' — '+fmtF(regFinal.fecha)+'</div>':'')+
+      '</div>';
+  }
+  badgeFacturacion+='</div>';
+  return badgeFacturacion;
+}
+
 async function loadPresupuestos(){
   presupuestos=await api('presupuestos?select=*&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.desc.nullslast,created_at.desc');
   try {
@@ -6438,6 +6503,89 @@ async function adjuntarFactura(pId) {
     });
     showToast('✅ Link de factura guardado', 'success');
     loadPresupuestos();
+  } catch (e) {
+    showToast('Error: ' + e.message, true);
+  }
+}
+
+// ── FICHA DEL TRABAJO — vista consolidada de un presupuesto (costos, rentabilidad, factura, facturación) ──
+let _fchPresupuestoId = null;
+
+async function abrirFichaTrabajo(presupuestoId) {
+  _fchPresupuestoId = presupuestoId;
+  document.getElementById('fchCliente').textContent = 'Cargando...';
+  document.getElementById('fchNumero').textContent = '';
+  document.getElementById('fchTotal').textContent = '';
+  document.getElementById('fchRentabilidad').textContent = 'Cargando...';
+  document.getElementById('fchFacturaUrl').value = '';
+  document.getElementById('fchFacturaLink').innerHTML = '';
+  document.getElementById('fchFacturacionWrap').innerHTML = '';
+  document.getElementById('mFichaTrabajo').classList.add('open');
+  await renderFichaTrabajo();
+}
+
+async function renderFichaTrabajo() {
+  const pId = _fchPresupuestoId;
+  if (!pId) return;
+  try {
+    const [pptoArr, costosArr, tarifas, impuestos] = await Promise.all([
+      api('presupuestos?id=eq.' + pId + '&select=*'),
+      api('costos_trabajo?presupuesto_id=eq.' + pId),
+      api('config_horas_hombre?select=*'),
+      api('config_impuestos?select=*')
+    ]);
+    const p = (pptoArr || [])[0];
+    if (!p) { showToast('No se encontró el presupuesto', true); cerrar('mFichaTrabajo'); return; }
+    const monedaSim = p.moneda === 'USD' ? 'U$D ' : '$';
+    document.getElementById('fchCliente').textContent = p.cliente_nombre || '—';
+    document.getElementById('fchNumero').textContent = 'N° ' + (p.numero || '—') + ' · ' + (etiquetasFlujo[p.estado_flujo] || p.estado_flujo || '—');
+    document.getElementById('fchTotal').textContent = p.precio_total ? (monedaSim + Number(p.precio_total).toLocaleString('es-AR')) : '—';
+
+    const iibbRow = (impuestos || []).find(function(r) { return r.clave === 'iibb'; });
+    const iibbTasa = (iibbRow && iibbRow.activo) ? (iibbRow.alicuota || 0) : 0;
+    const costos = (costosArr || [])[0] || null;
+    const b = calcularBalanceTrabajo(p, costos, tarifas || [], iibbTasa);
+    const fmt = function(n) { return n === null ? '—' : '$' + Math.round(n || 0).toLocaleString('es-AR'); };
+    const rentEl = document.getElementById('fchRentabilidad');
+    if (!b.tieneCostos) {
+      rentEl.innerHTML = '<span style="color:var(--text-muted);">Todavía no cargaste costos para este trabajo.</span>';
+    } else if (b.faltaTipoCambio) {
+      rentEl.innerHTML = '<span style="color:var(--red);">Falta cargar el tipo de cambio (trabajo en USD) para calcular la rentabilidad. Usá 💲 para cargarlo.</span>';
+    } else {
+      rentEl.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
+        + '<div>Mano de obra: <b>' + fmt(b.costoManoObra) + '</b></div>'
+        + '<div>Materiales: <b>' + fmt(b.costoMateriales) + '</b></div>'
+        + '<div>Otros gastos: <b>' + fmt(b.costoOtros) + '</b></div>'
+        + '<div>IIBB: <b>' + fmt(b.iibb) + '</b></div>'
+        + '</div>'
+        + '<div style="margin-top:8px;font-size:15px;font-weight:900;color:' + (b.margen >= 0 ? 'var(--green)' : 'var(--red)') + ';">Margen: ' + fmt(b.margen) + '</div>';
+    }
+
+    document.getElementById('fchFacturaUrl').value = p.factura_url || '';
+    document.getElementById('fchFacturaLink').innerHTML = p.factura_url
+      ? '<a href="' + p.factura_url + '" target="_blank" style="color:var(--accent);">Ver factura actual ↗</a>' : '';
+
+    document.getElementById('fchFacturacionWrap').innerHTML = renderFacturacionBand(p);
+  } catch (e) {
+    showToast('Error al cargar la ficha: ' + e.message, true);
+  }
+}
+
+async function guardarFacturaFicha() {
+  const pId = _fchPresupuestoId;
+  if (!pId) return;
+  const url = (document.getElementById('fchFacturaUrl').value || '').trim();
+  try {
+    await api('presupuestos?id=eq.' + pId, {
+      method: 'PATCH',
+      body: JSON.stringify({ factura_url: url || null }),
+      headers: { ...H, 'Prefer': 'return=minimal' }
+    });
+    showToast('✅ Factura guardada', 'success');
+    renderFichaTrabajo();
+    const tabPp = document.getElementById('tab-presupuestos');
+    if (tabPp && tabPp.style.display !== 'none') loadPresupuestos();
   } catch (e) {
     showToast('Error: ' + e.message, true);
   }
@@ -6471,11 +6619,6 @@ function renderPresupuestos(){
     // CAMBIO 1: badge estado_flujo simple
     const flujo=p.estado_flujo||'borrador';
     const puedeAvanzar=puedeAvanzarEstadoPpto()&&!!siguienteEstado[flujo];
-    const facturado50i=p.facturado_50_inicial||false;
-    const facturado50f=p.facturado_50_final||false;
-    const histFact=p.historial_estados||[];
-    const regInicial=histFact.filter(h=>h.estado==='facturacion_inicial'&&h.accion==='facturado').pop();
-    const regFinal=histFact.filter(h=>h.estado==='facturacion_final'&&h.accion==='facturado').pop();
     const fechaMostrar=p.fecha?fmtF(p.fecha):(p.created_at?fmtF(p.created_at.split('T')[0]):'—');
     const badgeManual=p.origen==='manual'?'<span class="ppto-badge-manual">📎 Manual</span>':'';
     const btnPdf=p.pdf_url?`<a href="${p.pdf_url}" target="_blank" class="btn-edit" style="text-decoration:none;display:inline-flex;align-items:center;">📄</a>`:'';
@@ -6501,32 +6644,8 @@ function renderPresupuestos(){
       tl+='</div>';
       timelineHTML=tl;
     }
-    // Facturación band — checkboxes y condiciones preservados del original
-    let badgeFacturacion='';
-    if(puedeVerPresupuestos()&&(flujo==='en_ejecucion'||flujo==='finalizado')){
-      badgeFacturacion='<div class="ppto-facturacion-band">';
-      badgeFacturacion+='<div>'+
-        '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
-        '<input type="checkbox" '+(facturado50i?'checked':'')+
-        ' onchange="toggleFacturacion(\''+p.id+'\',\'inicial\',this.checked)"'+
-        ' style="accent-color:#059669;width:14px;height:14px;"/>'+
-        '<span style="color:'+(facturado50i?'#059669':'#6b7280')+';font-weight:'+(facturado50i?'700':'400')+
-        ';">50% inicial facturado</span></label>'+
-        (regInicial?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regInicial.usuario+' — '+fmtF(regInicial.fecha)+'</div>':'')+
-        '</div>';
-      if(flujo==='finalizado'){
-        badgeFacturacion+='<div>'+
-          '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;">'+
-          '<input type="checkbox" '+(facturado50f?'checked':'')+
-          ' onchange="toggleFacturacion(\''+p.id+'\',\'final\',this.checked)"'+
-          ' style="accent-color:#059669;width:14px;height:14px;"/>'+
-          '<span style="color:'+(facturado50f?'#059669':'#6b7280')+';font-weight:'+(facturado50f?'700':'400')+
-          ';">50% final facturado</span></label>'+
-          (regFinal?'<div style="font-size:10px;color:#059669;margin-left:19px;">✍️ '+regFinal.usuario+' — '+fmtF(regFinal.fecha)+'</div>':'')+
-          '</div>';
-      }
-      badgeFacturacion+='</div>';
-    }
+    // Facturación band — ahora vive en renderFacturacionBand(), reutilizable también desde la Ficha del trabajo
+    const badgeFacturacion=renderFacturacionBand(p);
     return `<div class="ppto-card" style="border-left:4px solid ${borderColor};">
       <div class="ppto-card-header">
         <div class="ppto-card-header-left">
@@ -6551,6 +6670,7 @@ function renderPresupuestos(){
           ${btnPdf}
           ${btnCostos}
           ${btnFactura}
+          ${puedeVerPresupuestos()?`<button class="btn-edit" onclick="abrirFichaTrabajo('${p.id}')" title="Ver ficha completa del trabajo">📋</button>`:''}
           <button class="btn-edit" onclick="previewPptoById('${p.id}')">👁</button>
           <button class="btn-edit" onclick="abrirModalPpto('${p.id}')">✏️</button>
           ${p.estado==='borrador'?'<button class="btn-green" onclick="aprobarPpto(\''+p.id+'\')">✅ OK</button>':''}
@@ -7472,13 +7592,17 @@ async function guardarCostosTrabajo() {
     cerrar('mCostosTrabajo');
     if (!window._mpCostosIds) window._mpCostosIds = new Set();
     window._mpCostosIds.add(_ctPresupuestoId);
+    if (!window._pptoCostosIds) window._pptoCostosIds = new Set();
+    window._pptoCostosIds.add(_ctPresupuestoId);
     // Refrescar solo la pantalla que esté activa (no tocar las demás)
     const tabMP = document.getElementById('tab-mipanel');
     const tabPp = document.getElementById('tab-presupuestos');
     const tabEst = document.getElementById('tab-estadisticas');
+    const fichaModal = document.getElementById('mFichaTrabajo');
     if (tabMP && tabMP.style.display !== 'none') renderPlanillaMiPanel();
     if (tabPp && tabPp.style.display !== 'none') renderPresupuestos();
     if (tabEst && tabEst.style.display !== 'none') { try { renderBalanceService(); } catch (eb) {} }
+    if (fichaModal && fichaModal.classList.contains('open') && _fchPresupuestoId === _ctPresupuestoId) renderFichaTrabajo();
   } catch (e) {
     showToast('Error: ' + e.message, true);
   }
@@ -7873,6 +7997,8 @@ async function toggleFacturacion(pptoId,tipo,checked){
     showToast(checked?'✅ Facturación registrada':'Desmarcado','success');
     await loadPresupuestos();
     if(typeof loadNotificaciones==='function') await loadNotificaciones();
+    const fichaModal=document.getElementById('mFichaTrabajo');
+    if(fichaModal&&fichaModal.classList.contains('open')&&_fchPresupuestoId===pptoId) renderFichaTrabajo();
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
