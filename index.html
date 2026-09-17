@@ -6559,6 +6559,61 @@ function segAgregarPorPeriodo(items, periodoFn){
   return Object.keys(map).sort().map(function(k){ return map[k]; });
 }
 
+// Dibuja el gráfico de evolución mensual (facturación vs. margen) en un <canvas> y devuelve
+// un dataURL PNG listo para embeber en el Excel. ExcelJS gratuito no soporta gráficos nativos
+// editables de Excel, así que esto se inserta como una imagen — visual, pero no editable ahí.
+function segDibujarGraficoEvolucion(periodos, colorFact, colorMargen){
+  const W = 760, H = 320, padL = 70, padR = 20, padT = 30, padB = 50;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  if (!periodos.length) return null;
+
+  const maxVal = Math.max(1, ...periodos.map(function(p){ return Math.max(p.monto, p.margen); }));
+  const minVal = Math.min(0, ...periodos.map(function(p){ return Math.min(p.monto, p.margen); }));
+  const rango = maxVal - minVal || 1;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const x = function(i){ return padL + (periodos.length === 1 ? plotW/2 : (i/(periodos.length-1)) * plotW); };
+  const y = function(v){ return padT + plotH - ((v - minVal) / rango) * plotH; };
+
+  ctx.strokeStyle = '#e2e8f0'; ctx.fillStyle = '#6b7280'; ctx.font = '10px Arial'; ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const val = minVal + (rango * g / 4);
+    const yy = y(val);
+    ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.stroke();
+    ctx.fillText('$' + Math.round(val).toLocaleString('es-AR'), 4, yy + 3);
+  }
+  if (minVal < 0) {
+    ctx.strokeStyle = '#9ca3af'; ctx.beginPath(); ctx.moveTo(padL, y(0)); ctx.lineTo(W-padR, y(0)); ctx.stroke();
+  }
+
+  function linea(color, valores){
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath();
+    valores.forEach(function(v, i){ const px = x(i), py = y(v); i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); });
+    ctx.stroke();
+    ctx.fillStyle = color;
+    valores.forEach(function(v, i){ ctx.beginPath(); ctx.arc(x(i), y(v), 3.5, 0, 7); ctx.fill(); });
+  }
+  linea(colorFact, periodos.map(function(p){ return p.monto; }));
+  linea(colorMargen, periodos.map(function(p){ return p.margen; }));
+
+  ctx.fillStyle = '#374151'; ctx.font = '10px Arial'; ctx.textAlign = 'center';
+  periodos.forEach(function(p, i){
+    const partes = p.label.split(' ');
+    ctx.fillText(partes[0].slice(0,3) + ' ' + (partes[1]||''), x(i), H - padB + 16);
+  });
+  ctx.textAlign = 'left';
+
+  ctx.fillStyle = colorFact; ctx.fillRect(padL, 8, 10, 10);
+  ctx.fillStyle = '#1a2332'; ctx.font = '11px Arial'; ctx.fillText('Facturación', padL + 14, 17);
+  ctx.fillStyle = colorMargen; ctx.fillRect(padL + 100, 8, 10, 10);
+  ctx.fillStyle = '#1a2332'; ctx.fillText('Margen', padL + 114, 17);
+
+  return canvas.toDataURL('image/png');
+}
+
 // ── Helpers de estilo para ExcelJS ──
 function xlsTitulo(ws, texto, nCols, pal){
   const row = ws.addRow([texto]);
@@ -6616,6 +6671,16 @@ function segConstruirHojasEmpresa(wb, empresaKey, itemsEmp, generadoStr){
     if (ev.some(function(h){ return segPeriodoMensual(h.fecha).key===segPeriodoMensual(p.fecha).key; })) acc.mismoMes++;
     return acc;
   }, {conEvento:0, mismoMes:0});
+  const sinRespaldo = itemsEmp.reduce(function(acc,t){
+    const c = t.costos;
+    if (!c) return acc;
+    ['materiales','otros_gastos'].forEach(function(campo){
+      (c[campo]||[]).forEach(function(m){
+        if (m.proveedor && !m.factura && !m.factura_link) acc++;
+      });
+    });
+    return acc;
+  }, 0);
 
   const wsB = wb.addWorksheet('BALANCE ' + pal.tag);
   xlsTitulo(wsB, 'BALANCE — ' + empresaKey, 5, pal);
@@ -6634,12 +6699,28 @@ function segConstruirHojasEmpresa(wb, empresaKey, itemsEmp, generadoStr){
   xlsFila(wsB, ['Otros gastos', fmt(otrT), '', 'Total gastos', fmt(gasT)], {2:FMT_MONTO, 5:FMT_MONTO});
   xlsFila(wsB, ['IIBB', fmt(iibbT), '', 'Resultado neto total', fmt(netoT)], {2:FMT_MONTO, 5:FMT_MONTO});
   xlsFila(wsB, ['Rentabilidad ponderada', rentPond, '', 'Rentabilidad promedio simple', rentProm], {2:FMT_PCT, 5:FMT_PCT});
+  xlsFila(wsB, ['⚠ Compras con proveedor sin factura ni link', sinRespaldo]);
   wsB.addRow([]);
   xlsSeccion(wsB, 'CUMPLIMIENTO: "facturar el mismo mes del presupuesto"', 5, pal);
   xlsFila(wsB, ['Aprobados con algún registro de facturación', cumpl.conEvento]);
   xlsFila(wsB, ['De esos, facturados en el mismo mes', cumpl.mismoMes]);
   xlsFila(wsB, ['% de cumplimiento', cumpl.conEvento ? cumpl.mismoMes/cumpl.conEvento : 0], {2:FMT_PCT});
   xlsAnchos(wsB, [40,16,3,32,16]);
+
+  // ── Gráfico de evolución mensual (imagen embebida — ExcelJS gratuito no soporta gráficos nativos editables) ──
+  const mensualEmp = segAgregarPorPeriodo(aprobados, segPeriodoMensual);
+  if (mensualEmp.length && typeof segDibujarGraficoEvolucion === 'function') {
+    try {
+      const dataUrl = segDibujarGraficoEvolucion(mensualEmp, '#' + pal.headerBg.slice(2), '#059669');
+      if (dataUrl) {
+        const filaImg = wsB.rowCount + 2;
+        wsB.getCell('A' + (filaImg - 1)).value = 'EVOLUCIÓN MENSUAL (facturación y margen)';
+        wsB.getCell('A' + (filaImg - 1)).font = { bold: true, size: 11, color: { argb: pal.seccionTx } };
+        const imgId = wb.addImage({ base64: dataUrl, extension: 'png' });
+        wsB.addImage(imgId, { tl: { col: 0, row: filaImg - 1 }, ext: { width: 620, height: 260 } });
+      }
+    } catch (eg) { console.warn('[gráfico balance]', eg); }
+  }
 
   // ── PERIODOS ──
   const wsP = wb.addWorksheet('PERIODOS ' + pal.tag);
@@ -6677,21 +6758,23 @@ function segConstruirHojasEmpresa(wb, empresaKey, itemsEmp, generadoStr){
 
   // ── COMPRAS (detalle línea por línea: material u otro gasto, con proveedor y N° de factura) ──
   const wsC = wb.addWorksheet('COMPRAS ' + pal.tag);
-  xlsTitulo(wsC, 'DETALLE DE COMPRAS — ' + empresaKey + ' (materiales y otros gastos, con proveedor y factura)', 8, pal);
-  xlsHeader(wsC, ['Fecha','N° presupuesto','Cliente','Tipo','Descripción','Proveedor','N° factura de compra','Costo'], pal);
+  xlsTitulo(wsC, 'DETALLE DE COMPRAS — ' + empresaKey + ' (materiales y otros gastos, con proveedor y factura)', 10, pal);
+  xlsHeader(wsC, ['Fecha','N° presupuesto','Cliente','Tipo','Descripción','Proveedor','N° factura de compra','Link factura','Respaldado','Costo'], pal);
   itemsEmp.forEach(function(t){
     const p=t.ppto, c=t.costos;
     if (!c) return;
-    (c.materiales||[]).forEach(function(m){
-      if (!m.descripcion) return;
-      xlsFila(wsC, [p.fecha, p.numero||'', p.cliente_nombre||'', 'Material', m.descripcion, m.proveedor||'', m.factura||'', fmt(m.costo)], {8:FMT_MONTO});
-    });
-    (c.otros_gastos||[]).forEach(function(m){
-      if (!m.descripcion) return;
-      xlsFila(wsC, [p.fecha, p.numero||'', p.cliente_nombre||'', 'Otro gasto', m.descripcion, m.proveedor||'', m.factura||'', fmt(m.costo)], {8:FMT_MONTO});
+    ['materiales','otros_gastos'].forEach(function(campo){
+      (c[campo]||[]).forEach(function(m){
+        if (!m.descripcion) return;
+        const tipo = campo==='materiales' ? 'Material' : 'Otro gasto';
+        const respaldado = (m.factura || m.factura_link) ? 'Sí' : (m.proveedor ? 'No' : '—');
+        const fila = xlsFila(wsC, [p.fecha, p.numero||'', p.cliente_nombre||'', tipo, m.descripcion, m.proveedor||'', m.factura||'', m.factura_link?'Ver factura':'', respaldado, fmt(m.costo)], {10:FMT_MONTO});
+        if (m.factura_link) fila.getCell(8).value = { text: 'Ver factura', hyperlink: m.factura_link };
+        if (respaldado === 'No') fila.getCell(9).font = { color: { argb: 'FFB45309' }, bold: true };
+      });
     });
   });
-  xlsAnchos(wsC, [12,14,22,12,26,18,20,13]);
+  xlsAnchos(wsC, [12,14,20,12,24,16,18,14,12,13]);
 
   // ── APROBADOS ──
   const wsA = wb.addWorksheet('APROBADOS ' + pal.tag);
@@ -7764,6 +7847,36 @@ function ctRecalcManoObra() {
   ctRecalcTotalGeneral();
 }
 
+function ctFilaRespaldo(tipo, i, row){
+  const arrVar = tipo==='materiales' ? '_ctMateriales' : '_ctOtrosGastos';
+  const tieneLink = !!row.factura_link;
+  const faltaRespaldo = !!row.proveedor && !row.factura && !row.factura_link;
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:5px;">'
+    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.proveedor || '') + '" placeholder="Proveedor (opcional)" oninput="' + arrVar + '[' + i + '].proveedor=this.value;ctRefrescarRespaldo(\'' + tipo + '\',' + i + ')"/>'
+    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.factura || '') + '" placeholder="N° factura de compra (opcional)" oninput="' + arrVar + '[' + i + '].factura=this.value;ctRefrescarRespaldo(\'' + tipo + '\',' + i + ')"/>'
+    + '<button class="btn-secondary" onclick="ctAdjuntarFacturaLinea(\'' + tipo + '\',' + i + ')" title="' + (tieneLink?'Ver el link de la factura':'Adjuntar link de la foto/PDF de la factura') + '" style="padding:4px 8px;font-size:11px;color:' + (tieneLink?'var(--green)':'') + ';">📎</button>'
+    + '</div>'
+    + '<div id="ctResp_' + tipo + '_' + i + '" style="font-size:10px;color:var(--yellow);margin-top:3px;' + (faltaRespaldo?'':'display:none;') + '">⚠️ Tiene proveedor pero no factura ni link — quedaría sin respaldo</div>';
+}
+function ctRefrescarRespaldo(tipo, i){
+  const arr = tipo==='materiales' ? _ctMateriales : _ctOtrosGastos;
+  const row = arr[i];
+  const el = document.getElementById('ctResp_'+tipo+'_'+i);
+  if(!row || !el) return;
+  const faltaRespaldo = !!row.proveedor && !row.factura && !row.factura_link;
+  el.style.display = faltaRespaldo ? '' : 'none';
+}
+function ctAdjuntarFacturaLinea(tipo, i){
+  const arr = tipo==='materiales' ? _ctMateriales : _ctOtrosGastos;
+  const row = arr[i];
+  if(!row) return;
+  if(row.factura_link){ window.open(row.factura_link, '_blank'); return; }
+  const url = prompt('Pegá el link de la foto/PDF de esta factura de compra (Drive, Dropbox, etc.):', '');
+  if(!url || !url.trim()) return;
+  row.factura_link = url.trim();
+  if(tipo==='materiales') renderCostosMateriales(); else renderCostosOtrosGastos();
+}
+
 function renderCostosMateriales() {
   const cont = document.getElementById('ctMaterialesRows');
   cont.innerHTML = _ctMateriales.map((row, i) =>
@@ -7773,10 +7886,7 @@ function renderCostosMateriales() {
     + '<input class="form-input" type="number" min="0" step="0.01" style="width:110px;" value="' + (row.costo || '') + '" placeholder="Costo $" oninput="_ctMateriales[' + i + '].costo=parseFloat(this.value)||0;ctRecalcMateriales()"/>'
     + (_ctMateriales.length > 1 ? '<button class="btn-danger" onclick="ctQuitarMaterial(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
     + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:5px;">'
-    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.proveedor || '') + '" placeholder="Proveedor (opcional)" oninput="_ctMateriales[' + i + '].proveedor=this.value"/>'
-    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.factura || '') + '" placeholder="N° factura de compra (opcional)" oninput="_ctMateriales[' + i + '].factura=this.value"/>'
-    + '</div>'
+    + ctFilaRespaldo('materiales', i, row)
     + '</div>'
   ).join('');
   ctRecalcMateriales();
@@ -7805,10 +7915,7 @@ function renderCostosOtrosGastos() {
     + '<input class="form-input" type="number" min="0" step="0.01" style="width:110px;" value="' + (row.costo || '') + '" placeholder="Costo $" oninput="_ctOtrosGastos[' + i + '].costo=parseFloat(this.value)||0;ctRecalcOtrosGastos()"/>'
     + (_ctOtrosGastos.length > 1 ? '<button class="btn-danger" onclick="ctQuitarOtroGasto(' + i + ')" style="padding:4px 8px;">✕</button>' : '')
     + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:5px;">'
-    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.proveedor || '') + '" placeholder="Proveedor (opcional)" oninput="_ctOtrosGastos[' + i + '].proveedor=this.value"/>'
-    + '<input class="form-input" style="flex:1;min-width:120px;font-size:11px;" value="' + escapeHtml(row.factura || '') + '" placeholder="N° factura de compra (opcional)" oninput="_ctOtrosGastos[' + i + '].factura=this.value"/>'
-    + '</div>'
+    + ctFilaRespaldo('otros', i, row)
     + '</div>'
   ).join('');
   ctRecalcOtrosGastos();
@@ -7888,10 +7995,10 @@ async function guardarCostosTrabajo() {
     .map(r => ({ categoria: r.categoria, horario: r.horario, horas: r.horas }));
   const materiales = _ctMateriales
     .filter(r => r.descripcion && r.descripcion.trim())
-    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0, proveedor: (r.proveedor || '').trim(), factura: (r.factura || '').trim() }));
+    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0, proveedor: (r.proveedor || '').trim(), factura: (r.factura || '').trim(), factura_link: (r.factura_link || '').trim() }));
   const otrosGastos = _ctOtrosGastos
     .filter(r => r.descripcion && r.descripcion.trim())
-    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0, proveedor: (r.proveedor || '').trim(), factura: (r.factura || '').trim() }));
+    .map(r => ({ descripcion: r.descripcion.trim(), costo: r.costo || 0, proveedor: (r.proveedor || '').trim(), factura: (r.factura || '').trim(), factura_link: (r.factura_link || '').trim() }));
   const data = { presupuesto_id: _ctPresupuestoId, mano_obra: manoObra, materiales: materiales, otros_gastos: otrosGastos };
   try {
     if (_ctCostosId) {
