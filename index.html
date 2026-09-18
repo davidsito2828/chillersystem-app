@@ -1127,6 +1127,7 @@ tbody tr:hover{background:#f8faff;}
   <button class="nav-btn" id="tabEstadisticas" onclick="showTab('estadisticas',this)">📊 Estadísticas</button>
   <button class="nav-btn admin-only" id="tabFichajes" onclick="showTab('fichajes',this)">📍 Tiempos/Rutas</button>
   <button class="nav-btn" id="tabMiPanel" onclick="showTab('mipanel',this)" style="display:none;">🗂️ Mi Panel</button>
+  <button class="nav-btn" id="tabCronograma" onclick="showTab('cronograma',this)" style="display:none;">🗓️ Cronograma</button>
 </div>
 
 <!-- ═══ INICIO (dashboard opcional) ═══ -->
@@ -2180,6 +2181,90 @@ tbody tr:hover{background:#f8faff;}
   <div id="mpPlanilla" style="padding:0 16px 24px;"></div>
 </div>
 
+<div id="tab-cronograma" class="panel" style="display:none;">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title">🗓️ Cronograma de trabajos</div>
+      <div class="panel-count">Estado de obras y carga de personal técnico</div>
+    </div>
+    <button class="btn-secondary" onclick="exportarCronogramaExcel()" style="font-size:11px;padding:5px 10px;">📊 Exportar cronograma semanal</button>
+  </div>
+  <div id="cronoResumen" style="padding:16px 16px 0;"></div>
+  <div id="cronoBoard" style="display:flex;gap:12px;padding:16px;overflow-x:auto;"></div>
+  <div style="padding:0 16px 20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-top:1px solid var(--border);padding-top:16px;">
+      <div style="font-weight:700;font-size:13px;">Contratos de service recurrentes</div>
+      <button class="btn-secondary" onclick="abrirModalContrato(null)" style="font-size:11px;padding:4px 10px;">＋ Agregar contrato</button>
+    </div>
+    <div id="cronoContratos"></div>
+  </div>
+</div>
+
+<!-- MODAL TRABAJO DEL CRONOGRAMA -->
+<div class="modal-overlay" id="mCronoTrabajo">
+  <div class="modal" style="max-width:560px;">
+    <button class="modal-close" onclick="cerrar('mCronoTrabajo')">✕</button>
+    <div class="modal-title" id="ctTituloModal">Nuevo trabajo</div>
+    <input type="hidden" id="ctId"/>
+    <input type="hidden" id="ctPresupuestoId"/>
+    <div id="ctPptoBadge" style="display:none;font-size:11px;color:var(--accent);margin:0 0 10px;padding:6px 10px;background:var(--bg3);border-radius:6px;"></div>
+    <div class="form-grid">
+      <div class="form-group full"><label class="form-label">Cliente / obra *</label><input class="form-input" id="ctCliente2"/></div>
+      <div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="ctTipo">
+          <option>Instalación</option><option>Preventivo</option><option>Correctivo</option><option>Provisión</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Estado</label>
+        <select class="form-select" id="ctEstado">
+          <option value="pendiente">Pendiente de programación</option>
+          <option value="programado">Programado</option>
+          <option value="encurso">En curso</option>
+          <option value="finalizado">Finalizado</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Técnicos necesarios</label><input class="form-input" type="number" min="0" id="ctTecnicos" value="1"/></div>
+      <div class="form-group"><label class="form-label">Especialidad</label><input class="form-input" id="ctEspecialidad" placeholder="Ej: Electromecánico"/></div>
+      <div class="form-group"><label class="form-label">Fecha de inicio</label><input class="form-input" type="date" id="ctFechaInicio" onchange="ctRegenerarDias()"/></div>
+      <div class="form-group"><label class="form-label">Duración (días)</label><input class="form-input" type="number" min="1" id="ctDuracion" value="1" onchange="ctRegenerarDias()"/></div>
+      <div class="form-group full">
+        <label class="form-label">Plan por día (opcional)</label>
+        <div id="ctDiasContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Prioridad</label>
+        <select class="form-select" id="ctPrioridad"><option value="urgente">🔴 Urgente</option><option value="normal" selected>🔵 Normal</option><option value="flexible">⚪ Flexible</option></select>
+      </div>
+      <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="ctNotas" style="min-height:60px;"></textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mCronoTrabajo')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarCronoTrabajo()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONTRATO DE SERVICE RECURRENTE -->
+<div class="modal-overlay" id="mCronoContrato">
+  <div class="modal" style="max-width:420px;">
+    <button class="modal-close" onclick="cerrar('mCronoContrato')">✕</button>
+    <div class="modal-title" id="ccTitulo">Nuevo contrato de service</div>
+    <input type="hidden" id="ccId"/>
+    <div class="form-grid">
+      <div class="form-group full"><label class="form-label">Cliente *</label><input class="form-input" id="ccCliente"/></div>
+      <div class="form-group"><label class="form-label">Frecuencia</label>
+        <select class="form-select" id="ccFrecuencia"><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Técnicos por visita</label><input class="form-input" type="number" min="0" id="ccTecnicos" value="1"/></div>
+      <div class="form-group full"><label class="form-label">Horas estimadas por visita</label><input class="form-input" type="number" min="0" id="ccHoras" value="4"/></div>
+      <div class="form-group full"><label class="form-label">Notas</label><textarea class="form-textarea" id="ccNotas" style="min-height:50px;"></textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="cerrar('mCronoContrato')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarCronoContrato()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL INFORME -->
 <div class="modal-overlay" id="mInforme">
   <div class="modal" style="max-width:700px;">
@@ -2905,6 +2990,7 @@ async function iniciarApp(){
   document.getElementById('tabGaleria').style.display=puedeVerGaleria()?'':'none';
   document.getElementById('tabEstadisticas').style.display=puedeVerEstadisticas()?'':'none';
   document.getElementById('tabMiPanel').style.display=(usuarioActual.id===DAVID_USER_ID)?'':'none';
+  document.getElementById('tabCronograma').style.display=(usuarioActual.id===DAVID_USER_ID)?'':'none';
   
   // Excepción exclusiva: Fichajes sí lo ve gerencia
   const tabFichajes = document.getElementById('tabFichajes');
@@ -6029,7 +6115,8 @@ function puedeVerGaleria(){return !esTecnico();}
 function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
   if(id==='mipanel'&&(!usuarioActual||usuarioActual.id!==DAVID_USER_ID)){showToast('No tenés acceso a esta sección',true);return;}
-  ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  if(id==='cronograma'&&(!usuarioActual||usuarioActual.id!==DAVID_USER_ID)){showToast('No tenés acceso a esta sección',true);return;}
+  ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel','cronograma'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   const navBar=document.getElementById('navBar');
   if(navBar) navBar.style.display=id==='inicio'?'none':'flex';
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -6044,6 +6131,7 @@ function showTab(id,btn){
   if(id==='galeria'){renderGaleria();}
   if(id==='estadisticas'){renderEstadisticas();}
   if(id==='mipanel'){const f=document.getElementById('mpFecha');if(f&&!f.value)f.value=new Date().toISOString().split('T')[0];cargarDatosMiPanel();}
+  if(id==='cronograma'){loadCronograma();}
 }
 
 // ── INICIO (dashboard opcional) — delega 100% en los botones reales, sin lógica de roles propia ──
@@ -8340,6 +8428,328 @@ function abrirModalAvanzarEstado(pId,estadoActual,numero,cliente,monto){
   if(ok) avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto);
 }
 
+// ══════════════════════════════════════════
+//  CRONOGRAMA DE TRABAJOS — exclusivo de Mi Panel (David), sincronizado con Presupuestos
+// ══════════════════════════════════════════
+let cronogramaTrabajos=[];
+let cronogramaContratos=[];
+let cronogramaConfig={tecnicos_disponibles:0};
+const CRONO_COLUMNS=[
+  {key:'pendiente',label:'Pendiente de programación'},
+  {key:'programado',label:'Programado'},
+  {key:'encurso',label:'En curso'},
+  {key:'finalizado',label:'Finalizado'}
+];
+const CRONO_PRIO_LABEL={urgente:'Urgente',normal:'Normal',flexible:'Flexible'};
+const CRONO_DIAS_SEMANA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
+async function loadCronograma(){
+  try{
+    const [trabajos,contratos,config]=await Promise.all([
+      api('cronograma_trabajos?select=*&order=created_at.asc'),
+      api('cronograma_contratos?select=*&order=cliente_nombre.asc'),
+      api('cronograma_config?select=*')
+    ]);
+    cronogramaTrabajos=trabajos||[];
+    cronogramaContratos=contratos||[];
+    cronogramaConfig=(config&&config[0])||{tecnicos_disponibles:0};
+    renderCronogramaResumen();
+    renderCronogramaBoard();
+    renderCronogramaContratos();
+  }catch(e){ showToast('Error al cargar el cronograma: '+e.message, true); }
+}
+
+function renderCronogramaResumen(){
+  const enObras=cronogramaTrabajos.filter(t=>t.estado==='encurso').reduce((s,t)=>s+(t.tecnicos_necesarios||0),0);
+  const enContratos=cronogramaContratos.filter(c=>c.activo).reduce((s,c)=>s+(c.tecnicos||0),0);
+  const total=enObras+enContratos;
+  const disponibles=cronogramaConfig.tecnicos_disponibles||0;
+  const balance=disponibles-total;
+  const balColor=balance>0?'var(--green)':(balance===0?'var(--yellow)':'var(--red)');
+  const balBg=balance>0?'var(--green-bg)':(balance===0?'var(--yellow-bg)':'var(--red-bg)');
+  const balTxt=balance>0?('Sobran '+balance):(balance===0?'Justo, sin margen':('Faltan '+Math.abs(balance)));
+  document.getElementById('cronoResumen').innerHTML=
+    '<div style="display:flex;flex-wrap:wrap;gap:12px;">'
+    +'<div class="kpi-spark-card" style="min-width:170px;"><div class="kpi-spark-top"><div class="kpi-spark-label">Técnicos disponibles</div></div>'
+      +'<input type="number" min="0" id="cronoDisponibles" value="'+disponibles+'" style="width:70px;font-size:22px;font-weight:900;font-family:\'IBM Plex Mono\',monospace;border:none;border-bottom:2px solid var(--border);background:transparent;color:var(--text);" onchange="guardarCronoDisponibles(this.value)"/></div>'
+    +'<div class="kpi-spark-card" style="min-width:170px;"><div class="kpi-spark-top"><div class="kpi-spark-label">En obras activas</div></div><div class="kpi-spark-num">'+enObras+'</div></div>'
+    +'<div class="kpi-spark-card" style="min-width:170px;"><div class="kpi-spark-top"><div class="kpi-spark-label">En contratos esta semana</div></div><div class="kpi-spark-num">'+enContratos+'</div></div>'
+    +'<div class="kpi-spark-card" style="min-width:170px;border-left-color:'+balColor+';"><div class="kpi-spark-top"><div class="kpi-spark-label">Balance</div></div><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:'+balBg+';color:'+balColor+';margin-top:4px;">'+balTxt+'</span></div>'
+    +'</div>';
+}
+
+async function guardarCronoDisponibles(val){
+  cronogramaConfig.tecnicos_disponibles=parseInt(val,10)||0;
+  try{
+    await api('cronograma_config?id=eq.true',{method:'PATCH',body:JSON.stringify({tecnicos_disponibles:cronogramaConfig.tecnicos_disponibles}),headers:{...H,'Prefer':'return=minimal'}});
+    renderCronogramaResumen();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+function cronoCardHTML(t){
+  const prioColor=t.prioridad==='urgente'?'var(--red)':(t.prioridad==='flexible'?'var(--text-muted)':'var(--accent)');
+  const fechaTxt=t.fecha_inicio?(fmtF(t.fecha_inicio)+((t.duracion_dias||1)>1?(' (+'+((t.duracion_dias||1)-1)+'d)'):'')):'Sin fecha';
+  return '<div class="ppto-card" draggable="true" ondragstart="cronoOnDragStart(event,\''+t.id+'\')" style="border-left-color:'+prioColor+';margin-bottom:8px;padding:10px 12px;cursor:grab;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">'
+    +'<div style="font-weight:700;font-size:13px;">'+escapeHtml(t.cliente_nombre||'—')+'</div>'
+    +'<div style="display:flex;gap:2px;flex-shrink:0;">'
+    +(t.presupuesto_id?'<button class="btn-edit" style="padding:2px 5px;" onclick="previewPptoById(\''+t.presupuesto_id+'\')" title="Ver presupuesto">👁</button>':'')
+    +'<button class="btn-edit" style="padding:2px 5px;" onclick="abrirModalCronoTrabajo(\''+t.id+'\')">✎</button>'
+    +'<button class="btn-danger" style="padding:2px 5px;" onclick="eliminarCronoTrabajo(\''+t.id+'\')">✕</button>'
+    +'</div></div>'
+    +'<span style="display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg4);color:var(--text-dim);margin:5px 0;">'+escapeHtml(t.tipo||'—')+'</span>'
+    +'<div style="font-size:11px;color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;line-height:1.5;">'
+    +(t.tecnicos_necesarios||0)+' técnico(s) · '+escapeHtml(t.especialidad||'—')+'<br/>'
+    +fechaTxt+' · '+(CRONO_PRIO_LABEL[t.prioridad]||'Normal')
+    +'</div>'
+    +(t.notas?'<div style="font-size:11px;color:var(--text-muted);margin-top:5px;font-style:italic;">'+escapeHtml(t.notas)+'</div>':'')
+    +'</div>';
+}
+
+function renderCronogramaBoard(){
+  const cont=document.getElementById('cronoBoard');
+  cont.innerHTML=CRONO_COLUMNS.map(col=>{
+    const items=cronogramaTrabajos.filter(t=>t.estado===col.key);
+    return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;min-width:250px;flex:1;display:flex;flex-direction:column;max-height:600px;" ondragover="event.preventDefault();this.style.outline=\'2px dashed var(--accent)\';" ondragleave="this.style.outline=\'none\';" ondrop="cronoOnDrop(event,\''+col.key+'\')">'
+      +'<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">'
+        +'<div style="font-weight:700;font-size:12px;">'+col.label+'</div><span style="font-size:11px;color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;">'+items.length+'</span>'
+      +'</div>'
+      +'<div style="padding:10px;overflow-y:auto;flex:1;">'
+        +items.map(cronoCardHTML).join('')
+        +'<button class="btn-secondary" style="width:100%;font-size:11px;padding:6px;border-style:dashed;" onclick="abrirModalCronoTrabajo(null,\''+col.key+'\')">＋ Agregar trabajo</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+function cronoOnDragStart(e,id){ e.dataTransfer.setData('text/plain', id); }
+async function cronoOnDrop(e,estado){
+  e.preventDefault();
+  e.currentTarget.style.outline='none';
+  const id=e.dataTransfer.getData('text/plain');
+  const t=cronogramaTrabajos.find(x=>x.id===id);
+  if(!t||t.estado===estado) return;
+  const estadoAnterior=t.estado;
+  t.estado=estado;
+  renderCronogramaBoard();
+  try{
+    await api('cronograma_trabajos?id=eq.'+id,{method:'PATCH',body:JSON.stringify({estado}),headers:{...H,'Prefer':'return=minimal'}});
+  }catch(err){ t.estado=estadoAnterior; renderCronogramaBoard(); showToast('Error: '+err.message,true); }
+}
+
+function ctRegenerarDias(){
+  const fi=document.getElementById('ctFechaInicio').value;
+  const dur=parseInt(document.getElementById('ctDuracion').value,10)||1;
+  const cont=document.getElementById('ctDiasContainer');
+  const prevInputs={};
+  cont.querySelectorAll('input[data-fecha]').forEach(inp=>{ prevInputs[inp.dataset.fecha]=inp.value; });
+  if(!fi){ cont.innerHTML='<div style="font-size:11px;color:var(--text-dim);">Cargá una fecha de inicio para poder detallar el plan día por día.</div>'; return; }
+  let html='';
+  for(let i=0;i<dur;i++){
+    const d=new Date(fi+'T00:00:00');
+    d.setDate(d.getDate()+i);
+    const fechaStr=d.toISOString().split('T')[0];
+    const label=CRONO_DIAS_SEMANA[d.getDay()]+' '+fmtF(fechaStr);
+    const val=prevInputs[fechaStr]!==undefined?prevInputs[fechaStr]:((window._ctDiasExistente||{})[fechaStr]||'');
+    html+='<div style="display:flex;gap:8px;align-items:center;">'
+      +'<div style="width:120px;font-size:11px;color:var(--text-dim);flex-shrink:0;">'+label+'</div>'
+      +'<input class="form-input" data-fecha="'+fechaStr+'" placeholder="¿Qué se hace este día? (opcional)" value="'+escapeHtml(val)+'" style="font-size:12px;"/>'
+      +'</div>';
+  }
+  cont.innerHTML=html;
+}
+
+function abrirModalCronoTrabajo(id, presetEstado){
+  document.getElementById('ctId').value='';
+  document.getElementById('ctPresupuestoId').value='';
+  document.getElementById('ctPptoBadge').style.display='none';
+  document.getElementById('ctCliente2').value='';
+  document.getElementById('ctCliente2').disabled=false;
+  document.getElementById('ctTipo').value='Instalación';
+  document.getElementById('ctEstado').value=presetEstado||'pendiente';
+  document.getElementById('ctTecnicos').value=1;
+  document.getElementById('ctEspecialidad').value='';
+  document.getElementById('ctFechaInicio').value='';
+  document.getElementById('ctDuracion').value=1;
+  document.getElementById('ctPrioridad').value='normal';
+  document.getElementById('ctNotas').value='';
+  window._ctDiasExistente={};
+  document.getElementById('ctTituloModal').textContent='Nuevo trabajo';
+  if(id){
+    const t=cronogramaTrabajos.find(x=>x.id===id);
+    if(t){
+      document.getElementById('ctTituloModal').textContent='Editar trabajo';
+      document.getElementById('ctId').value=t.id;
+      document.getElementById('ctPresupuestoId').value=t.presupuesto_id||'';
+      if(t.presupuesto_id){
+        document.getElementById('ctPptoBadge').style.display='block';
+        document.getElementById('ctPptoBadge').textContent='🔗 Vinculado al presupuesto — el cliente se actualiza automáticamente desde ahí';
+        document.getElementById('ctCliente2').disabled=true;
+      }
+      document.getElementById('ctCliente2').value=t.cliente_nombre||'';
+      document.getElementById('ctTipo').value=t.tipo||'Instalación';
+      document.getElementById('ctEstado').value=t.estado||'pendiente';
+      document.getElementById('ctTecnicos').value=t.tecnicos_necesarios||1;
+      document.getElementById('ctEspecialidad').value=t.especialidad||'';
+      document.getElementById('ctFechaInicio').value=t.fecha_inicio||'';
+      document.getElementById('ctDuracion').value=t.duracion_dias||1;
+      document.getElementById('ctPrioridad').value=t.prioridad||'normal';
+      document.getElementById('ctNotas').value=t.notas||'';
+      window._ctDiasExistente={};
+      (t.dias_programados||[]).forEach(d=>{ window._ctDiasExistente[d.fecha]=d.tarea; });
+    }
+  }
+  ctRegenerarDias();
+  document.getElementById('mCronoTrabajo').classList.add('open');
+}
+
+async function guardarCronoTrabajo(){
+  const id=document.getElementById('ctId').value;
+  const cliente=document.getElementById('ctCliente2').value.trim();
+  if(!cliente){ showToast('Falta el cliente/obra',true); return; }
+  const dias=[];
+  document.querySelectorAll('#ctDiasContainer input[data-fecha]').forEach(inp=>{
+    if(inp.value.trim()) dias.push({fecha:inp.dataset.fecha, tarea:inp.value.trim()});
+  });
+  const data={
+    presupuesto_id: document.getElementById('ctPresupuestoId').value || null,
+    cliente_nombre: cliente,
+    tipo: document.getElementById('ctTipo').value,
+    estado: document.getElementById('ctEstado').value,
+    tecnicos_necesarios: parseInt(document.getElementById('ctTecnicos').value,10)||0,
+    especialidad: document.getElementById('ctEspecialidad').value.trim()||null,
+    fecha_inicio: document.getElementById('ctFechaInicio').value||null,
+    duracion_dias: parseInt(document.getElementById('ctDuracion').value,10)||1,
+    dias_programados: dias,
+    prioridad: document.getElementById('ctPrioridad').value,
+    notas: document.getElementById('ctNotas').value.trim()||null,
+    creado_por: usuarioActual?usuarioActual.nombre:null
+  };
+  try{
+    if(id){
+      await api('cronograma_trabajos?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    }else{
+      await api('cronograma_trabajos',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+    }
+    showToast('Guardado ✓','success');
+    cerrar('mCronoTrabajo');
+    await loadCronograma();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+async function eliminarCronoTrabajo(id){
+  if(!confirm('¿Eliminar este trabajo del cronograma?')) return;
+  try{
+    await api('cronograma_trabajos?id=eq.'+id,{method:'DELETE',headers:H});
+    showToast('Eliminado','success');
+    await loadCronograma();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+function cronoContratoRowHTML(c){
+  return '<div style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-top:1px dashed var(--border);font-size:12px;flex-wrap:wrap;">'
+    +'<div style="flex:2;min-width:140px;font-weight:600;">'+escapeHtml(c.cliente_nombre)+'</div>'
+    +'<div style="flex:2;min-width:180px;color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+escapeHtml(c.frecuencia)+' · '+(c.tecnicos||0)+' técnico(s) · '+(c.horas||0)+' hs/visita</div>'
+    +'<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);white-space:nowrap;cursor:pointer;"><input type="checkbox" '+(c.activo?'checked':'')+' onchange="toggleCronoContrato(\''+c.id+'\',this.checked)"/> Visita esta semana</label>'
+    +'<div style="display:flex;gap:4px;"><button class="btn-edit" style="padding:2px 5px;" onclick="abrirModalContrato(\''+c.id+'\')">✎</button><button class="btn-danger" style="padding:2px 5px;" onclick="eliminarCronoContrato(\''+c.id+'\')">✕</button></div>'
+    +'</div>';
+}
+
+function renderCronogramaContratos(){
+  const cont=document.getElementById('cronoContratos');
+  cont.innerHTML=cronogramaContratos.length?cronogramaContratos.map(cronoContratoRowHTML).join(''):'<div style="font-size:11px;color:var(--text-dim);padding:8px 4px;">Sin contratos de service cargados todavía.</div>';
+}
+
+async function toggleCronoContrato(id,val){
+  const c=cronogramaContratos.find(x=>x.id===id);
+  if(c) c.activo=val;
+  renderCronogramaResumen(); renderCronogramaContratos();
+  try{ await api('cronograma_contratos?id=eq.'+id,{method:'PATCH',body:JSON.stringify({activo:val}),headers:{...H,'Prefer':'return=minimal'}}); }
+  catch(e){ showToast('Error: '+e.message,true); await loadCronograma(); }
+}
+
+async function eliminarCronoContrato(id){
+  if(!confirm('¿Eliminar este contrato de service?')) return;
+  try{ await api('cronograma_contratos?id=eq.'+id,{method:'DELETE',headers:H}); showToast('Eliminado','success'); await loadCronograma(); }
+  catch(e){ showToast('Error: '+e.message,true); }
+}
+
+function abrirModalContrato(id){
+  document.getElementById('ccId').value='';
+  document.getElementById('ccCliente').value='';
+  document.getElementById('ccFrecuencia').value='Mensual';
+  document.getElementById('ccTecnicos').value=1;
+  document.getElementById('ccHoras').value=4;
+  document.getElementById('ccNotas').value='';
+  document.getElementById('ccTitulo').textContent=id?'Editar contrato':'Nuevo contrato de service';
+  if(id){
+    const c=cronogramaContratos.find(x=>x.id===id);
+    if(c){
+      document.getElementById('ccId').value=c.id;
+      document.getElementById('ccCliente').value=c.cliente_nombre||'';
+      document.getElementById('ccFrecuencia').value=c.frecuencia||'Mensual';
+      document.getElementById('ccTecnicos').value=c.tecnicos||1;
+      document.getElementById('ccHoras').value=c.horas||4;
+      document.getElementById('ccNotas').value=c.notas||'';
+    }
+  }
+  document.getElementById('mCronoContrato').classList.add('open');
+}
+
+async function guardarCronoContrato(){
+  const id=document.getElementById('ccId').value;
+  const cliente=document.getElementById('ccCliente').value.trim();
+  if(!cliente){ showToast('Falta el cliente',true); return; }
+  const data={
+    cliente_nombre:cliente,
+    frecuencia:document.getElementById('ccFrecuencia').value,
+    tecnicos:parseInt(document.getElementById('ccTecnicos').value,10)||0,
+    horas:parseInt(document.getElementById('ccHoras').value,10)||0,
+    notas:document.getElementById('ccNotas').value.trim()||null,
+    creado_por: usuarioActual?usuarioActual.nombre:null
+  };
+  try{
+    if(id){ await api('cronograma_contratos?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}}); }
+    else{ data.activo=false; await api('cronograma_contratos',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}}); }
+    showToast('Guardado ✓','success');
+    cerrar('mCronoContrato');
+    await loadCronograma();
+  }catch(e){showToast('Error: '+e.message,true);}
+}
+
+// Sincronización automática: al avanzar el estado de un presupuesto, refleja (o crea) su tarjeta en el cronograma
+async function sincronizarCronograma(pId, nuevoEstado, ppto){
+  const mapaEstado={aprobado_cliente:'pendiente', en_ejecucion:'encurso', finalizado:'finalizado'};
+  const estadoCrono=mapaEstado[nuevoEstado];
+  if(!estadoCrono) return;
+  const existentes=await api('cronograma_trabajos?presupuesto_id=eq.'+pId+'&select=id,estado');
+  const existente=(existentes||[])[0];
+  if(!existente){
+    await api('cronograma_trabajos',{
+      method:'POST',
+      body:JSON.stringify({
+        presupuesto_id:pId,
+        cliente_nombre:(ppto&&ppto.cliente_nombre)||'',
+        tipo:'Instalación',
+        estado:estadoCrono,
+        tecnicos_necesarios:1,
+        duracion_dias:1,
+        prioridad:'normal',
+        creado_por:usuarioActual?usuarioActual.nombre:null
+      }),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
+  } else if(nuevoEstado==='en_ejecucion' || nuevoEstado==='finalizado'){
+    // "aprobado_cliente" nunca pisa hacia atrás un estado que ya avanzaste a mano (ej: "programado")
+    await api('cronograma_trabajos?id=eq.'+existente.id,{
+      method:'PATCH',
+      body:JSON.stringify({estado:estadoCrono}),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
+  }
+  const tabCrono=document.getElementById('tab-cronograma');
+  if(tabCrono && tabCrono.style.display!=='none') await loadCronograma();
+}
+
 async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
   const siguiente=siguienteEstado[estadoActual];
   if(!siguiente) return;
@@ -8387,6 +8797,9 @@ async function _avanzarEstadoPptoAplicar(pId,siguiente,ppto,esComercial,extraPat
         }),
         headers:{...H,'Prefer':'return=minimal'}
       }).catch(()=>{});
+    }
+    if(siguiente==='aprobado_cliente'||siguiente==='en_ejecucion'||siguiente==='finalizado'){
+      sincronizarCronograma(pId,siguiente,ppto).catch(esync=>console.warn('[cronograma sync]',esync));
     }
     showToast('Estado actualizado ✓','success');
     await loadPresupuestos();
