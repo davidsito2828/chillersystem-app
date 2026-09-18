@@ -2187,6 +2187,7 @@ tbody tr:hover{background:#f8faff;}
       <div class="panel-title">🗓️ Cronograma de trabajos</div>
       <div class="panel-count">Estado de obras y carga de personal técnico</div>
     </div>
+    <button class="btn-secondary" onclick="sincronizarCronogramaMasivo()" style="font-size:11px;padding:5px 10px;" title="Revisa todos los presupuestos aprobados/en ejecución/finalizados y los crea o actualiza en el cronograma si faltan">🔄 Sincronizar presupuestos existentes</button>
     <button class="btn-secondary" onclick="exportarCronogramaExcel()" style="font-size:11px;padding:5px 10px;">📊 Exportar cronograma semanal</button>
   </div>
   <div id="cronoResumen" style="padding:16px 16px 0;"></div>
@@ -8443,6 +8444,20 @@ const CRONO_COLUMNS=[
 const CRONO_PRIO_LABEL={urgente:'Urgente',normal:'Normal',flexible:'Flexible'};
 const CRONO_DIAS_SEMANA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
+// Backfill manual: por si algún avance de estado quedó sin sincronizar (ej: se hizo con una versión vieja
+// de la app en caché). Reutiliza sincronizarCronograma() para cada presupuesto, sin duplicar su lógica.
+async function sincronizarCronogramaMasivo(){
+  if(!confirm('Esto revisa todos los presupuestos Aprobados/En ejecución/Finalizados y crea o actualiza su tarjeta en el cronograma si falta. No borra ni duplica nada ya cargado. ¿Continuar?')) return;
+  try{
+    const pptos=await api('presupuestos?estado_flujo=in.(aprobado_cliente,en_ejecucion,finalizado)&select=id,cliente_nombre,estado_flujo');
+    for(const p of (pptos||[])){
+      await sincronizarCronograma(p.id, p.estado_flujo, p);
+    }
+    showToast('✅ Sincronización completa ('+(pptos||[]).length+' presupuestos revisados)','success');
+    await loadCronograma();
+  }catch(e){ showToast('Error al sincronizar: '+e.message, true); }
+}
+
 async function loadCronograma(){
   try{
     const [trabajos,contratos,config]=await Promise.all([
@@ -8746,8 +8761,6 @@ async function sincronizarCronograma(pId, nuevoEstado, ppto){
       headers:{...H,'Prefer':'return=minimal'}
     });
   }
-  const tabCrono=document.getElementById('tab-cronograma');
-  if(tabCrono && tabCrono.style.display!=='none') await loadCronograma();
 }
 
 async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
