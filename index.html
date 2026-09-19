@@ -1322,6 +1322,12 @@ tbody tr:hover{background:#f8faff;}
             <label class="form-label">Firma digital — escribí tu nombre para confirmar</label>
             <input class="form-input" id="firmaDigital" placeholder="Nombre completo como firma de confirmación"/>
           </div>
+          <div class="form-group full">
+            <label class="form-label">📎 Informe físico (si se completó en papel)</label>
+            <input type="file" id="informeFisicoInput" accept="application/pdf,image/*" style="display:none;" onchange="adjuntarInformeFisico(this.files)"/>
+            <button class="btn-secondary" type="button" onclick="document.getElementById('informeFisicoInput').click()" id="btnInformeFisico" style="width:100%;padding:10px;font-size:13px;font-weight:700;border-style:dashed;">📎 Adjuntar informe físico (foto o PDF)</button>
+            <div id="informeFisicoPreview" style="margin-top:6px;font-size:12px;"></div>
+          </div>
         </div>
         <!-- CONFORMIDAD DEL CLIENTE -->
         <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;">
@@ -3797,6 +3803,43 @@ async function comprimirFoto(file){
     img.src=url;
   });
 }
+// Subida genérica (foto o PDF) sin comprimir — para documentos, a diferencia de subirFotos() que siempre comprime a JPEG
+async function subirInformeFisico(file,carpeta){
+  const ext=(file.name.split('.').pop()||'bin').toLowerCase();
+  const nombre=(carpeta||'informes-fisicos')+'/'+Date.now()+'_'+Math.random().toString(36).slice(2)+'.'+ext;
+  const r=await fetch(SURL+'/storage/v1/object/fotos/'+nombre,{
+    method:'POST',
+    headers:{'apikey':SKEY,'Authorization':'Bearer '+(_authToken||SKEY),'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},
+    body:file
+  });
+  if(!r.ok){
+    const err=await r.json().catch(()=>({}));
+    throw new Error(err.message||err.error||'Error al subir el archivo');
+  }
+  return SURL+'/storage/v1/object/public/fotos/'+nombre;
+}
+
+let _informeFisicoUrl=null;
+async function adjuntarInformeFisico(files){
+  if(!files||!files.length) return;
+  const file=files[0];
+  const btn=document.getElementById('btnInformeFisico');
+  const prev=document.getElementById('informeFisicoPreview');
+  btn.disabled=true;
+  const textoOriginal=btn.textContent;
+  btn.textContent='⏳ Subiendo...';
+  try{
+    const url=await subirInformeFisico(file,'informes-fisicos');
+    _informeFisicoUrl=url;
+    prev.innerHTML='✅ <a href="'+url+'" target="_blank" style="color:var(--accent);">Ver informe adjunto</a>';
+    btn.textContent='📎 Reemplazar informe físico';
+  }catch(e){
+    showToast('Error al subir el informe: '+e.message,true);
+    btn.textContent=textoOriginal;
+  }
+  btn.disabled=false;
+}
+
 async function subirFotos(files,carpeta){
   const urls=[];
   for(const f of files){
@@ -4798,6 +4841,11 @@ function filtrarClienteService(q){
 function abrirServiceCliente(cliId,restaurando=false){
   serviceClienteActual=cliId;
   if(!restaurando) servicePlanilla={};
+  _informeFisicoUrl=null;
+  const elPrevInf=document.getElementById('informeFisicoPreview');
+  if(elPrevInf) elPrevInf.innerHTML='';
+  const elBtnInf=document.getElementById('btnInformeFisico');
+  if(elBtnInf) elBtnInf.textContent='📎 Adjuntar informe físico (foto o PDF)';
   const c=clientes.find(x=>x.id===cliId);
   const eqs=equipos.filter(e=>e.cliente_id===cliId);
   document.getElementById('serviceClienteNombre').textContent=c.nombre;
@@ -5323,7 +5371,8 @@ async function guardarSoloPreventivo(){
         equipos_detalle:[...detalleExistente,...equiposDetalle],
         firma_cliente:firmaClienteSP.base64||null,
         firma_tipo:firmaClienteSP.tipo||null,
-        nombre_firmante:nombreFirmanteSP||null
+        nombre_firmante:nombreFirmanteSP||null,
+        informe_fisico_url:_informeFisicoUrl||null
       }),headers:{...H,'Prefer':'return=minimal'}});
     } else {
       await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({
@@ -5336,7 +5385,8 @@ async function guardarSoloPreventivo(){
         firma_tipo:firmaClienteSP.tipo||null,
         nombre_firmante:nombreFirmanteSP||null,
         estado:'pendiente',
-        equipos_detalle:equiposDetalle
+        equipos_detalle:equiposDetalle,
+        informe_fisico_url:_informeFisicoUrl||null
       }),headers:{...H,'Prefer':'return=minimal'}});
     }
     showToast('Preventivo guardado ✓','success');
@@ -5424,9 +5474,9 @@ async function guardarPlanilla(){
     if(aprobExistente&&aprobExistente.length){
       const existId=aprobExistente[0].id;
       const detalleExistente=aprobExistente[0].equipos_detalle||[];
-      await api('preventivos_aprobacion?id=eq.'+existId,{method:'PATCH',body:JSON.stringify({equipos_detalle:[...detalleExistente,...equiposDetalle],firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null}),headers:{...H,'Prefer':'return=minimal'}});
+      await api('preventivos_aprobacion?id=eq.'+existId,{method:'PATCH',body:JSON.stringify({equipos_detalle:[...detalleExistente,...equiposDetalle],firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null,informe_fisico_url:_informeFisicoUrl||null}),headers:{...H,'Prefer':'return=minimal'}});
     }else{
-      await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({cliente_id:serviceClienteActual,equipo_id:null,tecnico:tecnico||firma,fecha_servicio:fecha,firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null,estado:'pendiente',equipos_detalle:equiposDetalle}),headers:{...H,'Prefer':'return=minimal'}});
+      await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({cliente_id:serviceClienteActual,equipo_id:null,tecnico:tecnico||firma,fecha_servicio:fecha,firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null,estado:'pendiente',equipos_detalle:equiposDetalle,informe_fisico_url:_informeFisicoUrl||null}),headers:{...H,'Prefer':'return=minimal'}});
     }
     showToast('Planilla guardada ✓ — '+Object.keys(servicePlanilla).length+' equipo(s)','success');
     await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
@@ -5496,7 +5546,7 @@ function renderAprobaciones(){
       <td style="font-weight:600;">${'Informe '+(a.numero_ipd||a.numero||'—')+' — '+(cli?cli.nombre:'—')}</td>
       <td>${equiposHtml}</td>
       <td>${a.tecnico||'—'}</td>
-      <td>${firmaHtml}${a.nombre_firmante?`<div style="font-size:10px;color:var(--text-dim);">${a.nombre_firmante}</div>`:''}</td>
+      <td>${firmaHtml}${a.nombre_firmante?`<div style="font-size:10px;color:var(--text-dim);">${a.nombre_firmante}</div>`:''}${a.informe_fisico_url?`<div style="margin-top:3px;"><a href="${a.informe_fisico_url}" target="_blank" style="font-size:10px;color:var(--accent);">📎 Informe físico</a></div>`:''}</td>
       <td><span class="${esPendiente?'badge-pendiente':'badge-aprobado'}">${esPendiente?'⏳ Pendiente':'✅ Aprobado'}</span></td>
       <td style="white-space:nowrap;">
         ${esPendiente
