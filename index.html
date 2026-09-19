@@ -2201,7 +2201,10 @@ tbody tr:hover{background:#f8faff;}
   <div style="padding:0 16px 20px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-top:1px solid var(--border);padding-top:16px;">
       <div style="font-weight:700;font-size:13px;">Contratos de service recurrentes</div>
-      <button class="btn-secondary" onclick="abrirModalContrato(null)" style="font-size:11px;padding:4px 10px;">＋ Agregar contrato</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-secondary" onclick="traerClientesAbonados()" style="font-size:11px;padding:4px 10px;" title="Trae los clientes marcados como abonados en el módulo Clientes">🔄 Traer clientes abonados</button>
+        <button class="btn-secondary" onclick="abrirModalContrato(null)" style="font-size:11px;padding:4px 10px;">＋ Agregar contrato</button>
+      </div>
     </div>
     <div id="cronoContratos"></div>
   </div>
@@ -8732,6 +8735,23 @@ async function toggleCronoContrato(id,val){
   renderCronogramaResumen(); renderCronogramaContratos();
   try{ await api('cronograma_contratos?id=eq.'+id,{method:'PATCH',body:JSON.stringify({activo:val}),headers:{...H,'Prefer':'return=minimal'}}); }
   catch(e){ showToast('Error: '+e.message,true); await loadCronograma(); }
+}
+
+async function traerClientesAbonados(){
+  try{
+    const abonados=await api('clientes?tipo_cliente=eq.abonado&select=id,nombre&order=nombre.asc');
+    const existentesNombres=new Set(cronogramaContratos.map(c=>c.cliente_nombre));
+    const nuevos=(abonados||[]).filter(c=>!existentesNombres.has(c.nombre));
+    if(!nuevos.length){ showToast('No hay clientes abonados nuevos para agregar (ya están todos, o no hay ninguno marcado como abonado en Clientes)','success'); return; }
+    for(const c of nuevos){
+      await api('cronograma_contratos',{method:'POST',body:JSON.stringify({
+        cliente_nombre:c.nombre, frecuencia:'Mensual', tecnicos:1, horas:4, activo:false,
+        creado_por:usuarioActual?usuarioActual.nombre:null
+      }),headers:{...H,'Prefer':'return=minimal'}});
+    }
+    showToast('✅ '+nuevos.length+' cliente(s) abonado(s) agregado(s) — completá frecuencia y técnicos por visita','success');
+    await loadCronograma();
+  }catch(e){ showToast('Error: '+e.message, true); }
 }
 
 async function eliminarCronoContrato(id){
