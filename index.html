@@ -8496,10 +8496,12 @@ const CRONO_DIAS_SEMANA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viern
 
 // Backfill manual: por si algún avance de estado quedó sin sincronizar (ej: se hizo con una versión vieja
 // de la app en caché). Reutiliza sincronizarCronograma() para cada presupuesto, sin duplicar su lógica.
+const FECHA_CORTE_CRONOGRAMA='2026-09-15';
+
 async function sincronizarCronogramaMasivo(){
-  if(!confirm('Esto revisa todos los presupuestos Aprobados/En ejecución/Finalizados y crea o actualiza su tarjeta en el cronograma si falta. No borra ni duplica nada ya cargado. ¿Continuar?')) return;
+  if(!confirm('Esto revisa los presupuestos Aprobados/En ejecución/Finalizados desde el '+fmtF(FECHA_CORTE_CRONOGRAMA)+' en adelante, y crea o actualiza su tarjeta en el cronograma si falta. No borra ni duplica nada ya cargado. ¿Continuar?')) return;
   try{
-    const pptos=await api('presupuestos?estado_flujo=in.(aprobado_cliente,en_ejecucion,finalizado)&select=id,cliente_nombre,estado_flujo');
+    const pptos=await api('presupuestos?estado_flujo=in.(aprobado_cliente,en_ejecucion,finalizado)&fecha=gte.'+FECHA_CORTE_CRONOGRAMA+'&select=id,cliente_nombre,estado_flujo,detalle_trabajos,fecha');
     for(const p of (pptos||[])){
       await sincronizarCronograma(p.id, p.estado_flujo, p);
     }
@@ -8786,6 +8788,7 @@ async function sincronizarCronograma(pId, nuevoEstado, ppto){
   const mapaEstado={aprobado_cliente:'pendiente', en_ejecucion:'encurso', finalizado:'finalizado'};
   const estadoCrono=mapaEstado[nuevoEstado];
   if(!estadoCrono) return;
+  if(!ppto || !ppto.fecha || ppto.fecha<FECHA_CORTE_CRONOGRAMA) return; // no traemos trabajos anteriores al corte
   const existentes=await api('cronograma_trabajos?presupuesto_id=eq.'+pId+'&select=id,estado');
   const existente=(existentes||[])[0];
   if(!existente){
@@ -8799,6 +8802,7 @@ async function sincronizarCronograma(pId, nuevoEstado, ppto){
         tecnicos_necesarios:1,
         duracion_dias:1,
         prioridad:'normal',
+        notas:(ppto&&ppto.detalle_trabajos)?ppto.detalle_trabajos.slice(0,500):null,
         creado_por:usuarioActual?usuarioActual.nombre:null
       }),
       headers:{...H,'Prefer':'return=minimal'}
