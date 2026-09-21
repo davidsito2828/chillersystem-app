@@ -2197,7 +2197,19 @@ tbody tr:hover{background:#f8faff;}
     <button class="btn-secondary" onclick="exportarCronogramaExcel()" style="font-size:11px;padding:5px 10px;">📊 Exportar cronograma semanal</button>
   </div>
   <div id="cronoResumen" style="padding:16px 16px 0;"></div>
+  <div style="display:flex;gap:6px;padding:0 16px;">
+    <button id="btnVistaTablero" class="btn-primary" onclick="cronoCambiarVista('tablero')" style="font-size:11px;padding:5px 12px;">📋 Tablero</button>
+    <button id="btnVistaCalendario" class="btn-secondary" onclick="cronoCambiarVista('calendario')" style="font-size:11px;padding:5px 12px;">📅 Calendario semanal</button>
+  </div>
   <div id="cronoBoard" style="display:flex;gap:12px;padding:16px;overflow-x:auto;"></div>
+  <div id="cronoCalendario" style="display:none;padding:0 16px 16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0;">
+      <button class="btn-secondary" onclick="cronoSemanaAnterior()" style="padding:4px 10px;font-size:12px;">◀ Semana anterior</button>
+      <div id="cronoCalRango" style="font-weight:700;font-size:13px;"></div>
+      <button class="btn-secondary" onclick="cronoSemanaSiguiente()" style="padding:4px 10px;font-size:12px;">Semana siguiente ▶</button>
+    </div>
+    <div id="cronoCalendarioGrid"></div>
+  </div>
   <div style="padding:0 16px 20px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-top:1px solid var(--border);padding-top:16px;">
       <div style="font-weight:700;font-size:13px;">Contratos de service recurrentes</div>
@@ -8504,13 +8516,162 @@ const FECHA_CORTE_CRONOGRAMA='2026-09-01';
 async function sincronizarCronogramaMasivo(){
   if(!confirm('Esto revisa los presupuestos del módulo Presupuestos (no los de Mi Panel) Aprobados/En ejecución/Finalizados desde el '+fmtF(FECHA_CORTE_CRONOGRAMA)+' en adelante, y crea o actualiza su tarjeta en el cronograma si falta. No borra ni duplica nada ya cargado. ¿Continuar?')) return;
   try{
-    const pptos=await api('presupuestos?estado_flujo=in.(aprobado_cliente,en_ejecucion,finalizado)&fecha=gte.'+FECHA_CORTE_CRONOGRAMA+'&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&select=id,cliente_nombre,estado_flujo,detalle_trabajos,fecha');
+    const pptos=await api('presupuestos?estado_flujo=in.(aprobado_cliente,en_ejecucion,finalizado)&fecha=gte.'+FECHA_CORTE_CRONOGRAMA+'&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&select=id,numero,cliente_nombre,estado_flujo,detalle_trabajos,fecha');
     for(const p of (pptos||[])){
       await sincronizarCronograma(p.id, p.estado_flujo, p);
     }
     showToast('✅ Sincronización completa ('+(pptos||[]).length+' presupuestos revisados)','success');
     await loadCronograma();
   }catch(e){ showToast('Error al sincronizar: '+e.message, true); }
+}
+
+// Expande un trabajo a la lista de días que ocupa, con la tarea específica de ese día si se cargó
+function cronoDiasDelTrabajo(t){
+  if(!t.fecha_inicio) return [];
+  const dias=[];
+  const dur=t.duracion_dias||1;
+  const mapaDias={};
+  (t.dias_programados||[]).forEach(d=>{ mapaDias[d.fecha]=d.tarea; });
+  for(let i=0;i<dur;i++){
+    const d=new Date(t.fecha_inicio+'T00:00:00');
+    d.setDate(d.getDate()+i);
+    const fechaStr=d.toISOString().split('T')[0];
+    dias.push({fecha:fechaStr, tarea:mapaDias[fechaStr]||null});
+  }
+  return dias;
+}
+function cronoLunesDeSemana(fechaStr){
+  const d=new Date(fechaStr+'T00:00:00');
+  const dow=d.getDay();
+  const offset=dow===0?-6:(1-dow);
+  d.setDate(d.getDate()+offset);
+  return d.toISOString().split('T')[0];
+}
+function cronoDiasDeLaSemana(lunes){
+  const dias=[];
+  for(let i=0;i<6;i++){ const d=new Date(lunes+'T00:00:00'); d.setDate(d.getDate()+i); dias.push(d.toISOString().split('T')[0]); }
+  return dias;
+}
+
+let _cronoCalSemana=null;
+function cronoCambiarVista(vista){
+  document.getElementById('cronoBoard').style.display=vista==='tablero'?'flex':'none';
+  document.getElementById('cronoCalendario').style.display=vista==='calendario'?'block':'none';
+  document.getElementById('btnVistaTablero').className=vista==='tablero'?'btn-primary':'btn-secondary';
+  document.getElementById('btnVistaCalendario').className=vista==='calendario'?'btn-primary':'btn-secondary';
+  document.getElementById('btnVistaTablero').style.cssText='font-size:11px;padding:5px 12px;';
+  document.getElementById('btnVistaCalendario').style.cssText='font-size:11px;padding:5px 12px;';
+  if(vista==='calendario'){
+    if(!_cronoCalSemana) _cronoCalSemana=cronoLunesDeSemana(new Date().toISOString().split('T')[0]);
+    renderCronogramaCalendario();
+  }
+}
+function cronoSemanaAnterior(){
+  const d=new Date(_cronoCalSemana+'T00:00:00'); d.setDate(d.getDate()-7);
+  _cronoCalSemana=d.toISOString().split('T')[0]; renderCronogramaCalendario();
+}
+function cronoSemanaSiguiente(){
+  const d=new Date(_cronoCalSemana+'T00:00:00'); d.setDate(d.getDate()+7);
+  _cronoCalSemana=d.toISOString().split('T')[0]; renderCronogramaCalendario();
+}
+function renderCronogramaCalendario(){
+  if(!_cronoCalSemana) return;
+  const dias=cronoDiasDeLaSemana(_cronoCalSemana);
+  document.getElementById('cronoCalRango').textContent='Semana del '+fmtF(dias[0])+' al '+fmtF(dias[5]);
+  const hoy=new Date().toISOString().split('T')[0];
+  const porDia={}; dias.forEach(f=>porDia[f]=[]);
+  cronogramaTrabajos.forEach(t=>{
+    cronoDiasDelTrabajo(t).forEach(({fecha,tarea})=>{
+      if(porDia[fecha]) porDia[fecha].push({t,tarea});
+    });
+  });
+  document.getElementById('cronoCalendarioGrid').innerHTML=
+    '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">'
+    +dias.map(f=>{
+      const items=porDia[f];
+      const esHoy=f===hoy;
+      return '<div style="background:var(--bg3);border:1px solid '+(esHoy?'var(--accent)':'var(--border)')+';border-radius:10px;min-height:150px;">'
+        +'<div style="padding:8px 10px;border-bottom:1px solid var(--border);">'
+          +'<div style="font-weight:700;font-size:11px;'+(esHoy?'color:var(--accent);':'')+'">'+CRONO_DIAS_SEMANA[new Date(f+'T00:00:00').getDay()]+'</div>'
+          +'<div style="font-size:10px;color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;">'+fmtF(f)+'</div>'
+        +'</div>'
+        +'<div style="padding:6px;display:flex;flex-direction:column;gap:5px;">'
+        +(items.length?items.map(({t,tarea})=>{
+            const prioColor=t.prioridad==='urgente'?'var(--red)':(t.prioridad==='flexible'?'var(--text-muted)':'var(--accent)');
+            return '<div onclick="abrirModalCronoTrabajo(\''+t.id+'\')" style="cursor:pointer;background:var(--bg2);border-left:3px solid '+prioColor+';border-radius:6px;padding:5px 7px;font-size:11px;">'
+              +'<div style="font-weight:700;">'+escapeHtml(t.cliente_nombre||'—')+'</div>'
+              +(tarea?'<div style="color:var(--text-dim);margin-top:2px;">'+escapeHtml(tarea)+'</div>':'<div style="color:var(--text-muted);font-style:italic;margin-top:2px;">'+(t.tecnicos_necesarios||1)+' técnico(s)</div>')
+              +'</div>';
+          }).join(''):'<div style="font-size:10px;color:var(--text-muted);padding:6px;">Sin trabajos</div>')
+        +'</div></div>';
+    }).join('')
+    +'</div>';
+}
+
+async function exportarCronogramaExcel(){
+  if(typeof ExcelJS==='undefined'){ showToast('No se pudo cargar la librería de Excel. Revisá tu conexión e intentá de nuevo.',true); return; }
+  const trabajosConFecha=cronogramaTrabajos.filter(t=>t.fecha_inicio);
+  if(!trabajosConFecha.length){ showToast('Todavía no hay trabajos con fecha de inicio cargada para exportar. Cargá la fecha de inicio en cada tarjeta primero.',true); return; }
+  showToast('Generando cronograma...','success');
+  try{
+    const expandido=[];
+    trabajosConFecha.forEach(t=>{ cronoDiasDelTrabajo(t).forEach(d=>expandido.push(d.fecha)); });
+    const fechaMin=expandido.reduce((m,f)=>f<m?f:m,expandido[0]);
+    const fechaMax=expandido.reduce((m,f)=>f>m?f:m,expandido[0]);
+    let lunes=cronoLunesDeSemana(fechaMin);
+    const finLimite=cronoLunesDeSemana(fechaMax);
+    const semanas=[];
+    let guard=0;
+    while(lunes<=finLimite && guard<12){
+      semanas.push(lunes);
+      const d=new Date(lunes+'T00:00:00'); d.setDate(d.getDate()+7);
+      lunes=d.toISOString().split('T')[0];
+      guard++;
+    }
+
+    const wb=new ExcelJS.Workbook();
+    const ws=wb.addWorksheet('CRONOGRAMA');
+    const PAL_TITULO='FF0A1F44', PAL_SECCION='FFD6EEFB', PAL_SECCION_TX='FF0A1F44', PAL_HEADER='FF1B9CE2', PAL_HEADER_TX='FFFFFFFF';
+    function filaTitulo(texto,cols){
+      const row=ws.addRow([texto]); ws.mergeCells(row.number,1,row.number,cols);
+      row.getCell(1).font={bold:true,size:13,color:{argb:'FFFFFFFF'}};
+      row.getCell(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:PAL_TITULO}};
+      row.height=20;
+    }
+    filaTitulo('CRONOGRAMA DE TRABAJOS',9);
+    ws.addRow(['Generado: '+new Date().toLocaleString('es-AR')+' · '+(usuarioActual?usuarioActual.nombre:'')]);
+    ws.addRow([]);
+
+    semanas.forEach(lunesSem=>{
+      const dias=cronoDiasDeLaSemana(lunesSem);
+      const filaSem=ws.addRow(['Semana del '+fmtF(dias[0])+' al '+fmtF(dias[5])]);
+      ws.mergeCells(filaSem.number,1,filaSem.number,9);
+      filaSem.getCell(1).font={bold:true,size:11,color:{argb:PAL_SECCION_TX}};
+      filaSem.getCell(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:PAL_SECCION}};
+      const header=ws.addRow(['Cliente','N° Ppto','Técnicos',...dias.map(f=>CRONO_DIAS_SEMANA[new Date(f+'T00:00:00').getDay()]+' '+fmtF(f))]);
+      header.eachCell(c=>{ c.font={bold:true,color:{argb:PAL_HEADER_TX}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:PAL_HEADER}}; });
+      const trabajosSemana=trabajosConFecha.filter(t=>cronoDiasDelTrabajo(t).some(d=>dias.includes(d.fecha)));
+      if(!trabajosSemana.length){
+        const r=ws.addRow(['Sin trabajos programados esta semana']); ws.mergeCells(r.number,1,r.number,9);
+      } else {
+        trabajosSemana.forEach(t=>{
+          const mapa={}; cronoDiasDelTrabajo(t).forEach(d=>{ mapa[d.fecha]=d.tarea||'●'; });
+          ws.addRow([t.cliente_nombre||'—', t.numero_presupuesto||'—', t.tecnicos_necesarios||1, ...dias.map(f=>mapa[f]||'')]);
+        });
+      }
+      ws.addRow([]);
+    });
+    ws.columns=[{width:24},{width:11},{width:10},{width:20},{width:20},{width:20},{width:20},{width:20},{width:20}];
+
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='cronograma_'+new Date().toISOString().split('T')[0]+'.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✅ Cronograma exportado','success');
+  }catch(e){ showToast('Error al exportar: '+e.message,true); }
 }
 
 async function loadCronograma(){
@@ -8526,6 +8687,7 @@ async function loadCronograma(){
     renderCronogramaResumen();
     renderCronogramaBoard();
     renderCronogramaContratos();
+    if(document.getElementById('cronoCalendario') && document.getElementById('cronoCalendario').style.display!=='none') renderCronogramaCalendario();
   }catch(e){ showToast('Error al cargar el cronograma: '+e.message, true); }
 }
 
@@ -8561,7 +8723,7 @@ function cronoCardHTML(t){
   const fechaTxt=t.fecha_inicio?(fmtF(t.fecha_inicio)+((t.duracion_dias||1)>1?(' (+'+((t.duracion_dias||1)-1)+'d)'):'')):'Sin fecha';
   return '<div class="ppto-card" draggable="true" ondragstart="cronoOnDragStart(event,\''+t.id+'\')" style="border-left-color:'+prioColor+';margin-bottom:8px;padding:10px 12px;cursor:grab;">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">'
-    +'<div style="font-weight:700;font-size:13px;">'+escapeHtml(t.cliente_nombre||'—')+'</div>'
+    +'<div style="font-weight:700;font-size:13px;">'+escapeHtml(t.cliente_nombre||'—')+(t.numero_presupuesto?' <span style="font-weight:400;color:var(--text-dim);font-size:11px;">#'+escapeHtml(t.numero_presupuesto)+'</span>':'')+'</div>'
     +'<div style="display:flex;gap:2px;flex-shrink:0;">'
     +(t.presupuesto_id?'<button class="btn-edit" style="padding:2px 5px;" onclick="previewPptoById(\''+t.presupuesto_id+'\')" title="Ver presupuesto">👁</button>':'')
     +'<button class="btn-edit" style="padding:2px 5px;" onclick="abrirModalCronoTrabajo(\''+t.id+'\')">✎</button>'
@@ -8816,6 +8978,7 @@ async function sincronizarCronograma(pId, nuevoEstado, ppto){
       method:'POST',
       body:JSON.stringify({
         presupuesto_id:pId,
+        numero_presupuesto:(ppto&&ppto.numero)||null,
         cliente_nombre:(ppto&&ppto.cliente_nombre)||'',
         tipo:'Instalación',
         estado:estadoCrono,
