@@ -8610,7 +8610,7 @@ function renderCronogramaCalendario(){
 
 async function exportarCronogramaExcel(){
   if(typeof ExcelJS==='undefined'){ showToast('No se pudo cargar la librería de Excel. Revisá tu conexión e intentá de nuevo.',true); return; }
-  const trabajosConFecha=cronogramaTrabajos.filter(t=>t.fecha_inicio);
+  const trabajosConFecha=cronogramaTrabajos.filter(t=>t.fecha_inicio && t.fecha_inicio>=FECHA_CORTE_CRONOGRAMA);
   if(!trabajosConFecha.length){ showToast('Todavía no hay trabajos con fecha de inicio cargada para exportar. Cargá la fecha de inicio en cada tarjeta primero.',true); return; }
   showToast('Generando cronograma...','success');
   try{
