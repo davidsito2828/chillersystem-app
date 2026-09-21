@@ -8531,12 +8531,13 @@ function cronoDiasDelTrabajo(t){
   const dias=[];
   const dur=t.duracion_dias||1;
   const mapaDias={};
-  (t.dias_programados||[]).forEach(d=>{ mapaDias[d.fecha]=d.tarea; });
+  (t.dias_programados||[]).forEach(d=>{ mapaDias[d.fecha]={tarea:d.tarea, turno:d.turno||'todo_dia'}; });
   for(let i=0;i<dur;i++){
     const d=new Date(t.fecha_inicio+'T00:00:00');
     d.setDate(d.getDate()+i);
     const fechaStr=d.toISOString().split('T')[0];
-    dias.push({fecha:fechaStr, tarea:mapaDias[fechaStr]||null});
+    const info=mapaDias[fechaStr]||{};
+    dias.push({fecha:fechaStr, tarea:info.tarea||null, turno:info.turno||'todo_dia'});
   }
   return dias;
 }
@@ -8581,8 +8582,8 @@ function renderCronogramaCalendario(){
   const hoy=new Date().toISOString().split('T')[0];
   const porDia={}; dias.forEach(f=>porDia[f]=[]);
   cronogramaTrabajos.forEach(t=>{
-    cronoDiasDelTrabajo(t).forEach(({fecha,tarea})=>{
-      if(porDia[fecha]) porDia[fecha].push({t,tarea});
+    cronoDiasDelTrabajo(t).forEach(({fecha,tarea,turno})=>{
+      if(porDia[fecha]) porDia[fecha].push({t,tarea,turno});
     });
   });
   document.getElementById('cronoCalendarioGrid').innerHTML=
@@ -8596,10 +8597,11 @@ function renderCronogramaCalendario(){
           +'<div style="font-size:10px;color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;">'+fmtF(f)+'</div>'
         +'</div>'
         +'<div style="padding:6px;display:flex;flex-direction:column;gap:5px;">'
-        +(items.length?items.map(({t,tarea})=>{
+        +(items.length?items.map(({t,tarea,turno})=>{
             const prioColor=t.prioridad==='urgente'?'var(--red)':(t.prioridad==='flexible'?'var(--text-muted)':'var(--accent)');
+            const turnoTxt=turno==='manana'?'🌅 Mañana':(turno==='tarde'?'🌇 Tarde':'');
             return '<div onclick="abrirModalCronoTrabajo(\''+t.id+'\')" style="cursor:pointer;background:var(--bg2);border-left:3px solid '+prioColor+';border-radius:6px;padding:5px 7px;font-size:11px;">'
-              +'<div style="font-weight:700;">'+escapeHtml(t.cliente_nombre||'—')+'</div>'
+              +'<div style="font-weight:700;display:flex;justify-content:space-between;gap:4px;"><span>'+escapeHtml(t.cliente_nombre||'—')+'</span>'+(turnoTxt?'<span style="font-weight:400;font-size:9px;color:var(--text-dim);white-space:nowrap;">'+turnoTxt+'</span>':'')+'</div>'
               +(tarea?'<div style="color:var(--text-dim);margin-top:2px;">'+escapeHtml(tarea)+'</div>':'<div style="color:var(--text-muted);font-style:italic;margin-top:2px;">'+(t.tecnicos_necesarios||1)+' técnico(s)</div>')
               +'</div>';
           }).join(''):'<div style="font-size:10px;color:var(--text-muted);padding:6px;">Sin trabajos</div>')
@@ -8655,7 +8657,7 @@ async function exportarCronogramaExcel(){
         const r=ws.addRow(['Sin trabajos programados esta semana']); ws.mergeCells(r.number,1,r.number,9);
       } else {
         trabajosSemana.forEach(t=>{
-          const mapa={}; cronoDiasDelTrabajo(t).forEach(d=>{ mapa[d.fecha]=d.tarea||'●'; });
+          const mapa={}; cronoDiasDelTrabajo(t).forEach(d=>{ const pre=d.turno==='manana'?'🌅 ':(d.turno==='tarde'?'🌇 ':''); mapa[d.fecha]=pre+(d.tarea||'●'); });
           ws.addRow([t.cliente_nombre||'—', t.numero_presupuesto||'—', t.tecnicos_necesarios||1, ...dias.map(f=>mapa[f]||'')]);
         });
       }
@@ -8772,8 +8774,11 @@ function ctRegenerarDias(){
   const fi=document.getElementById('ctFechaInicio').value;
   const dur=parseInt(document.getElementById('ctDuracion').value,10)||1;
   const cont=document.getElementById('ctDiasContainer');
-  const prevInputs={};
-  cont.querySelectorAll('input[data-fecha]').forEach(inp=>{ prevInputs[inp.dataset.fecha]=inp.value; });
+  const prevValores={};
+  cont.querySelectorAll('input[data-fecha]').forEach(inp=>{
+    const sel=cont.querySelector('select[data-fecha-turno="'+inp.dataset.fecha+'"]');
+    prevValores[inp.dataset.fecha]={tarea:inp.value, turno:sel?sel.value:'todo_dia'};
+  });
   if(!fi){ cont.innerHTML='<div style="font-size:11px;color:var(--text-dim);">Cargá una fecha de inicio para poder detallar el plan día por día.</div>'; return; }
   let html='';
   for(let i=0;i<dur;i++){
@@ -8781,10 +8786,17 @@ function ctRegenerarDias(){
     d.setDate(d.getDate()+i);
     const fechaStr=d.toISOString().split('T')[0];
     const label=CRONO_DIAS_SEMANA[d.getDay()]+' '+fmtF(fechaStr);
-    const val=prevInputs[fechaStr]!==undefined?prevInputs[fechaStr]:((window._ctDiasExistente||{})[fechaStr]||'');
+    const existente=(window._ctDiasExistente||{})[fechaStr]||{};
+    const val=prevValores[fechaStr]?prevValores[fechaStr].tarea:(existente.tarea||'');
+    const turno=prevValores[fechaStr]?prevValores[fechaStr].turno:(existente.turno||'todo_dia');
     html+='<div style="display:flex;gap:8px;align-items:center;">'
-      +'<div style="width:120px;font-size:11px;color:var(--text-dim);flex-shrink:0;">'+label+'</div>'
-      +'<input class="form-input" data-fecha="'+fechaStr+'" placeholder="¿Qué se hace este día? (opcional)" value="'+escapeHtml(val)+'" style="font-size:12px;"/>'
+      +'<div style="width:110px;font-size:11px;color:var(--text-dim);flex-shrink:0;">'+label+'</div>'
+      +'<select data-fecha-turno="'+fechaStr+'" class="form-select" style="width:112px;font-size:11px;flex-shrink:0;">'
+        +'<option value="todo_dia"'+(turno==='todo_dia'?' selected':'')+'>Todo el día</option>'
+        +'<option value="manana"'+(turno==='manana'?' selected':'')+'>🌅 Mañana</option>'
+        +'<option value="tarde"'+(turno==='tarde'?' selected':'')+'>🌇 Tarde</option>'
+      +'</select>'
+      +'<input class="form-input" data-fecha="'+fechaStr+'" placeholder="¿Qué se hace este día? (opcional)" value="'+escapeHtml(val)+'" style="font-size:12px;flex:1;"/>'
       +'</div>';
   }
   cont.innerHTML=html;
@@ -8827,7 +8839,7 @@ function abrirModalCronoTrabajo(id, presetEstado){
       document.getElementById('ctPrioridad').value=t.prioridad||'normal';
       document.getElementById('ctNotas').value=t.notas||'';
       window._ctDiasExistente={};
-      (t.dias_programados||[]).forEach(d=>{ window._ctDiasExistente[d.fecha]=d.tarea; });
+      (t.dias_programados||[]).forEach(d=>{ window._ctDiasExistente[d.fecha]={tarea:d.tarea, turno:d.turno||'todo_dia'}; });
     }
   }
   ctRegenerarDias();
@@ -8840,7 +8852,9 @@ async function guardarCronoTrabajo(){
   if(!cliente){ showToast('Falta el cliente/obra',true); return; }
   const dias=[];
   document.querySelectorAll('#ctDiasContainer input[data-fecha]').forEach(inp=>{
-    if(inp.value.trim()) dias.push({fecha:inp.dataset.fecha, tarea:inp.value.trim()});
+    const sel=document.querySelector('#ctDiasContainer select[data-fecha-turno="'+inp.dataset.fecha+'"]');
+    const turno=sel?sel.value:'todo_dia';
+    if(inp.value.trim()||turno!=='todo_dia') dias.push({fecha:inp.dataset.fecha, tarea:inp.value.trim(), turno:turno});
   });
   const data={
     presupuesto_id: document.getElementById('ctPresupuestoId').value || null,
