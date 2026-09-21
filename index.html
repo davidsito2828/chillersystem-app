@@ -2247,11 +2247,12 @@ tbody tr:hover{background:#f8faff;}
       </div>
       <div class="form-group"><label class="form-label">Técnicos necesarios</label><input class="form-input" type="number" min="0" id="ctTecnicos" value="1"/></div>
       <div class="form-group"><label class="form-label">Especialidad</label><input class="form-input" id="ctEspecialidad" placeholder="Ej: Electromecánico"/></div>
-      <div class="form-group"><label class="form-label">Fecha de inicio</label><input class="form-input" type="date" id="ctFechaInicio" onchange="ctRegenerarDias()"/></div>
-      <div class="form-group"><label class="form-label">Duración (días)</label><input class="form-input" type="number" min="1" id="ctDuracion" value="1" onchange="ctRegenerarDias()"/></div>
+      <div class="form-group"><label class="form-label">Fecha de inicio (estimada)</label><input class="form-input" type="date" id="ctFechaInicio"/></div>
+      <div class="form-group"><label class="form-label">Duración estimada (días)</label><input class="form-input" type="number" min="1" id="ctDuracion" value="1"/></div>
       <div class="form-group full">
-        <label class="form-label">Plan por día (opcional)</label>
-        <div id="ctDiasContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <label class="form-label">Plan por día (opcional) — agregá los días sueltos que necesites, no tienen que ser seguidos, y un mismo día puede tener mañana y tarde por separado</label>
+        <div id="ctDiasContainer" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
+        <button type="button" class="btn-secondary" onclick="ctAgregarDia()" style="font-size:11px;padding:4px 10px;">＋ Agregar día</button>
       </div>
       <div class="form-group"><label class="form-label">Prioridad</label>
         <select class="form-select" id="ctPrioridad"><option value="urgente">🔴 Urgente</option><option value="normal" selected>🔵 Normal</option><option value="flexible">⚪ Flexible</option></select>
@@ -8527,19 +8528,14 @@ async function sincronizarCronogramaMasivo(){
 
 // Expande un trabajo a la lista de días que ocupa, con la tarea específica de ese día si se cargó
 function cronoDiasDelTrabajo(t){
-  if(!t.fecha_inicio) return [];
-  const dias=[];
-  const dur=t.duracion_dias||1;
-  const mapaDias={};
-  (t.dias_programados||[]).forEach(d=>{ mapaDias[d.fecha]={tarea:d.tarea, turno:d.turno||'todo_dia'}; });
-  for(let i=0;i<dur;i++){
-    const d=new Date(t.fecha_inicio+'T00:00:00');
-    d.setDate(d.getDate()+i);
-    const fechaStr=d.toISOString().split('T')[0];
-    const info=mapaDias[fechaStr]||{};
-    dias.push({fecha:fechaStr, tarea:info.tarea||null, turno:info.turno||'todo_dia'});
+  if(t.dias_programados && t.dias_programados.length){
+    return t.dias_programados
+      .map(d=>({fecha:d.fecha, tarea:d.tarea||null, turno:d.turno||'todo_dia'}))
+      .sort((a,b)=>a.fecha<b.fecha?-1:(a.fecha>b.fecha?1:0));
   }
-  return dias;
+  // Todavía sin plan por día cargado: al menos lo ubicamos en su fecha de inicio estimada
+  if(t.fecha_inicio) return [{fecha:t.fecha_inicio, tarea:null, turno:'todo_dia'}];
+  return [];
 }
 function cronoLunesDeSemana(fechaStr){
   const d=new Date(fechaStr+'T00:00:00');
@@ -8626,12 +8622,12 @@ function cronoCeldaDia(items){
 
 async function exportarCronogramaExcel(){
   if(typeof ExcelJS==='undefined'){ showToast('No se pudo cargar la librería de Excel. Revisá tu conexión e intentá de nuevo.',true); return; }
-  const trabajosConFecha=cronogramaTrabajos.filter(t=>t.fecha_inicio && t.fecha_inicio>=FECHA_CORTE_CRONOGRAMA);
-  if(!trabajosConFecha.length){ showToast('Todavía no hay trabajos con fecha de inicio cargada para exportar. Cargá la fecha de inicio en cada tarjeta primero.',true); return; }
+  const trabajosConFecha=cronogramaTrabajos.filter(t=>cronoDiasDelTrabajo(t).some(d=>d.fecha>=FECHA_CORTE_CRONOGRAMA));
+  if(!trabajosConFecha.length){ showToast('Todavía no hay trabajos con algún día cargado (desde el '+fmtF(FECHA_CORTE_CRONOGRAMA)+') para exportar. Agregales al menos un día en "Plan por día" primero.',true); return; }
   showToast('Generando cronograma...','success');
   try{
     const expandido=[];
-    trabajosConFecha.forEach(t=>{ cronoDiasDelTrabajo(t).forEach(d=>expandido.push(d.fecha)); });
+    trabajosConFecha.forEach(t=>{ cronoDiasDelTrabajo(t).forEach(d=>{ if(d.fecha>=FECHA_CORTE_CRONOGRAMA) expandido.push(d.fecha); }); });
     const fechaMin=expandido.reduce((m,f)=>f<m?f:m,expandido[0]);
     const fechaMax=expandido.reduce((m,f)=>f>m?f:m,expandido[0]);
     let lunes=cronoLunesDeSemana(fechaMin);
@@ -8750,7 +8746,10 @@ async function guardarCronoDisponibles(val){
 
 function cronoCardHTML(t){
   const prioColor=t.prioridad==='urgente'?'var(--red)':(t.prioridad==='flexible'?'var(--text-muted)':'var(--accent)');
-  const fechaTxt=t.fecha_inicio?(fmtF(t.fecha_inicio)+((t.duracion_dias||1)>1?(' (+'+((t.duracion_dias||1)-1)+'d)'):'')):'Sin fecha';
+  const diasCargados=(t.dias_programados||[]).length;
+  const fechaTxt=t.fecha_inicio
+    ?(fmtF(t.fecha_inicio)+' aprox.'+(diasCargados?(' · '+diasCargados+' día(s) programado(s)'):''))
+    :(diasCargados?(diasCargados+' día(s) programado(s)'):'Sin fecha');
   return '<div class="ppto-card" draggable="true" ondragstart="cronoOnDragStart(event,\''+t.id+'\')" style="border-left-color:'+prioColor+';margin-bottom:8px;padding:10px 12px;cursor:grab;">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">'
     +'<div style="font-weight:700;font-size:13px;">'+escapeHtml(t.cliente_nombre||'—')+(t.numero_presupuesto?' <span style="font-weight:400;color:var(--text-dim);font-size:11px;">#'+escapeHtml(t.numero_presupuesto)+'</span>':'')+'</div>'
@@ -8798,36 +8797,33 @@ async function cronoOnDrop(e,estado){
   }catch(err){ t.estado=estadoAnterior; renderCronogramaBoard(); showToast('Error: '+err.message,true); }
 }
 
-function ctRegenerarDias(){
-  const fi=document.getElementById('ctFechaInicio').value;
-  const dur=parseInt(document.getElementById('ctDuracion').value,10)||1;
+function ctFilaDia(fecha,turno,tarea){
+  return '<div class="ct-dia-row" style="display:flex;gap:6px;align-items:center;">'
+    +'<input type="date" class="form-input" data-campo="fecha" value="'+(fecha||'')+'" style="width:150px;flex-shrink:0;font-size:12px;"/>'
+    +'<select class="form-select" data-campo="turno" style="width:112px;flex-shrink:0;font-size:11px;">'
+      +'<option value="todo_dia"'+(!turno||turno==='todo_dia'?' selected':'')+'>Todo el día</option>'
+      +'<option value="manana"'+(turno==='manana'?' selected':'')+'>🌅 Mañana</option>'
+      +'<option value="tarde"'+(turno==='tarde'?' selected':'')+'>🌇 Tarde</option>'
+    +'</select>'
+    +'<input class="form-input" data-campo="tarea" placeholder="¿Qué se hace? (opcional)" value="'+escapeHtml(tarea||'')+'" style="font-size:12px;flex:1;"/>'
+    +'<button type="button" class="btn-danger" onclick="this.closest(\'.ct-dia-row\').remove()" style="padding:4px 8px;flex-shrink:0;">✕</button>'
+    +'</div>';
+}
+function ctVacioDiasHTML(){
+  return '<div class="ct-dia-vacio" style="font-size:11px;color:var(--text-dim);">Sin días cargados todavía — usá "＋ Agregar día". Podés repetir la misma fecha dos veces (una para la mañana, otra para la tarde).</div>';
+}
+function ctAgregarDia(){
   const cont=document.getElementById('ctDiasContainer');
-  const prevValores={};
-  cont.querySelectorAll('input[data-fecha]').forEach(inp=>{
-    const sel=cont.querySelector('select[data-fecha-turno="'+inp.dataset.fecha+'"]');
-    prevValores[inp.dataset.fecha]={tarea:inp.value, turno:sel?sel.value:'todo_dia'};
-  });
-  if(!fi){ cont.innerHTML='<div style="font-size:11px;color:var(--text-dim);">Cargá una fecha de inicio para poder detallar el plan día por día.</div>'; return; }
-  let html='';
-  for(let i=0;i<dur;i++){
-    const d=new Date(fi+'T00:00:00');
-    d.setDate(d.getDate()+i);
-    const fechaStr=d.toISOString().split('T')[0];
-    const label=CRONO_DIAS_SEMANA[d.getDay()]+' '+fmtF(fechaStr);
-    const existente=(window._ctDiasExistente||{})[fechaStr]||{};
-    const val=prevValores[fechaStr]?prevValores[fechaStr].tarea:(existente.tarea||'');
-    const turno=prevValores[fechaStr]?prevValores[fechaStr].turno:(existente.turno||'todo_dia');
-    html+='<div style="display:flex;gap:8px;align-items:center;">'
-      +'<div style="width:110px;font-size:11px;color:var(--text-dim);flex-shrink:0;">'+label+'</div>'
-      +'<select data-fecha-turno="'+fechaStr+'" class="form-select" style="width:112px;font-size:11px;flex-shrink:0;">'
-        +'<option value="todo_dia"'+(turno==='todo_dia'?' selected':'')+'>Todo el día</option>'
-        +'<option value="manana"'+(turno==='manana'?' selected':'')+'>🌅 Mañana</option>'
-        +'<option value="tarde"'+(turno==='tarde'?' selected':'')+'>🌇 Tarde</option>'
-      +'</select>'
-      +'<input class="form-input" data-fecha="'+fechaStr+'" placeholder="¿Qué se hace este día? (opcional)" value="'+escapeHtml(val)+'" style="font-size:12px;flex:1;"/>'
-      +'</div>';
-  }
-  cont.innerHTML=html;
+  const vacio=cont.querySelector('.ct-dia-vacio');
+  if(vacio) vacio.remove();
+  const fi=document.getElementById('ctFechaInicio').value;
+  const primeraFila=cont.querySelectorAll('.ct-dia-row').length===0;
+  cont.insertAdjacentHTML('beforeend', ctFilaDia(primeraFila&&fi?fi:'', 'todo_dia', ''));
+}
+function ctCargarDias(dias){
+  const cont=document.getElementById('ctDiasContainer');
+  if(!dias||!dias.length){ cont.innerHTML=ctVacioDiasHTML(); return; }
+  cont.innerHTML=dias.map(d=>ctFilaDia(d.fecha,d.turno,d.tarea)).join('');
 }
 
 function abrirModalCronoTrabajo(id, presetEstado){
@@ -8844,8 +8840,8 @@ function abrirModalCronoTrabajo(id, presetEstado){
   document.getElementById('ctDuracion').value=1;
   document.getElementById('ctPrioridad').value='normal';
   document.getElementById('ctNotas').value='';
-  window._ctDiasExistente={};
   document.getElementById('ctTituloModal').textContent='Nuevo trabajo';
+  let diasTrabajo=[];
   if(id){
     const t=cronogramaTrabajos.find(x=>x.id===id);
     if(t){
@@ -8866,11 +8862,10 @@ function abrirModalCronoTrabajo(id, presetEstado){
       document.getElementById('ctDuracion').value=t.duracion_dias||1;
       document.getElementById('ctPrioridad').value=t.prioridad||'normal';
       document.getElementById('ctNotas').value=t.notas||'';
-      window._ctDiasExistente={};
-      (t.dias_programados||[]).forEach(d=>{ window._ctDiasExistente[d.fecha]={tarea:d.tarea, turno:d.turno||'todo_dia'}; });
+      diasTrabajo=t.dias_programados||[];
     }
   }
-  ctRegenerarDias();
+  ctCargarDias(diasTrabajo);
   document.getElementById('mCronoTrabajo').classList.add('open');
 }
 
@@ -8879,10 +8874,12 @@ async function guardarCronoTrabajo(){
   const cliente=document.getElementById('ctCliente2').value.trim();
   if(!cliente){ showToast('Falta el cliente/obra',true); return; }
   const dias=[];
-  document.querySelectorAll('#ctDiasContainer input[data-fecha]').forEach(inp=>{
-    const sel=document.querySelector('#ctDiasContainer select[data-fecha-turno="'+inp.dataset.fecha+'"]');
-    const turno=sel?sel.value:'todo_dia';
-    if(inp.value.trim()||turno!=='todo_dia') dias.push({fecha:inp.dataset.fecha, tarea:inp.value.trim(), turno:turno});
+  document.querySelectorAll('#ctDiasContainer .ct-dia-row').forEach(row=>{
+    const fecha=row.querySelector('[data-campo="fecha"]').value;
+    if(!fecha) return;
+    const turno=row.querySelector('[data-campo="turno"]').value;
+    const tarea=row.querySelector('[data-campo="tarea"]').value.trim();
+    dias.push({fecha:fecha, turno:turno, tarea:tarea});
   });
   const data={
     presupuesto_id: document.getElementById('ctPresupuestoId').value || null,
