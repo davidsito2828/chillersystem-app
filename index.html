@@ -1748,7 +1748,7 @@ tbody tr:hover{background:#f8faff;}
   <div class="panel-header">
     <div><div class="panel-title">💼 Presupuestos</div><div class="panel-count" id="pptoCount">—</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
-      <input type="text" id="buscarPptoNumero" class="search-box" placeholder="Buscar por N°…" oninput="renderPresupuestos()" style="width:130px;"/>
+      <input type="text" id="buscarPptoNumero" class="search-box" placeholder="Buscar por N° o cliente…" oninput="renderPresupuestos()" style="width:170px;"/>
       <select class="search-box" style="width:auto;" onchange="filtroPptoEstado=this.value;renderPresupuestos()">
         <option value="">Todos</option>
         <option value="borrador">📝 Borrador</option>
@@ -7070,7 +7070,7 @@ async function adjuntarFactura(pId) {
 function renderPresupuestos(){
   const _buscarNro=(document.getElementById('buscarPptoNumero')?.value||'').trim().toLowerCase();
   let lista=filtroPptoEstado?presupuestos.filter(p=>p.estado_flujo===filtroPptoEstado):presupuestos;
-  if(_buscarNro) lista=lista.filter(p=>(p.numero||'').toLowerCase().includes(_buscarNro));
+  if(_buscarNro) lista=lista.filter(p=>(p.numero||'').toLowerCase().includes(_buscarNro)||(p.cliente_nombre||'').toLowerCase().includes(_buscarNro));
   document.getElementById('pptoCount').textContent=lista.length+' presupuesto(s)';
   const tb=document.getElementById('pptoBody');
   if(!lista.length){
