@@ -2788,7 +2788,8 @@ function calcularFrecuenciaRecomendada(tipo){
 
 function _getEstacion(fecha){
   // Hemisferio sur (Argentina)
-  const m=new Date(fecha).getMonth(); // 0=ene
+  const d=(typeof fecha==='string')?new Date(fecha+'T00:00:00'):new Date(fecha);
+  const m=d.getMonth(); // 0=ene
   if(m>=2&&m<=4)return 'otoño';
   if(m>=5&&m<=7)return 'invierno';
   if(m>=8&&m<=10)return 'primavera';
@@ -2821,7 +2822,7 @@ function getTareasEquipo(tipo, ultimoPreventivo){
     return {tareas_hoy,badge_estacional,badge_trimestral};
   }
 
-  const desde=new Date(ultimoPreventivo);desde.setHours(0,0,0,0);
+  const desde=new Date(ultimoPreventivo+'T00:00:00');desde.setHours(0,0,0,0);
   const diasTranscurridos=Math.ceil((hoy-desde)/(1000*60*60*24));
 
   // Siempre tareas mensuales
@@ -3533,7 +3534,7 @@ function getTareasParaHoy(equipoId, tipoEquipo){
       ?historial.reduce((a,b)=>a.fecha_realizada>b.fecha_realizada?a:b)
       :null;
     const diasDesde=ultimaRealizada
-      ?Math.ceil((hoy-new Date(ultimaRealizada.fecha_realizada))/(1000*60*60*24))
+      ?Math.ceil((hoy-new Date(ultimaRealizada.fecha_realizada+'T00:00:00'))/(1000*60*60*24))
       :null;
     const pendiente=diasDesde===null||(diasDesde>=tarea.frecuencia_dias);
     const urgencia=diasDesde===null?'nunca'
@@ -3557,7 +3558,7 @@ function setStatus(ok){
 // ── DÍAS HÁBILES (lunes=1 … sábado=6, domingo excluido) ──
 function diasHabilesDesde(fecha){
   // Cuántos días hábiles pasaron desde `fecha` hasta hoy (inclusive hoy no)
-  const desde=new Date(fecha);desde.setHours(0,0,0,0);
+  const desde=(typeof fecha==='string')?new Date(fecha+'T00:00:00'):new Date(fecha);desde.setHours(0,0,0,0);
   const hoy=new Date();hoy.setHours(0,0,0,0);
   if(desde>=hoy)return 0;
   let n=0;const cur=new Date(desde);
@@ -3566,7 +3567,7 @@ function diasHabilesDesde(fecha){
 }
 function diasHabilesHasta(fecha){
   // Días hábiles desde hoy hasta `fecha`. Positivo=futuro, negativo=pasado.
-  const hasta=new Date(fecha);hasta.setHours(0,0,0,0);
+  const hasta=(typeof fecha==='string')?new Date(fecha+'T00:00:00'):new Date(fecha);hasta.setHours(0,0,0,0);
   const hoy=new Date();hoy.setHours(0,0,0,0);
   if(hasta.getTime()===hoy.getTime())return 0;
   const sign=hasta>hoy?1:-1;
@@ -7348,7 +7349,7 @@ function calcularDiasSinRespuesta(ppto) {
   }
   if (!fechaRef) fechaRef = ppto.fecha;
   if (!fechaRef) return null;
-  return Math.floor((new Date() - new Date(fechaRef)) / 86400000);
+  return Math.floor((new Date() - new Date(fechaRef+'T00:00:00')) / 86400000);
 }
 
 function colorDias(dias) {
@@ -9178,7 +9179,8 @@ function renderPptoPdf(p){
     firmaEmpresa:'CHILLER SERVICE S.A.',
     logo:'https://www.chillersystem.com/assets/img/logo.webp'
   };
-  const fecha=p.fecha||p.created_at?new Date((p.fecha||p.created_at)).toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
+  const _fechaBaseP=p.fecha||p.created_at;
+  const fecha=_fechaBaseP?new Date(_fechaBaseP.includes('T')?_fechaBaseP:_fechaBaseP+'T00:00:00').toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
   const items=p.items||[];
   const dolar=p.dolar||'';
 
@@ -9537,7 +9539,8 @@ function renderInformePdf(inf){
     logo:'https://www.chillersystem.com/assets/img/logo.webp'
   };
   window._currentInformeNumero=inf.numero;
-  const fecha=inf.fecha||inf.created_at?new Date((inf.fecha||inf.created_at)).toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
+  const _fechaBaseI=inf.fecha||inf.created_at;
+  const fecha=_fechaBaseI?new Date(_fechaBaseI.includes('T')?_fechaBaseI:_fechaBaseI+'T00:00:00').toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
   const fotos=inf.fotos_seleccionadas||[];
   const tipoLabel=inf.tipo==='tecnico'?'INFORME TÉCNICO':'INFORME DE GESTIÓN';
   const periodo=inf.periodo_desde&&inf.periodo_hasta?' — Período: '+fmtF(inf.periodo_desde)+' al '+fmtF(inf.periodo_hasta):'';
@@ -9729,7 +9732,7 @@ function renderEstadisticas(){
     const d=new Date(anioActual,mesActual-i,1);
     const m=d.getMonth(), a=d.getFullYear();
     const nombM=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m];
-    const mm=intervenciones.filter(iv=>{const fd=new Date(iv.fecha);return fd.getMonth()===m&&fd.getFullYear()===a;});
+    const mm=intervenciones.filter(iv=>{const fd=new Date(iv.fecha+'T00:00:00');return fd.getMonth()===m&&fd.getFullYear()===a;});
     meses.push({label:nombM,prev:mm.filter(iv=>iv.tipo==='Preventivo').length,corr:mm.filter(iv=>iv.tipo==='Correctivo').length});
   }
   // meses[5] = mes actual, meses[4] = mes anterior
