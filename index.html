@@ -2335,13 +2335,19 @@ tbody tr:hover{background:#f8faff;}
         </select>
       </div>
 
+      <!-- OBJETIVO -->
+      <div class="form-group full">
+        <label class="form-label">Objetivo</label>
+        <textarea class="form-textarea" id="iObjetivo" placeholder="Objetivo del informe..." style="min-height:70px;"></textarea>
+      </div>
+
       <!-- DESARROLLO -->
       <div class="form-group full">
         <label class="form-label">Desarrollo — Equipos e intervenciones</label>
         <div id="iDesarrolloContainer" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
           <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">Seleccioná un cliente para ver las intervenciones disponibles</div>
         </div>
-        <textarea class="form-textarea" id="iDesarrollo" placeholder="Desarrollo adicional, observaciones técnicas..." style="min-height:80px;"></textarea>
+        <textarea class="form-textarea" id="iDesarrollo" placeholder="Resumen general (opcional) — se muestra antes del detalle por equipo" style="min-height:60px;"></textarea>
       </div>
 
       <!-- FOTOS -->
@@ -9342,6 +9348,7 @@ function cargarDatosClienteInforme(cliId){
 function cargarIntervencionesInforme(cliId){
   const eqs=equipos.filter(e=>e.cliente_id===cliId);
   const intervs=intervenciones.filter(i=>eqs.some(e=>e.id===i.equipo_id)||i.cliente_id===cliId);
+  window._informeIntervs=intervs;
   const container=document.getElementById('iDesarrolloContainer');
   const fotosContainer=document.getElementById('iFotosContainer');
   if(!intervs.length){
@@ -9372,8 +9379,10 @@ function cargarIntervencionesInforme(cliId){
   });
   if(!todasFotos.length){
     fotosContainer.innerHTML='<div style="font-size:11px;color:var(--text-dim);">Sin fotos disponibles en las intervenciones</div>';
+    window._informeTodasFotos=[];
     return;
   }
+  window._informeTodasFotos=todasFotos;
   fotosContainer.innerHTML='<div style="font-size:11px;color:var(--accent);margin-bottom:8px;font-weight:700;letter-spacing:1px;">FOTOS DISPONIBLES — Seleccioná las que incluirás</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:10px;">'
     +todasFotos.map((f,idx)=>'<div style="position:relative;width:90px;">'
@@ -9394,7 +9403,8 @@ function toggleFotoInforme(idx,url){
     if(img) img.style.border='2px solid var(--border)';
   }else{
     const desc=document.getElementById('descFotoInf-'+idx);
-    fotosInformeSeleccionadas.push({url:realUrl,descripcion:desc?desc.value:''});
+    const origen=(window._informeTodasFotos||[])[idx];
+    fotosInformeSeleccionadas.push({url:realUrl,descripcion:desc?desc.value:'',intervencion_id:origen&&origen.interv?origen.interv.id:null});
     if(img) img.style.border='2px solid #34d399';
   }
 }
@@ -9413,9 +9423,22 @@ function getFotosSeleccionadas(){
   return fotosInformeSeleccionadas;
 }
 
+function getIntervencionesIncluidas(){
+  const checks=document.querySelectorAll('[id^="intv-"]:checked');
+  const ids=Array.from(checks).map(c=>c.id.replace('intv-',''));
+  const intervs=window._informeIntervs||[];
+  return ids.map(id=>{
+    const i=intervs.find(x=>x.id===id);
+    if(!i) return null;
+    const eq=equipos.find(e=>e.id===i.equipo_id);
+    return {id:i.id, equipo:eq?eq.nombre:'General', tipo:i.tipo, fecha:i.fecha, descripcion:i.descripcion||''};
+  }).filter(Boolean);
+}
+
 function abrirModalInforme(id=null){
   fotosInformeSeleccionadas=[];
-  ['informeId','iNumero','iClienteNombre','iClienteDireccion','iContacto','iReferencia','iDesarrollo','iConclusion'].forEach(x=>document.getElementById(x).value='');
+  window._informeIntervs=[];
+  ['informeId','iNumero','iClienteNombre','iClienteDireccion','iContacto','iReferencia','iDesarrollo','iConclusion','iObjetivo'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('iFechaInf').value=new Date().toISOString().split('T')[0];
   document.getElementById('iPeriodoDesdeFecha').value='';
   document.getElementById('iPeriodoHastaFecha').value='';
@@ -9425,6 +9448,8 @@ function abrirModalInforme(id=null){
   document.getElementById('iFotosContainer').innerHTML='<div style="font-size:11px;color:var(--text-dim);">Seleccioná un cliente para ver las fotos disponibles</div>';
   selEmpI('ChillerSystem');
   selTipoInforme('tecnico');
+  const OBJETIVO_DEFAULT='Informar tareas de rutina y detallar las actividades de mantenimiento preventivo y correctivo realizadas en todos los equipos de aire acondicionado existentes en la planta principal.';
+  const CONCLUSION_DEFAULT='Todas las tareas de mantenimiento preventivo y correctivo fueron realizadas con éxito. Los equipos que presentaron fallas se identifican y, de ser requerido por el cliente, se enviará presupuesto e informe para reparar o reemplazar los mismos.';
   if(id){
     const inf=informes.find(x=>x.id===id);
     document.getElementById('tInforme').textContent='Editar Informe';
@@ -9435,8 +9460,9 @@ function abrirModalInforme(id=null){
     document.getElementById('iClienteDireccion').value=inf.cliente_direccion||'';
     document.getElementById('iContacto').value=inf.cliente_contacto||'';
     document.getElementById('iReferencia').value=inf.referencia||'';
+    document.getElementById('iObjetivo').value=inf.objetivo||OBJETIVO_DEFAULT;
     document.getElementById('iDesarrollo').value=inf.desarrollo||'';
-    document.getElementById('iConclusion').value=inf.conclusion||'';
+    document.getElementById('iConclusion').value=inf.conclusion||CONCLUSION_DEFAULT;
     document.getElementById('iPeriodoDesdeFecha').value=inf.periodo_desde||'';
     document.getElementById('iPeriodoHastaFecha').value=inf.periodo_hasta||'';
     selEmpI(inf.empresa||'ChillerSystem');
@@ -9448,6 +9474,8 @@ function abrirModalInforme(id=null){
     }
   }else{
     document.getElementById('tInforme').textContent='Nuevo Informe';
+    document.getElementById('iObjetivo').value=OBJETIVO_DEFAULT;
+    document.getElementById('iConclusion').value=CONCLUSION_DEFAULT;
   }
   document.getElementById('mInforme').classList.add('open');
 }
@@ -9471,7 +9499,9 @@ async function guardarInforme(estado){
     periodo_desde:document.getElementById('iPeriodoDesdeFecha').value||null,
     periodo_hasta:document.getElementById('iPeriodoHastaFecha').value||null,
     presupuesto_id:document.getElementById('iPresupuestoId').value||null,
+    objetivo:document.getElementById('iObjetivo').value.trim()||null,
     desarrollo:document.getElementById('iDesarrollo').value.trim()||null,
+    intervenciones_incluidas:getIntervencionesIncluidas(),
     fotos_seleccionadas:fotos,
     conclusion:document.getElementById('iConclusion').value.trim()||null,
     estado:id?(informes.find(x=>x.id===id)||{}).estado||estado:estado,
@@ -9513,10 +9543,13 @@ function previewInforme(){
     referencia:document.getElementById('iReferencia').value,
     periodo_desde:document.getElementById('iPeriodoDesdeFecha').value,
     periodo_hasta:document.getElementById('iPeriodoHastaFecha').value,
+    objetivo:document.getElementById('iObjetivo').value,
     desarrollo:document.getElementById('iDesarrollo').value,
+    intervenciones_incluidas:getIntervencionesIncluidas(),
     fotos_seleccionadas:fotos,
     conclusion:document.getElementById('iConclusion').value,
-    fecha:document.getElementById('iFechaInf').value
+    fecha:document.getElementById('iFechaInf').value,
+    creado_por:usuarioActual?usuarioActual.nombre:null
   };
   renderInformePdf(inf);
   document.getElementById('mInformePdf').classList.add('open');
@@ -9529,107 +9562,164 @@ function previewInformeById(id){
   document.getElementById('mInformePdf').classList.add('open');
 }
 
+const LOGO_CHILLERSERVICE_DATAURI = 'data:image/png;base64,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';
+
 function renderInformePdf(inf){
-  const empresa={
+  const isCS = inf.empresa !== 'ChillerService';
+  const empresa = isCS ? {
+    nombre:'CHILLERSYSTEM ING. S.R.L.',
+    subtitulo:'Sistemas de Aire Acondicionado y Calefacción',
+    dir:'Sarmiento 4070 (1678) Caseros',tel:'4734-5999',
+    firmaCargo:'Gte. de Servicios y Proyectos',
+    firmaEmpresa:'CHILLERSYSTEM ING. S.R.L.',
+    logo:LOGO_CHILLERSYSTEM_DATAURI,
+    logoAlto:60,
+    nombrePortada:'CHILLERSYSTEM'
+  } : {
     nombre:'CHILLERSERVICE S.A.',
     subtitulo:'Servicios e Instalaciones Termomecánicas',
     dir:'Esmeralda 762 (1007) – 2°B – Cap.Fed.',tel:'5032-4033',
     firmaCargo:'Apoderado.',
     firmaEmpresa:'CHILLER SERVICE S.A.',
-    logo:'https://www.chillersystem.com/assets/img/logo.webp'
+    logo:LOGO_CHILLERSERVICE_DATAURI,
+    logoAlto:55,
+    nombrePortada:'CHILLERSERVICE'
   };
   window._currentInformeNumero=inf.numero;
-  const _fechaBaseI=inf.fecha||inf.created_at;
-  const fecha=_fechaBaseI?new Date(_fechaBaseI.includes('T')?_fechaBaseI:_fechaBaseI+'T00:00:00').toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
+  const _fechaBaseInf=inf.fecha||inf.created_at;
+  const fecha=_fechaBaseInf?new Date(_fechaBaseInf.includes('T')?_fechaBaseInf:_fechaBaseInf+'T00:00:00').toLocaleDateString('es-AR',{day:'numeric',month:'long',year:'numeric'}):'';
+  const mesAnio=_fechaBaseInf?new Date(_fechaBaseInf.includes('T')?_fechaBaseInf:_fechaBaseInf+'T00:00:00').toLocaleDateString('es-AR',{month:'long',year:'numeric'}).toUpperCase():'';
+  const descripcionLabel=inf.tipo==='tecnico'?'INFORME TÉCNICO':'INFORME DE GESTIÓN';
+  const proyectoLabel=(inf.referencia||'PREVENTIVOS Y CORRECTIVOS').toUpperCase();
+
+  const intervsInc=inf.intervenciones_incluidas||[];
   const fotos=inf.fotos_seleccionadas||[];
-  const tipoLabel=inf.tipo==='tecnico'?'INFORME TÉCNICO':'INFORME DE GESTIÓN';
-  const periodo=inf.periodo_desde&&inf.periodo_hasta?' — Período: '+fmtF(inf.periodo_desde)+' al '+fmtF(inf.periodo_hasta):'';
+  const fotosGenerales=fotos.filter(f=>!f.intervencion_id);
 
-  // BUILD INDICE
-  const secciones=[];
-  secciones.push({num:'1',titulo:'Introducción'});
-  secciones.push({num:'2',titulo:'Desarrollo'+(inf.tipo==='gestion'?' — Plan de mantenimiento':'')});
-  if(fotos.length) secciones.push({num:'3',titulo:'Registro fotográfico'});
-  secciones.push({num:fotos.length?'4':'3',titulo:'Conclusiones y recomendaciones'});
+  const secciones=[{titulo:'Objetivo'},{titulo:'Desarrollo'}];
+  if(fotosGenerales.length) secciones.push({titulo:'Registro fotográfico'});
+  secciones.push({titulo:'Conclusiones y recomendaciones'});
 
-  let html='<div id="informeImprimible" style="font-family:Arial,sans-serif;font-size:12px;color:#000;padding:30px;max-width:750px;margin:0 auto;">';
-  // HEADER
-  html+='<table width="100%" style="border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:20px;"><tr>';
-  html+='<td width="120"><img src="'+empresa.logo+'" style="height:60px;object-fit:contain;"/></td>';
-  html+='<td style="text-align:center;"><div style="font-size:24px;font-weight:900;font-style:italic;">'+empresa.nombre+'</div>';
-  html+='<div style="font-size:13px;font-style:italic;">'+empresa.subtitulo+'</div></td></tr></table>';
-  // TITULO
-  html+='<div style="text-align:center;margin:20px 0;padding:12px;background:#f5f5f5;border-radius:4px;">';
-  html+='<div style="font-size:18px;font-weight:900;text-transform:uppercase;">'+tipoLabel+'</div>';
-  html+='<div style="font-size:13px;margin-top:4px;">N° '+inf.numero+periodo+'</div></div>';
-  // DATOS
-  html+='<table width="100%" style="margin-bottom:16px;"><tr>';
-  html+='<td width="50%"><div><strong>Cliente:</strong> '+escapeHtml(inf.cliente_nombre)+'</div>';
-  if(inf.cliente_direccion) html+='<div>'+inf.cliente_direccion+'</div>';
-  if(inf.cliente_contacto) html+='<div><strong>At.:</strong> '+inf.cliente_contacto+'</div>';
-  html+='</td><td width="50%" style="text-align:right;">';
-  html+='<div>Buenos Aires, '+fecha+'</div>';
-  if(inf.referencia) html+='<div><strong>Ref.:</strong> '+inf.referencia+'</div>';
-  html+='</td></tr></table>';
-  html+='<hr style="margin:16px 0;"/>';
-  // INDICE
-  html+='<div style="margin:16px 0;page-break-after:avoid;">';
-  html+='<div style="font-size:14px;font-weight:bold;text-decoration:underline;margin-bottom:10px;">ÍNDICE</div>';
-  html+='<table width="100%">';
-  secciones.forEach(s=>{
-    html+='<tr><td style="padding:4px 0;">'+s.num+'. '+s.titulo+'</td><td style="text-align:right;border-bottom:1px dotted #999;">..................</td></tr>';
-  });
-  html+='</table></div><hr style="margin:16px 0;"/>';
-  // INTRODUCCION
-  html+='<div style="margin:16px 0;">';
-  html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">1. INTRODUCCIÓN</div>';
-  html+='<p>Por intermedio del presente informe, '+empresa.nombre+' hace entrega del registro de trabajos realizados correspondiente a '+inf.cliente_nombre+'. Los trabajos se llevaron a cabo en el marco del plan de mantenimiento '+(inf.tipo==='gestion'?'preventivo y correctivo del período '+fmtF(inf.periodo_desde||'')+' al '+fmtF(inf.periodo_hasta||''):'preventivo y correctivo programado')+'.</p>';
-  html+='</div><hr style="margin:16px 0;"/>';
-  // DESARROLLO
-  html+='<div style="margin:16px 0;">';
-  html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">2. DESARROLLO</div>';
-  if(inf.desarrollo) html+='<p style="white-space:pre-wrap;">'+escapeHtmlMultiline(inf.desarrollo)+'</p>';
-  else html+='<p style="color:#666;font-style:italic;">Ver registro de intervenciones adjunto.</p>';
-  html+='</div>';
-  // FOTOS
-  if(fotos.length){
-    html+='<hr style="margin:16px 0;"/>';
-    html+='<div style="margin:16px 0;">';
-    html+='<div style="font-size:14px;font-weight:bold;margin-bottom:12px;">3. REGISTRO FOTOGRÁFICO</div>';
-    // 2 fotos por fila
-    for(let i=0;i<fotos.length;i+=2){
-      html+='<table width="100%" style="margin-bottom:16px;"><tr>';
-      for(let j=i;j<Math.min(i+2,fotos.length);j++){
-        html+='<td width="50%" style="padding:0 8px;text-align:center;">';
-        html+='<img src="'+fotos[j].url+'" style="max-width:100%;max-height:220px;object-fit:contain;border:1px solid #ddd;border-radius:4px;"/>';
-        if(fotos[j].descripcion) html+='<div style="font-size:11px;margin-top:5px;font-style:italic;color:#555;">'+fotos[j].descripcion+'</div>';
-        html+='</td>';
+  function gridFotos(lista){
+    if(!lista.length) return '';
+    let h='';
+    for(let i=0;i<lista.length;i+=3){
+      h+='<table width="100%" style="margin:4px 0;"><tr>';
+      for(let j=i;j<Math.min(i+3,lista.length);j++){
+        const f=lista[j];
+        h+='<td width="33.33%" style="padding:4px;text-align:center;vertical-align:top;">'
+          +'<img src="'+f.url+'" style="width:100%;height:130px;object-fit:cover;border:1px solid #ccc;border-radius:3px;"/>'
+          +(f.descripcion?'<div style="font-size:9px;margin-top:3px;color:#555;">'+escapeHtml(f.descripcion)+'</div>':'')
+          +'</td>';
       }
-      if(fotos.length%2!==0&&i===fotos.length-1) html+='<td width="50%"></td>';
-      html+='</tr></table>';
+      h+='</tr></table>';
     }
+    return h;
+  }
+
+  function tablaCabecera(){
+    return '<table width="100%" style="border-collapse:collapse;margin-bottom:14px;">'
+      +'<tr>'
+      +'<td width="50%" style="border:1px solid #333;padding:6px 10px;text-align:center;font-size:9px;">'
+        +'<div style="font-weight:bold;">CLIENTE</div><div style="margin-top:3px;">'+escapeHtml((inf.cliente_nombre||'').toUpperCase())+'</div></td>'
+      +'<td width="50%" style="border:1px solid #333;padding:6px 10px;text-align:center;font-size:9px;">'
+        +'<div style="font-weight:bold;">PROYECTO</div><div style="margin-top:3px;font-weight:bold;">'+escapeHtml(proyectoLabel)+'</div></td>'
+      +'</tr></table>';
+  }
+  function tablaPie(){
+    return '<table width="100%" style="border-collapse:collapse;margin-top:24px;">'
+      +'<tr>'
+      +'<td width="50%" style="border:1px solid #333;padding:6px 10px;text-align:center;font-size:9px;">'
+        +'<div style="font-weight:bold;">RESPONSABLE DEL PROYECTO</div><div style="margin-top:3px;">'+escapeHtml(empresa.firmaEmpresa)+'</div></td>'
+      +'<td width="50%" style="border:1px solid #333;padding:6px 10px;text-align:center;font-size:9px;">'
+        +'<div style="font-weight:bold;">DESCRIPCIÓN</div><div style="margin-top:3px;">'+escapeHtml(descripcionLabel)+'</div></td>'
+      +'</tr></table>';
+  }
+
+  let html='<div id="informeImprimible" style="font-family:Arial,sans-serif;font-size:11px;color:#000;max-width:790px;margin:0 auto;">';
+
+  // ══ PORTADA ══
+  html+='<div style="background:#bcd5ed;padding:50px 45px;min-height:960px;position:relative;box-sizing:border-box;border-left:14px solid #1f487c;page-break-after:always;overflow:hidden;">';
+  html+='<div style="position:absolute;top:40px;right:45px;"><img src="'+empresa.logo+'" style="height:'+empresa.logoAlto+'px;object-fit:contain;"/></div>';
+  html+='<div style="margin-top:230px;">';
+  html+='<div style="font-size:28px;color:#1a2332;line-height:1.3;">Informe de avances<br/>preventivos y correctivos</div>';
+  html+='<div style="font-size:15px;color:#374151;margin-top:10px;">'+escapeHtml(inf.cliente_nombre||'')+'</div>';
+  html+='</div>';
+  html+='<svg width="220" height="260" style="position:absolute;left:0px;bottom:90px;" viewBox="0 0 220 260">'
+    +'<path d="M10,260 C40,180 20,120 70,10" stroke="#1f487c" stroke-width="2.5" fill="none"/>'
+    +'<path d="M35,260 C65,190 45,130 95,30" stroke="#5b8ef7" stroke-width="1.5" fill="none" opacity="0.6"/>'
+    +'</svg>';
+  html+='<div style="position:absolute;bottom:50px;left:45px;">';
+  html+='<div style="color:#3b5f8f;font-weight:700;font-size:13px;">'+empresa.nombrePortada+'</div>';
+  html+='<div style="color:#374151;font-size:10px;">'+mesAnio+'</div>';
+  html+='</div>';
+  html+='</div>';
+
+  // ══ TABLA DE CONTENIDO ══
+  html+='<div style="page-break-after:always;padding-top:10px;">';
+  html+='<div style="text-align:center;font-size:11px;color:#666;margin-bottom:6px;">'+empresa.nombrePortada+' &nbsp;·&nbsp; '+mesAnio+'</div>';
+  html+='<div style="font-size:19px;font-weight:600;text-align:center;margin:18px 0 4px;line-height:1.3;">Informe de avances<br/>preventivos y correctivos</div>';
+  html+='<div style="text-align:center;color:#555;margin-bottom:22px;">'+escapeHtml(inf.cliente_nombre||'')+'</div>';
+  html+=tablaCabecera();
+  html+='<table width="100%" style="border-collapse:collapse;margin-bottom:14px;font-size:9px;">'
+    +'<tr><td style="border:1px solid #333;padding:4px 8px;font-weight:bold;width:33%;">RESPONSABLE DEL PROYECTO</td><td style="border:1px solid #333;padding:4px 8px;" colspan="2">'+escapeHtml(empresa.firmaEmpresa)+'</td></tr>'
+    +'<tr><td style="border:1px solid #333;padding:4px 8px;font-weight:bold;">DESCRIPCIÓN</td><td style="border:1px solid #333;padding:4px 8px;" colspan="2">'+escapeHtml(descripcionLabel)+'</td></tr>'
+    +'</table>';
+  html+='<div style="font-weight:bold;margin:18px 0 8px;">Tabla de contenido</div>';
+  secciones.forEach(s=>{ html+='<div style="margin:3px 0;">'+s.titulo.toUpperCase()+'</div>'; });
+  html+='<table width="100%" style="border-collapse:collapse;margin-top:24px;font-size:9px;">'
+    +'<tr>'+['Versión','Confeccionó','Fecha','Aprobó','Lista de distribución'].map(h=>'<td style="border:1px solid #333;padding:4px 6px;font-weight:bold;text-align:center;">'+h+'</td>').join('')+'</tr>'
+    +'<tr>'
+    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.numero||'')+'</td>'
+    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.creado_por||'—')+'</td>'
+    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+fecha+'</td>'
+    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.aprobado_por||'')+'</td>'
+    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">&nbsp;</td>'
+    +'</tr></table>';
+  html+='</div>';
+
+  // ══ OBJETIVO ══
+  html+='<div style="page-break-after:always;">';
+  html+=tablaCabecera();
+  html+='<div style="font-weight:bold;font-size:13px;margin-bottom:8px;">Objetivo</div>';
+  html+='<p style="white-space:pre-wrap;line-height:1.5;margin:0;">'+escapeHtmlMultiline(inf.objetivo||'')+'</p>';
+  html+='</div>';
+
+  // ══ DESARROLLO ══
+  html+='<div>';
+  html+=tablaCabecera();
+  html+='<div style="font-weight:bold;font-size:13px;margin-bottom:8px;">Desarrollo</div>';
+  if(inf.desarrollo) html+='<p style="white-space:pre-wrap;line-height:1.5;margin:0 0 14px;">'+escapeHtmlMultiline(inf.desarrollo)+'</p>';
+  if(intervsInc.length){
+    intervsInc.forEach((it,idx)=>{
+      html+='<div style="margin-bottom:16px;">';
+      html+='<div style="font-weight:bold;margin-bottom:4px;">'+(idx+1)+'. '+escapeHtml(it.equipo)+'</div>';
+      if(it.descripcion) html+='<p style="margin:0 0 6px;line-height:1.4;">'+escapeHtmlMultiline(it.descripcion)+'</p>';
+      html+=gridFotos(fotos.filter(f=>f.intervencion_id===it.id));
+      html+='</div>';
+    });
+  } else if(!inf.desarrollo){
+    html+='<p style="color:#666;font-style:italic;">Sin intervenciones ni observaciones cargadas.</p>';
+  }
+  html+='</div>';
+
+  // ══ REGISTRO FOTOGRAFICO (fotos generales, sin intervención puntual) ══
+  if(fotosGenerales.length){
+    html+='<div style="page-break-before:always;">';
+    html+=tablaCabecera();
+    html+='<div style="font-weight:bold;font-size:13px;margin-bottom:10px;text-decoration:underline;">Registro Fotográfico</div>';
+    html+=gridFotos(fotosGenerales);
     html+='</div>';
   }
-  // CONCLUSION
-  html+='<hr style="margin:16px 0;"/>';
-  html+='<div style="margin:16px 0;">';
-  const numConc=fotos.length?'4':'3';
-  html+='<div style="font-size:14px;font-weight:bold;margin-bottom:8px;">'+numConc+'. CONCLUSIONES Y RECOMENDACIONES</div>';
-  if(inf.conclusion) html+='<p style="white-space:pre-wrap;">'+escapeHtmlMultiline(inf.conclusion)+'</p>';
-  else html+='<p style="color:#666;font-style:italic;">Sin observaciones adicionales.</p>';
+
+  // ══ CONCLUSIONES ══
+  html+='<div style="page-break-before:always;">';
+  html+=tablaCabecera();
+  html+='<div style="font-weight:bold;font-size:13px;margin-bottom:8px;">Conclusiones</div>';
+  html+='<p style="white-space:pre-wrap;line-height:1.5;margin:0;">'+escapeHtmlMultiline(inf.conclusion||'')+'</p>';
+  html+=tablaPie();
   html+='</div>';
-  // FIRMA
-  html+='<div style="text-align:right;margin-top:50px;">';
-  html+='<div style="display:inline-block;text-align:center;">';
-  html+='<div style="border-top:1px solid #000;padding-top:6px;min-width:200px;">';
-  html+='<div><strong>Ing. Norberto Garcia</strong></div>';
-  html+='<div>'+empresa.firmaCargo+'</div>';
-  html+='<div>'+empresa.firmaEmpresa+'</div>';
-  html+='</div></div></div>';
-  // FOOTER
-  html+='<div style="border-top:1px solid #000;margin-top:30px;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;">';
-  html+='<span>Informe N°'+inf.numero+'</span>';
-  html+='<span>'+empresa.dir+' //TE.: '+empresa.tel+'</span></div>';
+
   html+='</div>';
 
   document.getElementById('informePdfContent').innerHTML=html;
