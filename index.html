@@ -9602,18 +9602,14 @@ function renderInformePdf(inf){
 
   function gridFotos(lista){
     if(!lista.length) return '';
-    let h='';
-    for(let i=0;i<lista.length;i+=3){
-      h+='<table width="100%" style="margin:4px 0;"><tr>';
-      for(let j=i;j<Math.min(i+3,lista.length);j++){
-        const f=lista[j];
-        h+='<td width="33.33%" style="padding:4px;text-align:center;vertical-align:top;">'
-          +'<img src="'+f.url+'" style="width:100%;height:130px;object-fit:cover;border:1px solid #ccc;border-radius:3px;"/>'
-          +(f.descripcion?'<div style="font-size:9px;margin-top:3px;color:#555;">'+escapeHtml(f.descripcion)+'</div>':'')
-          +'</td>';
-      }
-      h+='</tr></table>';
-    }
+    let h='<div style="display:flex;flex-wrap:wrap;margin:4px 0;">';
+    lista.forEach(function(f){
+      h+='<div style="width:33.33%;box-sizing:border-box;padding:4px;text-align:center;vertical-align:top;">'
+        +'<img src="'+f.url+'" style="display:block;width:100%;height:130px;object-fit:cover;border:1px solid #ccc;border-radius:3px;"/>'
+        +(f.descripcion?'<div style="font-size:9px;margin-top:3px;color:#555;">'+escapeHtml(f.descripcion)+'</div>':'')
+        +'</div>';
+    });
+    h+='</div>';
     return h;
   }
 
