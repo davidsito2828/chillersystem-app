@@ -1300,6 +1300,7 @@ tbody tr:hover{background:#f8faff;}
         <span id="serviceClienteAlerta"></span>
       </div>
     </div>
+    <div id="serviceReclamosHistorial" style="padding:0 18px;"></div>
     <div id="serviceEquiposList" style="padding:14px 18px;"></div>
     <!-- FIRMA -->
     <div style="padding:0 18px 20px;">
@@ -1313,6 +1314,11 @@ tbody tr:hover{background:#f8faff;}
           <div class="form-group">
             <label class="form-label">Fecha del service</label>
             <input class="form-input" id="firmaFecha" type="date"/>
+          </div>
+          <div class="form-group full" id="falsaAlarmaWrap" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;">
+              <input type="checkbox" id="firmaFalsaAlarma"/> Fue una falsa alarma — no hizo falta ningún correctivo
+            </label>
           </div>
           <div class="form-group full">
             <label class="form-label">Observaciones del sitio</label>
@@ -1372,6 +1378,27 @@ tbody tr:hover{background:#f8faff;}
 </div>
 
 <!-- MODAL EQUIPO SERVICE -->
+<!-- MODAL: MOTIVO DE LA VISITA (cortina previa a entrar al cliente en Service) -->
+<div class="modal-overlay" id="mTipoVisitaService">
+  <div class="modal" style="max-width:420px;text-align:center;">
+    <button class="modal-close" onclick="cancelarTipoVisita()">✕</button>
+    <div class="modal-title" style="margin-bottom:4px;">¿Motivo de la visita?</div>
+    <div id="tvClienteNombre" style="font-size:12px;color:var(--text-dim);margin-bottom:18px;"></div>
+    <div id="tvOpciones" style="display:flex;flex-direction:column;gap:12px;">
+      <button class="btn-primary" style="padding:16px 12px;font-size:15px;font-weight:700;" onclick="elegirTipoVisita('preventivo')">🔧 Preventivo</button>
+      <button class="btn-secondary" style="padding:16px 12px;font-size:15px;font-weight:700;border:2px solid var(--accent);" onclick="elegirTipoVisita('reclamo')">📞 Atención de reclamo</button>
+    </div>
+    <div id="tvReclamoForm" style="display:none;margin-top:6px;text-align:left;">
+      <label class="form-label">¿Cuál fue el reclamo? *</label>
+      <textarea class="form-textarea" id="tvReclamoDesc" placeholder="Ej: El cliente reporta que el AC del piso 3 no enfría" style="min-height:80px;"></textarea>
+      <div class="form-actions" style="margin-top:12px;">
+        <button class="btn-secondary" onclick="volverTipoVisitaOpciones()">← Volver</button>
+        <button class="btn-primary" onclick="confirmarReclamoYEntrar()">Continuar →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="mServiceEq">
   <div class="modal" style="max-width:560px;">
     <button class="modal-close" onclick="cerrar('mServiceEq')">✕</button>
@@ -1380,7 +1407,7 @@ tbody tr:hover{background:#f8faff;}
     <input type="hidden" id="sTipo" value=""/>
 
     <!-- PASO 1: SELECTOR DE TIPO (siempre visible arriba) -->
-    <div style="margin-bottom:16px;">
+    <div id="sTipoSelectorWrap" style="margin-bottom:16px;">
       <div style="font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;font-weight:700;margin-bottom:10px;">¿Qué tipo de trabajo es?</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <button id="sTipoPreventivo" onclick="setServiceTipo('Preventivo')"
@@ -4878,7 +4905,93 @@ function renderServiceClientes(lista){
 function filtrarClienteService(q){
   renderServiceClientes(clisFiltrados().filter(c=>c.nombre.toLowerCase().includes(q.toLowerCase())));
 }
+let tipoVisitaService='preventivo';
+let reclamoActualId=null;
+let reclamoEquiposRevisados=[];
+let _pendingServiceClienteId=null;
+
 function abrirServiceCliente(cliId,restaurando=false){
+  if(!restaurando){
+    _pendingServiceClienteId=cliId;
+    const c=clientes.find(x=>x.id===cliId);
+    document.getElementById('tvClienteNombre').textContent=c?c.nombre:'';
+    document.getElementById('tvOpciones').style.display='flex';
+    document.getElementById('tvReclamoForm').style.display='none';
+    document.getElementById('tvReclamoDesc').value='';
+    document.getElementById('mTipoVisitaService').classList.add('open');
+    return;
+  }
+  _continuarAbrirServiceCliente(cliId,restaurando);
+}
+
+function cancelarTipoVisita(){
+  cerrar('mTipoVisitaService');
+  _pendingServiceClienteId=null;
+}
+
+function elegirTipoVisita(tipo){
+  if(tipo==='preventivo'){
+    tipoVisitaService='preventivo';
+    reclamoActualId=null;
+    reclamoEquiposRevisados=[];
+    cerrar('mTipoVisitaService');
+    _continuarAbrirServiceCliente(_pendingServiceClienteId,false);
+  }else{
+    document.getElementById('tvOpciones').style.display='none';
+    document.getElementById('tvReclamoForm').style.display='block';
+  }
+}
+function volverTipoVisitaOpciones(){
+  document.getElementById('tvOpciones').style.display='flex';
+  document.getElementById('tvReclamoForm').style.display='none';
+}
+
+async function confirmarReclamoYEntrar(){
+  const desc=document.getElementById('tvReclamoDesc').value.trim();
+  if(!desc){showToast('Contame cuál fue el reclamo',true);return;}
+  const c=clientes.find(x=>x.id===_pendingServiceClienteId);
+  try{
+    const r=await api('reclamos',{
+      method:'POST',
+      body:JSON.stringify({
+        cliente_id:_pendingServiceClienteId,
+        cliente_nombre:c?c.nombre:'',
+        descripcion:desc,
+        estado:'en_atencion',
+        creado_por:usuarioActual?usuarioActual.nombre:null
+      }),
+      headers:{...H,'Prefer':'return=representation'}
+    });
+    reclamoActualId=Array.isArray(r)?r[0]?.id:r?.id;
+  }catch(e){
+    showToast('No se pudo registrar el reclamo: '+e.message,true);
+    return;
+  }
+  tipoVisitaService='reclamo';
+  reclamoEquiposRevisados=[];
+  cerrar('mTipoVisitaService');
+  _continuarAbrirServiceCliente(_pendingServiceClienteId,false);
+}
+
+async function cerrarReclamoSiCorresponde(){
+  if(!reclamoActualId) return;
+  const falsaAlarma=document.getElementById('firmaFalsaAlarma')?.checked||false;
+  const nombresEq=equipos.filter(e=>reclamoEquiposRevisados.includes(e.id)).map(e=>e.nombre);
+  try{
+    await api('reclamos?id=eq.'+reclamoActualId,{
+      method:'PATCH',
+      body:JSON.stringify({
+        estado:falsaAlarma?'falsa_alarma':'resuelto',
+        falsa_alarma:falsaAlarma,
+        equipos_revisados:nombresEq,
+        resultado:falsaAlarma?'Falsa alarma — no hizo falta correctivo.':('Se revisaron: '+nombresEq.join(', ')+'.')
+      }),
+      headers:{...H,'Prefer':'return=minimal'}
+    });
+  }catch(e){console.warn('[cerrar reclamo]',e);}
+}
+
+function _continuarAbrirServiceCliente(cliId,restaurando=false){
   serviceClienteActual=cliId;
   if(!restaurando) servicePlanilla={};
   _informeFisicoUrl=null;
@@ -4886,9 +4999,12 @@ function abrirServiceCliente(cliId,restaurando=false){
   if(elPrevInf) elPrevInf.innerHTML='';
   const elBtnInf=document.getElementById('btnInformeFisico');
   if(elBtnInf) elBtnInf.textContent='📎 Adjuntar informe físico (foto o PDF)';
+  document.getElementById('falsaAlarmaWrap').style.display=tipoVisitaService==='reclamo'?'block':'none';
+  const falsaAlarmaCb=document.getElementById('firmaFalsaAlarma');
+  if(falsaAlarmaCb) falsaAlarmaCb.checked=false;
   const c=clientes.find(x=>x.id===cliId);
   const eqs=equipos.filter(e=>e.cliente_id===cliId);
-  document.getElementById('serviceClienteNombre').textContent=c.nombre;
+  document.getElementById('serviceClienteNombre').textContent=c.nombre+(tipoVisitaService==='reclamo'?' — 📞 Atención de reclamo':'');
   document.getElementById('serviceClienteMeta').textContent=[c.direccion,c.telefono].filter(Boolean).join(' · ')||'Sin datos';
   document.getElementById('serviceClientesList').style.display='none';
   document.getElementById('serviceDetalle').style.display='block';
@@ -4896,6 +5012,25 @@ function abrirServiceCliente(cliId,restaurando=false){
   const tieneCorrectivo=eqs.some(eq=>intervenciones.some(i=>i.equipo_id===eq.id&&i.necesita_correctivo&&i.es_planilla&&!i.correctivo_resuelto));
   document.getElementById('serviceClienteAlerta').innerHTML=tieneCorrectivo?'<span style="color:var(--red);font-weight:700;font-size:12px;">🔴 Correctivo pendiente</span>':'';
   renderServiceEquipos(eqs);
+  renderReclamosCliente(cliId);
+}
+
+async function renderReclamosCliente(cliId){
+  const cont=document.getElementById('serviceReclamosHistorial');
+  if(!cont) return;
+  cont.innerHTML='';
+  try{
+    const reclamos=await api('reclamos?cliente_id=eq.'+cliId+'&order=created_at.desc&limit=5');
+    if(!reclamos||!reclamos.length) return;
+    const estadoLabel={en_atencion:'⏳ En atención',resuelto:'✅ Resuelto',falsa_alarma:'⚪ Falsa alarma'};
+    cont.innerHTML='<div style="margin-top:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
+      +'<div style="font-weight:700;font-size:12px;margin-bottom:6px;">📞 Reclamos anteriores</div>'
+      +reclamos.map(r=>'<div style="font-size:11px;padding:5px 0;border-top:1px dashed var(--border);">'
+        +'<span style="color:var(--text-dim);">'+fmtF(r.fecha)+'</span> · '+(estadoLabel[r.estado]||r.estado)+'<br/>'
+        +escapeHtml(r.descripcion||'')
+        +'</div>').join('')
+      +'</div>';
+  }catch(e){console.warn('[reclamos historial]',e);}
 }
 function renderServiceEquipos(eqs){
   const el=document.getElementById('serviceEquiposList');
@@ -4931,6 +5066,7 @@ function volverListaService(){
   document.getElementById('serviceDetalle').style.display='none';
   document.getElementById('serviceClientesList').style.display='block';
   serviceClienteActual=null;servicePlanilla={};
+  tipoVisitaService='preventivo';reclamoActualId=null;reclamoEquiposRevisados=[];
   renderServiceClientes(clisFiltrados());
 }
 function abrirServiceEq(eqId){
@@ -4959,8 +5095,17 @@ function abrirServiceEq(eqId){
   document.getElementById('sTareasWrap').style.display='none';
   document.getElementById('sCancelarSinTipo').style.display='block';
 
-  // Renderizar tareas recomendadas para este equipo
-  _renderTareasService(eq);
+  if(tipoVisitaService==='reclamo'){
+    if(!reclamoEquiposRevisados.includes(eqId)) reclamoEquiposRevisados.push(eqId);
+    document.getElementById('sTipoSelectorWrap').style.display='none';
+    setServiceTipo('Correctivo');
+    document.getElementById('sTrabajoLabel').textContent='Notas de la atención del reclamo';
+  }else{
+    document.getElementById('sTipoSelectorWrap').style.display='';
+  }
+
+  // Renderizar tareas recomendadas para este equipo (no aplica en modo reclamo)
+  if(tipoVisitaService!=='reclamo') _renderTareasService(eq);
 
   // Mark equipo as visited for validation
   if(!servicePlanilla[eqId]) servicePlanilla[eqId]={};
@@ -5369,12 +5514,13 @@ async function guardarSoloPreventivo(){
       }
     }
     // ─── Intervención general de resumen (sin equipo) ───
+    const esReclamoVisita=tipoVisitaService==='reclamo';
     const data={
       cliente_id:serviceClienteActual,
-      equipo_id:null, tipo:'Preventivo', fecha,
+      equipo_id:null, tipo:esReclamoVisita?'Reclamo':'Preventivo', fecha,
       tecnico:tecnico||firma,
-      descripcion:'✅ Preventivo — '+cli.nombre,
-      solucion:'Equipos operativos — '+eqs.length+' equipo(s) revisados',
+      descripcion:esReclamoVisita?('📞 Atención de reclamo — '+cli.nombre):('✅ Preventivo — '+cli.nombre),
+      solucion:esReclamoVisita?('Reclamo atendido — '+eqs.length+' equipo(s) revisados'):('Equipos operativos — '+eqs.length+' equipo(s) revisados'),
       firma:firma, notas:notasGlobal,
       latitud: coords?.latitud || null,
       longitud: coords?.longitud || null,
@@ -5429,6 +5575,7 @@ async function guardarSoloPreventivo(){
         informe_fisico_url:_informeFisicoUrl||null
       }),headers:{...H,'Prefer':'return=minimal'}});
     }
+    await cerrarReclamoSiCorresponde();
     showToast('Preventivo guardado ✓','success');
     await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
     calcAlertas(); volverListaService();
@@ -5518,6 +5665,7 @@ async function guardarPlanilla(){
     }else{
       await api('preventivos_aprobacion',{method:'POST',body:JSON.stringify({cliente_id:serviceClienteActual,equipo_id:null,tecnico:tecnico||firma,fecha_servicio:fecha,firma_cliente:firmaClienteData.base64||null,firma_tipo:firmaClienteData.tipo||null,estado:'pendiente',equipos_detalle:equiposDetalle,informe_fisico_url:_informeFisicoUrl||null}),headers:{...H,'Prefer':'return=minimal'}});
     }
+    await cerrarReclamoSiCorresponde();
     showToast('Planilla guardada ✓ — '+Object.keys(servicePlanilla).length+' equipo(s)','success');
     await Promise.all([loadIntervenciones(),loadEquipos(),loadClientes(),loadTareasConfig(),loadAprobaciones()]);
     calcAlertas();volverListaService();
