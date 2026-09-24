@@ -5742,7 +5742,7 @@ function renderAprobaciones(){
           :`<div style="display:flex;gap:5px;flex-wrap:wrap;">
               <a href="${urlInforme}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
               <button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="mostrarModalWhatsApp('${a.id}')">📲 WhatsApp</button>
-              ${esGerencia()?`<button onclick="eliminarAprobacion('${a.id}')" style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">🗑️</button>`:''}
+              ${esGerencia()?`<button onclick="eliminarAprobacion('${a.id}',this)" data-grupo-ids='${grupoIdsJson.replace(/'/g,"&#39;")}' style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">🗑️</button>`:''}
             </div>`
         }
       </td>
@@ -6133,10 +6133,17 @@ async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
-async function eliminarAprobacion(id){
-  if(!confirm('¿Eliminar este informe de aprobación? Esta acción no se puede deshacer.')) return;
+async function eliminarAprobacion(idRepresentante,btn){
+  let ids=[idRepresentante];
+  if(btn&&btn.dataset.grupoIds){
+    try{ const parsed=JSON.parse(btn.dataset.grupoIds); if(Array.isArray(parsed)&&parsed.length) ids=parsed; }catch(e){}
+  }
+  const msg=ids.length>1
+    ?('¿Eliminar esta visita completa? Son '+ids.length+' registros agrupados en esta fila. Esta acción no se puede deshacer.')
+    :'¿Eliminar este informe de aprobación? Esta acción no se puede deshacer.';
+  if(!confirm(msg)) return;
   try{
-    await api('preventivos_aprobacion?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+    await api('preventivos_aprobacion?id=in.('+ids.join(',')+')',{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Informe eliminado ✓','success');
     await loadAprobaciones();
   }catch(e){showToast('Error al eliminar: '+e.message,true);}
