@@ -9602,11 +9602,11 @@ function renderInformePdf(inf){
 
   function gridFotos(lista){
     if(!lista.length) return '';
-    let h='<div style="display:flex;flex-wrap:wrap;gap:2mm;margin:2mm 0;">';
+    let h='<div style="display:flex;flex-wrap:wrap;gap:4mm;margin:3mm 0;">';
     lista.forEach(function(f){
-      h+='<div style="width:10mm;">'
-        +'<img src="'+f.url+'" style="display:block;width:10mm;height:10mm;object-fit:cover;border:0.3mm solid #ccc;border-radius:0.5mm;"/>'
-        +(f.descripcion?'<div style="font-size:6px;margin-top:1mm;color:#555;line-height:1.2;">'+escapeHtml(f.descripcion)+'</div>':'')
+      h+='<div style="width:100mm;page-break-inside:avoid;">'
+        +'<img src="'+f.url+'" style="display:block;width:100mm;height:100mm;object-fit:cover;border:0.3mm solid #ccc;border-radius:1mm;"/>'
+        +(f.descripcion?'<div style="font-size:10px;margin-top:1mm;color:#555;line-height:1.3;">'+escapeHtml(f.descripcion)+'</div>':'')
         +'</div>';
     });
     h+='</div>';
@@ -9688,9 +9688,11 @@ function renderInformePdf(inf){
   if(inf.desarrollo) html+='<p style="white-space:pre-wrap;line-height:1.5;margin:0 0 14px;">'+escapeHtmlMultiline(inf.desarrollo)+'</p>';
   if(intervsInc.length){
     intervsInc.forEach((it,idx)=>{
-      html+='<div style="margin-bottom:16px;page-break-inside:avoid;">';
+      html+='<div style="margin-bottom:16px;">';
+      html+='<div style="page-break-inside:avoid;">';
       html+='<div style="font-weight:bold;margin-bottom:4px;">'+(idx+1)+'. '+escapeHtml(it.equipo)+'</div>';
       if(it.descripcion) html+='<p style="margin:0 0 6px;line-height:1.4;">'+escapeHtmlMultiline(it.descripcion)+'</p>';
+      html+='</div>';
       html+=gridFotos(fotos.filter(f=>f.intervencion_id===it.id));
       html+='</div>';
     });
@@ -9730,7 +9732,8 @@ function imprimirInforme(){
     filename:'Informe-'+numero+'.pdf',
     image:{type:'jpeg',quality:0.98},
     html2canvas:{scale:2,useCORS:true},
-    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+    pagebreak:{mode:['css','avoid-all']}
   }).from(contenido).save();
 }
 
