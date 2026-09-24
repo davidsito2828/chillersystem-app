@@ -9602,11 +9602,11 @@ function renderInformePdf(inf){
 
   function gridFotos(lista){
     if(!lista.length) return '';
-    let h='<div style="display:flex;flex-wrap:wrap;margin:4px 0;">';
+    let h='<div style="display:flex;flex-wrap:wrap;gap:2mm;margin:2mm 0;">';
     lista.forEach(function(f){
-      h+='<div style="width:33.33%;box-sizing:border-box;padding:4px;text-align:center;vertical-align:top;">'
-        +'<img src="'+f.url+'" style="display:block;width:100%;height:130px;object-fit:cover;border:1px solid #ccc;border-radius:3px;"/>'
-        +(f.descripcion?'<div style="font-size:9px;margin-top:3px;color:#555;">'+escapeHtml(f.descripcion)+'</div>':'')
+      h+='<div style="width:10mm;">'
+        +'<img src="'+f.url+'" style="display:block;width:10mm;height:10mm;object-fit:cover;border:0.3mm solid #ccc;border-radius:0.5mm;"/>'
+        +(f.descripcion?'<div style="font-size:6px;margin-top:1mm;color:#555;line-height:1.2;">'+escapeHtml(f.descripcion)+'</div>':'')
         +'</div>';
     });
     h+='</div>';
@@ -9688,7 +9688,7 @@ function renderInformePdf(inf){
   if(inf.desarrollo) html+='<p style="white-space:pre-wrap;line-height:1.5;margin:0 0 14px;">'+escapeHtmlMultiline(inf.desarrollo)+'</p>';
   if(intervsInc.length){
     intervsInc.forEach((it,idx)=>{
-      html+='<div style="margin-bottom:16px;">';
+      html+='<div style="margin-bottom:16px;page-break-inside:avoid;">';
       html+='<div style="font-weight:bold;margin-bottom:4px;">'+(idx+1)+'. '+escapeHtml(it.equipo)+'</div>';
       if(it.descripcion) html+='<p style="margin:0 0 6px;line-height:1.4;">'+escapeHtmlMultiline(it.descripcion)+'</p>';
       html+=gridFotos(fotos.filter(f=>f.intervencion_id===it.id));
