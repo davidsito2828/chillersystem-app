@@ -2313,6 +2313,8 @@ tbody tr:hover{background:#f8faff;}
       </div>
       <div class="form-group"><label class="form-label">N° Informe *</label><input class="form-input" id="iNumero" placeholder="Ej: IT-001/2026"/></div>
       <div class="form-group"><label class="form-label">Fecha</label><input class="form-input" id="iFechaInf" type="date"/></div>
+      <div class="form-group"><label class="form-label">Confeccionó</label><input class="form-input" id="iConfeccionadoPor" placeholder="Nombre de quien lo hizo"/></div>
+      <div class="form-group"><label class="form-label">Lista de distribución</label><input class="form-input" id="iListaDistribucion" placeholder="Ej: Juan Pérez, María López"/></div>
       <div class="form-group full"><label class="form-label">Cliente *</label>
         <select class="form-select" id="iClienteId" onchange="cargarDatosClienteInforme(this.value)">
           <option value="">— Seleccioná un cliente —</option>
@@ -9438,7 +9440,8 @@ function getIntervencionesIncluidas(){
 function abrirModalInforme(id=null){
   fotosInformeSeleccionadas=[];
   window._informeIntervs=[];
-  ['informeId','iNumero','iClienteNombre','iClienteDireccion','iContacto','iReferencia','iDesarrollo','iConclusion','iObjetivo'].forEach(x=>document.getElementById(x).value='');
+  ['informeId','iNumero','iClienteNombre','iClienteDireccion','iContacto','iReferencia','iDesarrollo','iConclusion','iObjetivo','iListaDistribucion'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('iConfeccionadoPor').value=usuarioActual?usuarioActual.nombre:'';
   document.getElementById('iFechaInf').value=new Date().toISOString().split('T')[0];
   document.getElementById('iPeriodoDesdeFecha').value='';
   document.getElementById('iPeriodoHastaFecha').value='';
@@ -9461,6 +9464,8 @@ function abrirModalInforme(id=null){
     document.getElementById('iContacto').value=inf.cliente_contacto||'';
     document.getElementById('iReferencia').value=inf.referencia||'';
     document.getElementById('iObjetivo').value=inf.objetivo||OBJETIVO_DEFAULT;
+    document.getElementById('iConfeccionadoPor').value=inf.confeccionado_por||inf.creado_por||(usuarioActual?usuarioActual.nombre:'');
+    document.getElementById('iListaDistribucion').value=inf.lista_distribucion||'';
     document.getElementById('iDesarrollo').value=inf.desarrollo||'';
     document.getElementById('iConclusion').value=inf.conclusion||CONCLUSION_DEFAULT;
     document.getElementById('iPeriodoDesdeFecha').value=inf.periodo_desde||'';
@@ -9505,7 +9510,9 @@ async function guardarInforme(estado){
     fotos_seleccionadas:fotos,
     conclusion:document.getElementById('iConclusion').value.trim()||null,
     estado:id?(informes.find(x=>x.id===id)||{}).estado||estado:estado,
-    creado_por:usuarioActual?usuarioActual.nombre:null
+    creado_por:usuarioActual?usuarioActual.nombre:null,
+    confeccionado_por:document.getElementById('iConfeccionadoPor').value.trim()||null,
+    lista_distribucion:document.getElementById('iListaDistribucion').value.trim()||null
   };
   try{
     if(id) await api('informes?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
@@ -9549,7 +9556,9 @@ function previewInforme(){
     fotos_seleccionadas:fotos,
     conclusion:document.getElementById('iConclusion').value,
     fecha:document.getElementById('iFechaInf').value,
-    creado_por:usuarioActual?usuarioActual.nombre:null
+    creado_por:usuarioActual?usuarioActual.nombre:null,
+    confeccionado_por:document.getElementById('iConfeccionadoPor').value,
+    lista_distribucion:document.getElementById('iListaDistribucion').value
   };
   renderInformePdf(inf);
   document.getElementById('mInformePdf').classList.add('open');
@@ -9667,10 +9676,10 @@ function renderInformePdf(inf){
     +'<tr>'+['Versión','Confeccionó','Fecha','Aprobó','Lista de distribución'].map(h=>'<td style="border:1px solid #333;padding:4px 6px;font-weight:bold;text-align:center;">'+h+'</td>').join('')+'</tr>'
     +'<tr>'
     +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.numero||'')+'</td>'
-    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.creado_por||'—')+'</td>'
+    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.confeccionado_por||inf.creado_por||'—')+'</td>'
     +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+fecha+'</td>'
     +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.aprobado_por||'')+'</td>'
-    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">&nbsp;</td>'
+    +'<td style="border:1px solid #333;padding:4px 6px;text-align:center;">'+escapeHtml(inf.lista_distribucion||'')+'</td>'
     +'</tr></table>';
   html+='</div>';
 
@@ -9687,13 +9696,28 @@ function renderInformePdf(inf){
   html+='<div style="font-weight:bold;font-size:13px;margin-bottom:8px;">Desarrollo</div>';
   if(inf.desarrollo) html+='<p style="white-space:pre-wrap;line-height:1.5;margin:0 0 14px;">'+escapeHtmlMultiline(inf.desarrollo)+'</p>';
   if(intervsInc.length){
-    intervsInc.forEach((it,idx)=>{
+    // Agrupamos por equipo: si el mismo equipo aparece varias veces (varias intervenciones
+    // cargadas por separado), se junta en un solo punto, sin repetir la misma descripción.
+    const gruposEquipo=[];
+    const indiceGrupo={};
+    intervsInc.forEach(it=>{
+      const key=it.equipo;
+      if(indiceGrupo[key]===undefined){
+        indiceGrupo[key]=gruposEquipo.length;
+        gruposEquipo.push({equipo:it.equipo, ids:[], descripciones:[]});
+      }
+      const g=gruposEquipo[indiceGrupo[key]];
+      g.ids.push(it.id);
+      const desc=(it.descripcion||'').trim();
+      if(desc && !g.descripciones.includes(desc)) g.descripciones.push(desc);
+    });
+    gruposEquipo.forEach((g,idx)=>{
       html+='<div style="margin-bottom:16px;">';
       html+='<div style="page-break-inside:avoid;">';
-      html+='<div style="font-weight:bold;margin-bottom:4px;">'+(idx+1)+'. '+escapeHtml(it.equipo)+'</div>';
-      if(it.descripcion) html+='<p style="margin:0 0 6px;line-height:1.4;">'+escapeHtmlMultiline(it.descripcion)+'</p>';
+      html+='<div style="font-weight:bold;margin-bottom:4px;">'+(idx+1)+'. '+escapeHtml(g.equipo)+'</div>';
+      g.descripciones.forEach(d=>{ html+='<p style="margin:0 0 6px;line-height:1.4;">'+escapeHtmlMultiline(d)+'</p>'; });
       html+='</div>';
-      html+=gridFotos(fotos.filter(f=>f.intervencion_id===it.id));
+      html+=gridFotos(fotos.filter(f=>g.ids.includes(f.intervencion_id)));
       html+='</div>';
     });
   } else if(!inf.desarrollo){
