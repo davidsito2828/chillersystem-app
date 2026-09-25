@@ -1386,6 +1386,7 @@ tbody tr:hover{background:#f8faff;}
     <div id="tvClienteNombre" style="font-size:12px;color:var(--text-dim);margin-bottom:18px;"></div>
     <div id="tvOpciones" style="display:flex;flex-direction:column;gap:12px;">
       <button class="btn-primary" style="padding:16px 12px;font-size:15px;font-weight:700;" onclick="elegirTipoVisita('preventivo')">🔧 Preventivo</button>
+      <button class="btn-secondary" style="padding:16px 12px;font-size:15px;font-weight:700;border:2px solid #dc2626;color:#dc2626;" onclick="elegirTipoVisita('correctivo')">🛠️ Correctivo</button>
       <button class="btn-secondary" style="padding:16px 12px;font-size:15px;font-weight:700;border:2px solid var(--accent);" onclick="elegirTipoVisita('reclamo')">📞 Atención de reclamo</button>
     </div>
     <div id="tvReclamoForm" style="display:none;margin-top:6px;text-align:left;">
@@ -4930,8 +4931,8 @@ function cancelarTipoVisita(){
 }
 
 function elegirTipoVisita(tipo){
-  if(tipo==='preventivo'){
-    tipoVisitaService='preventivo';
+  if(tipo==='preventivo'||tipo==='correctivo'){
+    tipoVisitaService=tipo;
     reclamoActualId=null;
     reclamoEquiposRevisados=[];
     cerrar('mTipoVisitaService');
@@ -5004,7 +5005,7 @@ function _continuarAbrirServiceCliente(cliId,restaurando=false){
   if(falsaAlarmaCb) falsaAlarmaCb.checked=false;
   const c=clientes.find(x=>x.id===cliId);
   const eqs=equipos.filter(e=>e.cliente_id===cliId);
-  document.getElementById('serviceClienteNombre').textContent=c.nombre+(tipoVisitaService==='reclamo'?' — 📞 Atención de reclamo':'');
+  document.getElementById('serviceClienteNombre').textContent=c.nombre+(tipoVisitaService==='reclamo'?' — 📞 Atención de reclamo':(tipoVisitaService==='correctivo'?' — 🛠️ Correctivo':''));
   document.getElementById('serviceClienteMeta').textContent=[c.direccion,c.telefono].filter(Boolean).join(' · ')||'Sin datos';
   document.getElementById('serviceClientesList').style.display='none';
   document.getElementById('serviceDetalle').style.display='block';
@@ -5095,17 +5096,17 @@ function abrirServiceEq(eqId){
   document.getElementById('sTareasWrap').style.display='none';
   document.getElementById('sCancelarSinTipo').style.display='block';
 
-  if(tipoVisitaService==='reclamo'){
+  if(tipoVisitaService==='reclamo'||tipoVisitaService==='correctivo'){
     if(!reclamoEquiposRevisados.includes(eqId)) reclamoEquiposRevisados.push(eqId);
     document.getElementById('sTipoSelectorWrap').style.display='none';
     setServiceTipo('Correctivo');
-    document.getElementById('sTrabajoLabel').textContent='Notas de la atención del reclamo';
+    document.getElementById('sTrabajoLabel').textContent=tipoVisitaService==='reclamo'?'Notas de la atención del reclamo':'Descripción del correctivo realizado';
   }else{
     document.getElementById('sTipoSelectorWrap').style.display='';
   }
 
-  // Renderizar tareas recomendadas para este equipo (no aplica en modo reclamo)
-  if(tipoVisitaService!=='reclamo') _renderTareasService(eq);
+  // Renderizar tareas recomendadas para este equipo (no aplica en modo reclamo/correctivo)
+  if(tipoVisitaService==='preventivo') _renderTareasService(eq);
 
   // Mark equipo as visited for validation
   if(!servicePlanilla[eqId]) servicePlanilla[eqId]={};
@@ -5514,13 +5515,18 @@ async function guardarSoloPreventivo(){
       }
     }
     // ─── Intervención general de resumen (sin equipo) ───
-    const esReclamoVisita=tipoVisitaService==='reclamo';
+    const resumenPorModo={
+      reclamo:{tipo:'Reclamo',desc:'📞 Atención de reclamo — '+cli.nombre,sol:'Reclamo atendido — '+eqs.length+' equipo(s) revisados'},
+      correctivo:{tipo:'Correctivo',desc:'🛠️ Visita de correctivo — '+cli.nombre,sol:'Correctivo atendido — '+eqs.length+' equipo(s) revisados'},
+      preventivo:{tipo:'Preventivo',desc:'✅ Preventivo — '+cli.nombre,sol:'Equipos operativos — '+eqs.length+' equipo(s) revisados'}
+    };
+    const resumenModo=resumenPorModo[tipoVisitaService]||resumenPorModo.preventivo;
     const data={
       cliente_id:serviceClienteActual,
-      equipo_id:null, tipo:esReclamoVisita?'Reclamo':'Preventivo', fecha,
+      equipo_id:null, tipo:resumenModo.tipo, fecha,
       tecnico:tecnico||firma,
-      descripcion:esReclamoVisita?('📞 Atención de reclamo — '+cli.nombre):('✅ Preventivo — '+cli.nombre),
-      solucion:esReclamoVisita?('Reclamo atendido — '+eqs.length+' equipo(s) revisados'):('Equipos operativos — '+eqs.length+' equipo(s) revisados'),
+      descripcion:resumenModo.desc,
+      solucion:resumenModo.sol,
       firma:firma, notas:notasGlobal,
       latitud: coords?.latitud || null,
       longitud: coords?.longitud || null,
@@ -6328,6 +6334,17 @@ async function renderGaleria(){
 
   // Ordenar por fecha desc
   todasLasFotos.sort((a,b)=>new Date(b.fecha||0)-new Date(a.fecha||0));
+
+  // Deduplicar por URL: si la misma foto quedó referenciada por varias intervenciones
+  // repetidas, se muestra una sola vez (nos quedamos con la primera, ya ordenada por fecha)
+  const _urlsVistas=new Set();
+  const todasLasFotosSinDup=todasLasFotos.filter(f=>{
+    if(_urlsVistas.has(f.url)) return false;
+    _urlsVistas.add(f.url);
+    return true;
+  });
+  todasLasFotos.length=0;
+  todasLasFotos.push(...todasLasFotosSinDup);
 
   const clientesConFotos=[...new Set(todasLasFotos.map(f=>f.cliente))].sort();
   let html='';
