@@ -1684,7 +1684,7 @@ tbody tr:hover{background:#f8faff;}
         <div class="foto-preview-grid" id="resFotoPreview"></div>
       </div>
     </div>
-    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mCorrectivoRes')">Cancelar</button><button class="btn-primary" id="btnGuardarResCorrectivo" onclick="guardarResolucionCorrectivo()">💾 Guardar resolución</button></div>
+    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mCorrectivoRes')">Cancelar</button><button class="btn-primary" onclick="guardarResolucionCorrectivo()">💾 Guardar resolución</button></div>
   </div>
 </div>
   </div>
@@ -6279,10 +6279,6 @@ async function guardarResolucionCorrectivo(){
   const tecnico=document.getElementById('resTecnico').value.trim();
   const descripcion=document.getElementById('resDesc').value.trim();
   if(!fecha||!tecnico||!descripcion){showToast('Completá todos los campos de resolución',true);return;}
-  const original=intervenciones.find(x=>x.id===id);
-  if(original&&original.correctivo_resuelto){showToast('Este correctivo ya fue resuelto antes — cerrá esta ventana',true);return;}
-  const btnRes=document.getElementById('btnGuardarResCorrectivo');
-  if(btnRes) btnRes.disabled=true;
   showToast('Guardando resolución...');
   try{
     let fotosUrls=[];
@@ -6317,7 +6313,6 @@ async function guardarResolucionCorrectivo(){
     await loadIntervenciones();
     calcAlertas();
   }catch(e){showToast('Error: '+e.message,true);}
-  finally{ if(btnRes) btnRes.disabled=false; }
 }
 
 async function renderGaleria(){
@@ -10357,35 +10352,19 @@ function renderBalanceServiceContenido(trabajos, gananciasTasa) {
   }
 
   if (!totalTrabajos) {
-    html += '<div style="padding:32px;text-align:center;color:var(--text-dim);font-size:13px;">📭 No hay trabajos de Service finalizados en el período.</div>';
+    html += '<div style="padding:32px;text-align:center;color:var(--text-dim);font-size:13px;">📭 No hay trabajos en el período.</div>';
   } else {
-    html += '<div class="table-wrap"><table>'
-      + '<thead><tr><th>Cliente</th><th>N°</th><th>Ingreso</th><th>M. Obra</th><th>Materiales</th><th>Otros</th><th>IIBB</th><th>Margen</th><th style="width:64px;"></th></tr></thead><tbody>'
-      + trabajos.map(function(t) {
-          const p = t.ppto, b = t.balance;
-          const esUSD = b.moneda === 'USD';
-          const ingresoCell = esUSD
-            ? '<div>U$D ' + Number(p.precio_total || 0).toLocaleString('es-AR') + '</div>'
-              + (b.tipoCambio ? '<div style="font-size:10px;color:var(--text-dim);">≈ ' + fmt(b.ingreso) + '</div>' : '<div style="font-size:10px;color:var(--red);">falta TC</div>')
-            : fmt(b.ingreso);
-          const margenColor = b.margen === null ? 'var(--text-muted)' : (b.margen >= 0 ? 'var(--green)' : 'var(--red)');
-          const margenCell = b.margen === null ? '— falta TC' : fmt(b.margen);
-          const btnTC = esUSD
-            ? '<button onclick="mCargarTipoCambio(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (b.tipoCambio ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;" title="' + (b.tipoCambio ? 'Tipo de cambio cargado · Editar' : 'Cargar tipo de cambio') + '">💱</button>'
-            : '';
-          return '<tr>'
-            + '<td class="td-name">' + escapeHtml(p.cliente_nombre || '—') + '</td>'
-            + '<td class="td-mono" style="font-size:11px;">' + escapeHtml(p.numero || '—') + '</td>'
-            + '<td class="td-mono">' + ingresoCell + '</td>'
-            + '<td class="td-mono">' + fmt(b.costoManoObra) + '</td>'
-            + '<td class="td-mono">' + fmt(b.costoMateriales) + '</td>'
-            + '<td class="td-mono">' + fmt(b.costoOtros || 0) + '</td>'
-            + '<td class="td-mono">' + fmt(b.iibb) + '</td>'
-            + '<td class="td-mono" style="font-weight:700;color:' + margenColor + ';">' + margenCell + '</td>'
-            + '<td><button onclick="abrirEditorCostos(\'' + p.id + '\')" style="background:none;border:none;cursor:pointer;font-size:13px;color:' + (b.tieneCostos ? 'var(--green)' : 'var(--text-muted)') + ';padding:2px 4px;border-radius:4px;" title="' + (b.tieneCostos ? 'Editar costos' : 'Cargar costos') + '">💲</button>' + btnTC + '</td>'
-            + '</tr>';
-        }).join('')
-      + '</tbody></table></div>';
+    const periodosMensuales = segAgregarPorPeriodo(trabajos, segPeriodoMensual);
+    const graficoUrl = segDibujarGraficoEvolucion(periodosMensuales, '#2563eb', '#059669');
+    html += '<div class="dash-section-title" style="margin-top:4px;">📈 Producción por mes</div>';
+    if (graficoUrl) {
+      html += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;overflow-x:auto;">'
+        + '<img src="' + graficoUrl + '" style="display:block;max-width:100%;height:auto;"/>'
+        + '</div>';
+    } else {
+      html += '<div style="padding:20px;text-align:center;color:var(--text-dim);font-size:12px;">Sin datos suficientes todavía para graficar.</div>';
+    }
+    html += '<div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Detalle trabajo por trabajo: exportá el Excel desde Presupuestos ("📊 Exportar Balance").</div>';
   }
 
   return html;
