@@ -1011,7 +1011,7 @@ tbody tr:hover{background:#f8faff;}
         <label>Usuario</label>
         <div class="login-input-wrap">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-          <input type="text" id="loginUser" placeholder="Tu usuario" autocomplete="username"/>
+          <input type="text" id="loginUser" placeholder="Tu usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"/>
         </div>
       </div>
       <div class="login-field">
@@ -2956,7 +2956,7 @@ async function doLogin(){
     const authRes=await fetch(SURL+'/auth/v1/token?grant_type=password',{
       method:'POST',
       headers:{'apikey':SKEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email:u+'@'+AUTH_DOMAIN,password:p})
+      body:JSON.stringify({email:u.toLowerCase().replace(/\s+/g,'')+'@'+AUTH_DOMAIN,password:p})
     });
     if(authRes.ok){
       const session=await authRes.json();
