@@ -1684,7 +1684,7 @@ tbody tr:hover{background:#f8faff;}
         <div class="foto-preview-grid" id="resFotoPreview"></div>
       </div>
     </div>
-    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mCorrectivoRes')">Cancelar</button><button class="btn-primary" onclick="guardarResolucionCorrectivo()">💾 Guardar resolución</button></div>
+    <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mCorrectivoRes')">Cancelar</button><button class="btn-primary" id="btnGuardarResCorrectivo" onclick="guardarResolucionCorrectivo()">💾 Guardar resolución</button></div>
   </div>
 </div>
   </div>
@@ -6279,6 +6279,10 @@ async function guardarResolucionCorrectivo(){
   const tecnico=document.getElementById('resTecnico').value.trim();
   const descripcion=document.getElementById('resDesc').value.trim();
   if(!fecha||!tecnico||!descripcion){showToast('Completá todos los campos de resolución',true);return;}
+  const original=intervenciones.find(x=>x.id===id);
+  if(original&&original.correctivo_resuelto){showToast('Este correctivo ya fue resuelto antes — cerrá esta ventana',true);return;}
+  const btnRes=document.getElementById('btnGuardarResCorrectivo');
+  if(btnRes) btnRes.disabled=true;
   showToast('Guardando resolución...');
   try{
     let fotosUrls=[];
@@ -6313,6 +6317,7 @@ async function guardarResolucionCorrectivo(){
     await loadIntervenciones();
     calcAlertas();
   }catch(e){showToast('Error: '+e.message,true);}
+  finally{ if(btnRes) btnRes.disabled=false; }
 }
 
 async function renderGaleria(){
