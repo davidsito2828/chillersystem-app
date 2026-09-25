@@ -5099,8 +5099,6 @@ function abrirServiceEq(eqId){
   if(tipoVisitaService==='reclamo'||tipoVisitaService==='correctivo'){
     if(!reclamoEquiposRevisados.includes(eqId)) reclamoEquiposRevisados.push(eqId);
     document.getElementById('sTipoSelectorWrap').style.display='none';
-    setServiceTipo('Correctivo');
-    document.getElementById('sTrabajoLabel').textContent=tipoVisitaService==='reclamo'?'Notas de la atención del reclamo':'Descripción del correctivo realizado';
   }else{
     document.getElementById('sTipoSelectorWrap').style.display='';
   }
@@ -5123,7 +5121,7 @@ function abrirServiceEq(eqId){
     document.getElementById('sCorrienteComp').value=p.lecturas_operativas?.corriente_compresor||'';
     document.getElementById('sCargaGas').value=p.lecturas_operativas?.carga_gas||'';
     document.getElementById('sRepuestos').value=p.repuestos||'';
-    setServiceTipo(p.tipo||'Preventivo');
+    setServiceTipo(p.tipo||(tipoVisitaService!=='preventivo'?'Correctivo':'Preventivo'));
   }
   document.getElementById('mServiceEq').classList.add('open');
 }
@@ -5458,11 +5456,12 @@ async function guardarSoloPreventivo(){
       const p=servicePlanilla[eq.id];
       const frec=eq.frecuencia_dias||30;
       if(p){
-        // Subir fotos si hay
-        let fotosUrls=[];
+        // Subir fotos nuevas si hay, y sumarlas a las que ya se hubieran guardado antes en esta misma visita
+        let fotosNuevasUrls=[];
         if(p.fotos_nuevas&&p.fotos_nuevas.length){
-          try{ fotosUrls=await subirFotos(p.fotos_nuevas,'service'); }catch(e){console.warn('[fotos eq]',e);}
+          try{ fotosNuevasUrls=await subirFotos(p.fotos_nuevas,'service'); }catch(e){console.warn('[fotos eq]',e);}
         }
+        const fotosUrls=[...(p.fotos_guardadas||[]),...fotosNuevasUrls];
         // Guardar intervención individual por equipo (con lecturas y fotos)
         const eqData={
           equipo_id:eq.id, tipo:p.tipo||'Preventivo', fecha,
@@ -5480,8 +5479,19 @@ async function guardarSoloPreventivo(){
           precision_gps: coords?.precision_gps || null,
           firma:firma, es_planilla:true
         };
-        const eqRes=await api('intervenciones',{method:'POST',body:JSON.stringify(eqData),headers:{...H,'Prefer':'return=representation'}});
-        const eqIntervId=Array.isArray(eqRes)?eqRes[0]?.id:eqRes?.id;
+        let eqIntervId;
+        if(p.intervencion_id){
+          // Ya se guardó este equipo en esta misma visita: actualizar, no duplicar
+          await api('intervenciones?id=eq.'+p.intervencion_id,{method:'PATCH',body:JSON.stringify(eqData),headers:{...H,'Prefer':'return=minimal'}});
+          eqIntervId=p.intervencion_id;
+          await api('tareas_realizadas?intervencion_id=eq.'+eqIntervId,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+        }else{
+          const eqRes=await api('intervenciones',{method:'POST',body:JSON.stringify(eqData),headers:{...H,'Prefer':'return=representation'}});
+          eqIntervId=Array.isArray(eqRes)?eqRes[0]?.id:eqRes?.id;
+        }
+        p.intervencion_id=eqIntervId;
+        p.fotos_guardadas=fotosUrls;
+        p.fotos_nuevas=[];
         // Actualizar preventivo del equipo
         if(p.tipo!=='Correctivo'){
           await api('equipos?id=eq.'+eq.id,{method:'PATCH',body:JSON.stringify({ultimo_preventivo:fecha,proximo_preventivo:calcProx(fecha,frec),ignorar_alarma:false}),headers:{...H,'Prefer':'return=minimal'}});
@@ -5617,9 +5627,10 @@ async function guardarPlanilla(){
   try{
     for(const eqId of Object.keys(servicePlanilla)){
       const p=servicePlanilla[eqId];
-      let fotosUrls=[];
+      let fotosNuevasUrls=[];
       debug('[Fotos] equipo:',eqId,'fotos:',p.fotos_nuevas?.length);
-      if(p.fotos_nuevas&&p.fotos_nuevas.length) fotosUrls=await subirFotos(p.fotos_nuevas,'service');
+      if(p.fotos_nuevas&&p.fotos_nuevas.length) fotosNuevasUrls=await subirFotos(p.fotos_nuevas,'service');
+      const fotosUrls=[...(p.fotos_guardadas||[]),...fotosNuevasUrls];
       const descCorr=p.tipo==='Correctivo'
         ?([p.desc_correctivo,p.necesita_resolucion?'Necesita: '+p.necesita_resolucion:null].filter(Boolean).join(' — '))
         :p.trabajo;
@@ -5636,8 +5647,19 @@ async function guardarPlanilla(){
         longitud: coords?.longitud || null,
         precision_gps: coords?.precision_gps || null,
         firma:firma,es_planilla:true};
-      const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
-      const intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
+      let intervId;
+      if(p.intervencion_id){
+        // Ya se guardó este equipo en esta misma visita: actualizar, no duplicar
+        await api('intervenciones?id=eq.'+p.intervencion_id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
+        intervId=p.intervencion_id;
+        await api('tareas_realizadas?intervencion_id=eq.'+intervId,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}}).catch(()=>{});
+      }else{
+        const intervRes=await api('intervenciones',{method:'POST',body:JSON.stringify(data),headers:{...H,'Prefer':'return=representation'}});
+        intervId=Array.isArray(intervRes)?intervRes[0]?.id:intervRes?.id;
+      }
+      p.intervencion_id=intervId;
+      p.fotos_guardadas=fotosUrls;
+      p.fotos_nuevas=[];
       if(p.tipo!=='Correctivo'){
         const eq=equipos.find(e=>e.id===eqId);
         const frec=eq?eq.frecuencia_dias||30:30;
