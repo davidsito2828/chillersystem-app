@@ -10376,7 +10376,7 @@ async function renderBalanceService() {
   el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);">Calculando balance...</div>';
   try {
     const [pptos, costosArr, tarifas, impuestos] = await Promise.all([
-      api('presupuestos?select=*&fecha=gte.' + FECHA_INICIO_SEGUIMIENTO + '&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.asc'),
+      api('presupuestos?select=*&estado_flujo=in.(aprobado_cliente,en_ejecucion,finalizado)&fecha=gte.' + FECHA_INICIO_SEGUIMIENTO + '&or=(origen.is.null,origen.not.in.(comercial_david,comercial_david_historico))&order=fecha.asc'),
       api('costos_trabajo?select=*'),
       api('config_horas_hombre?select=*'),
       api('config_impuestos?select=*')
