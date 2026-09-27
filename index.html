@@ -294,6 +294,10 @@ body{
   box-shadow:inset 0 2px 0 var(--accent);
 }
 .nav-btn.hidden{display:none;}
+.nav-group{display:flex;align-items:center;gap:2px;flex-wrap:wrap;border-left:1px solid var(--border);padding-left:6px;margin-left:2px;}
+.nav-group:first-child{border-left:0;padding-left:0;margin-left:0;}
+.nav-group-label{display:none;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);font-weight:800;padding:0 4px;}
+@media(max-width:700px){.nav{align-items:flex-start;gap:5px;}.nav-group{border-left:0;padding:0;margin:0;}.nav-group-label{display:block;width:100%;}.nav-group-admin,.nav-group-personal{display:none;}}
 
 /* ── INICIO (dashboard opcional, delega en botones reales) ── */
 .inicio-hero{background:var(--bg-header);color:#fff;padding:16px 20px;font-size:14px;font-weight:800;}
@@ -1139,23 +1143,31 @@ tbody tr:hover{background:#f8faff;}
 </div>
 
 <!-- TABS -->
-<div class="nav" id="navBar">
-  <button class="nav-btn" id="tabInicio" onclick="showTab('inicio',this)">🏠 Inicio</button>
-  <button class="nav-btn active" id="tabCli" onclick="showTab('clientes',this)">🏢 Clientes</button>
-  <button class="nav-btn" id="tabEq" onclick="showTab('equipos',this)">⚙️ Equipos</button>
-  <button class="nav-btn" id="tabHist" onclick="showTab('historial',this)">📋 Historial</button>
-  <button class="nav-btn hidden" id="tabUsers" onclick="showTab('usuarios',this)">👥 Usuarios</button>
-  <button class="nav-btn" id="tabService" onclick="showTab('service',this)">🔧 Service</button>
-  <button class="nav-btn" id="tabEventual" onclick="showTab('eventual',this)">🔖 Eventuales</button>
-  <button class="nav-btn admin-only" id="tabPpto" onclick="showTab('presupuestos',this)">💼 Presupuestos</button>
-  <button class="nav-btn admin-only" id="tabInformes" onclick="showTab('informes',this)">📊 Informes</button>
-  <button class="nav-btn" id="tabGaleria" onclick="showTab('galeria',this)">📷 Galería</button>
-  <button class="nav-btn" id="tabTareas" onclick="showTab('tareas',this)">⚙️ Config. Tareas</button>
-  <button class="nav-btn admin-only" id="tabAprobaciones" onclick="showTab('aprobaciones',this)">✅ Aprobaciones</button>
-  <button class="nav-btn" id="tabEstadisticas" onclick="showTab('estadisticas',this)">📊 Estadísticas</button>
-  <button class="nav-btn admin-only" id="tabFichajes" onclick="showTab('fichajes',this)">📍 Tiempos/Rutas</button>
-  <button class="nav-btn" id="tabMiPanel" onclick="showTab('mipanel',this)" style="display:none;">🗂️ Mi Panel</button>
-  <button class="nav-btn" id="tabCronograma" onclick="showTab('cronograma',this)" style="display:none;">🗓️ Cronograma</button>
+<div class="nav" id="navBar" aria-label="Módulos de la aplicación">
+  <div class="nav-group"><span class="nav-group-label">Operación</span>
+    <button class="nav-btn" id="tabInicio" data-module="inicio" onclick="showTab('inicio',this)">🏠 Inicio</button>
+    <button class="nav-btn" id="tabEq" data-module="equipos" onclick="showTab('equipos',this)">⚙️ Equipos</button>
+    <button class="nav-btn" id="tabHist" data-module="historial" onclick="showTab('historial',this)">📋 Historial</button>
+    <button class="nav-btn" id="tabService" data-module="service" onclick="showTab('service',this)">🔧 Service</button>
+    <button class="nav-btn" id="tabEventual" data-module="eventual" onclick="showTab('eventual',this)">🔖 Eventuales</button>
+    <button class="nav-btn" id="tabGaleria" data-module="galeria" onclick="showTab('galeria',this)">📷 Galería</button>
+  </div>
+  <div class="nav-group"><span class="nav-group-label">Gestión</span>
+    <button class="nav-btn active" id="tabCli" data-module="clientes" onclick="showTab('clientes',this)">🏢 Clientes</button>
+    <button class="nav-btn" id="tabPpto" data-module="presupuestos" onclick="showTab('presupuestos',this)">💼 Presupuestos</button>
+    <button class="nav-btn" id="tabInformes" data-module="informes" onclick="showTab('informes',this)">📊 Informes</button>
+    <button class="nav-btn" id="tabEstadisticas" data-module="estadisticas" onclick="showTab('estadisticas',this)">📈 Estadísticas</button>
+    <button class="nav-btn" id="tabTareas" data-module="tareas" onclick="showTab('tareas',this)">⚙️ Config. tareas</button>
+  </div>
+  <div class="nav-group nav-group-admin"><span class="nav-group-label">Administración</span>
+    <button class="nav-btn" id="tabUsers" data-module="usuarios" onclick="showTab('usuarios',this)">👥 Usuarios</button>
+    <button class="nav-btn" id="tabAprobaciones" data-module="aprobaciones" onclick="showTab('aprobaciones',this)">✅ Aprobaciones</button>
+    <button class="nav-btn" id="tabFichajes" data-module="fichajes" onclick="showTab('fichajes',this)">📍 Tiempos/Rutas</button>
+  </div>
+  <div class="nav-group nav-group-personal"><span class="nav-group-label">Personal</span>
+    <button class="nav-btn" id="tabMiPanel" data-module="mipanel" onclick="showTab('mipanel',this)" style="display:none;">🗂️ Mi Panel</button>
+    <button class="nav-btn" id="tabCronograma" data-module="cronograma" onclick="showTab('cronograma',this)" style="display:none;">🗓️ Cronograma</button>
+  </div>
 </div>
 
 <!-- ═══ INICIO (dashboard opcional) ═══ -->
@@ -1199,7 +1211,7 @@ tbody tr:hover{background:#f8faff;}
     <div><div class="panel-title">🏢 Clientes</div><div class="panel-count" id="cliCount">—</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <input class="search-box" type="text" placeholder="🔍 Buscar..." oninput="filtrarCli(this.value)"/>
-      <button class="btn-primary admin-only" onclick="abrirModalCli()">＋ Nuevo cliente</button>
+      <button class="btn-primary" data-permission="clientes.manage" onclick="abrirModalCli()">＋ Nuevo cliente</button>
     </div>
   </div>
   <div id="clientesList"><div class="loading"><span class="spinner"></span>Cargando...</div></div>
@@ -1211,7 +1223,7 @@ tbody tr:hover{background:#f8faff;}
     <div><div class="panel-title">⚙️ Equipos</div><div class="panel-count" id="eqCount">—</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <input class="search-box" type="text" placeholder="🔍 Buscar..." oninput="filtrarEq(this.value)"/>
-      <button class="btn-primary" onclick="abrirModalEq()">＋ Nuevo equipo</button>
+      <button class="btn-primary" data-permission="equipos.manage" onclick="abrirModalEq()">＋ Nuevo equipo</button>
     </div>
   </div>
   <div class="table-wrap">
@@ -1725,7 +1737,7 @@ tbody tr:hover{background:#f8faff;}
     <div><div class="panel-title">🔖 Clientes Eventuales</div><div class="panel-count" id="eventualCount">—</div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <input class="search-box" type="text" placeholder="🔍 Buscar..." oninput="filtrarEventuales(this.value)"/>
-      <button class="btn-primary" onclick="abrirModalEventual()">＋ Nuevo cliente eventual</button>
+      <button class="btn-primary" data-permission="eventual.manage" onclick="abrirModalEventual()">＋ Nuevo cliente eventual</button>
     </div>
   </div>
   <div id="eventualList"><div class="loading"><span class="spinner"></span>Cargando...</div></div>
@@ -1815,8 +1827,8 @@ tbody tr:hover{background:#f8faff;}
         <option value="finalizado">🏁 Finalizado</option>
         <option value="rechazado">❌ Rechazado</option>
       </select>
-      <button class="btn-primary" onclick="abrirModalPpto()">＋ Nuevo presupuesto</button>
-      <button class="btn-secondary" onclick="abrirModalCargarPpto()">📎 Cargar presupuesto</button>
+      <button class="btn-primary" data-permission="presupuestos.edit" onclick="abrirModalPpto()">＋ Nuevo presupuesto</button>
+      <button class="btn-secondary" data-permission="presupuestos.edit" onclick="abrirModalCargarPpto()">📎 Cargar presupuesto</button>
       <button class="btn-secondary" onclick="exportarSeguimientoExcel()">📊 Exportar Balance</button>
     </div>
   </div>
@@ -2050,7 +2062,7 @@ tbody tr:hover{background:#f8faff;}
         <option value="borrador">🔴 Borrador</option>
         <option value="aprobado">✅ Aprobado</option>
       </select>
-      <button class="btn-primary" onclick="abrirModalInforme()">＋ Nuevo informe</button>
+      <button class="btn-primary" data-permission="informes.manage" onclick="abrirModalInforme()">＋ Nuevo informe</button>
     </div>
   </div>
   <div class="table-wrap">
@@ -2616,14 +2628,45 @@ let dismissedAlertas=new Set(); // alertas descartadas temporalmente
 let aprobaciones=[]; // preventivos pendientes/aprobados
 let notificaciones=[]; // notificaciones de facturación
 
-// ── Helpers de jerarquía ──────────────────
-function esGerencia(){return usuarioActual&&(usuarioActual.jerarquia==='gerencia'||usuarioActual.rol==='admin');}
-function esSupervisorAdmin(){return usuarioActual&&usuarioActual.jerarquia==='supervisor_admin';}
-function esAdministrativo(){return usuarioActual&&usuarioActual.jerarquia==='administrativo';}
-function esTecnico(){return usuarioActual&&usuarioActual.jerarquia==='tecnico';}
+// ── Helpers de jerarquía y permisos de interfaz ─────────────────────────────
+// No crea roles: consume únicamente rol/jerarquia que ya entrega la tabla usuarios.
+function esGerencia(){return !!usuarioActual&&(usuarioActual.jerarquia==='gerencia'||usuarioActual.rol==='admin');}
+function esSupervisorAdmin(){return !!usuarioActual&&usuarioActual.jerarquia==='supervisor_admin';}
+function esAdministrativo(){return !!usuarioActual&&usuarioActual.jerarquia==='administrativo';}
+function esTecnico(){return !!usuarioActual&&(usuarioActual.jerarquia==='tecnico'||usuarioActual.rol==='tecnico');}
+function puedeGestionarMaestros(){return esGerencia();}
+function puedeGestionarClientes(){return esGerencia()||esSupervisorAdmin();}
+function puedeGestionarEventuales(){return esGerencia()||esAdministrativo();}
 function puedeVerPresupuestos(){return esGerencia()||esSupervisorAdmin()||esAdministrativo();}
 function puedeEditarPresupuestos(){return esGerencia();}
 function puedeAvanzarEstadoPpto(){return esGerencia()||esAdministrativo();}
+function puedeVerInformes(){return puedeVerPresupuestos();}
+function puedeVerTareas(){return !esTecnico();}
+function puedeVerAprobaciones(){return esGerencia()||esSupervisorAdmin();}
+function puedeVerModulo(id){
+  const acceso={inicio:true,equipos:true,historial:true,service:true,galeria:!esTecnico(),
+    clientes:puedeGestionarClientes(),eventual:puedeGestionarEventuales(),presupuestos:puedeVerPresupuestos(),
+    informes:puedeVerInformes(),tareas:puedeVerTareas(),aprobaciones:puedeVerAprobaciones(),
+    estadisticas:esGerencia()||esSupervisorAdmin(),fichajes:esGerencia(),
+    usuarios:esGerencia(),mipanel:!!usuarioActual&&usuarioActual.id===DAVID_USER_ID,
+    cronograma:!!usuarioActual&&usuarioActual.id===DAVID_USER_ID};
+  return !!acceso[id];
+}
+function puedeAccion(id){
+  const acceso={'clientes.manage':puedeGestionarClientes(),'equipos.manage':puedeGestionarMaestros(),
+    'eventual.manage':puedeGestionarEventuales(),'presupuestos.edit':puedeEditarPresupuestos(),
+    'presupuestos.advance':puedeAvanzarEstadoPpto(),'informes.manage':esGerencia(),
+    'tareas.manage':esGerencia(),'aprobaciones.manage':esGerencia()};
+  return !!acceso[id];
+}
+function exigirPermiso(check,mensaje='No tenés permiso para realizar esta acción'){
+  if(check) return true; showToast('⛔ '+mensaje,true); return false;
+}
+function aplicarPermisosUI(){
+  document.querySelectorAll('[data-module]').forEach(el=>{el.style.display=puedeVerModulo(el.dataset.module)?'':'none';});
+  document.querySelectorAll('[data-permission]').forEach(el=>{el.style.display=puedeAccion(el.dataset.permission)?'':'none';});
+  document.getElementById('empresaFilter').style.display=esGerencia()?'flex':'none';
+}
 
 // ── Constantes flujo presupuestos ─────────
 const ESTADOS_FLUJO=['borrador','en_revision','enviado','aprobado_cliente','en_ejecucion','finalizado'];
@@ -3065,26 +3108,11 @@ async function iniciarApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appScreen').style.display='block';
   document.getElementById('userNombre').textContent=usuarioActual.nombre;
-  const isAdmin=usuarioActual.rol==='admin';
-  const esJefatura=['admin','gerencia'].includes(usuarioActual.rol);
-  
-  document.getElementById('userRolBadge').textContent=isAdmin?'Admin':(esJefatura?'Gerencia':'Técnico');
+  const esJefatura=esGerencia();
+  document.getElementById('userRolBadge').textContent=esGerencia()?'Gerencia':(esSupervisorAdmin()?'Supervisión':(esAdministrativo()?'Administración':'Técnico'));
   document.getElementById('userRolBadge').className=esJefatura?'rol-admin':'rol-tecnico';
-  // Mostrar/ocultar según rol
-  document.getElementById('empresaFilter').style.display=isAdmin?'flex':'none';
-  document.getElementById('tabCli').style.display=isAdmin?'':'none';
-  document.getElementById('tabUsers').classList.toggle('hidden',!isAdmin);
-  document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
-  document.getElementById('tabGaleria').style.display=puedeVerGaleria()?'':'none';
-  document.getElementById('tabEstadisticas').style.display=puedeVerEstadisticas()?'':'none';
-  document.getElementById('tabMiPanel').style.display=(usuarioActual.id===DAVID_USER_ID)?'':'none';
-  document.getElementById('tabCronograma').style.display=(usuarioActual.id===DAVID_USER_ID)?'':'none';
-  
-  // Excepción exclusiva: Fichajes sí lo ve gerencia
-  const tabFichajes = document.getElementById('tabFichajes');
-  if(tabFichajes) tabFichajes.style.display = esJefatura ? '' : 'none';
-
-  // EXIGIR GPS PARA TÉCNICOS (Admin/Gerencia se lo saltan)
+  aplicarPermisosUI();
+  // EXIGIR GPS PARA TÉCNICOS (jefatura se lo salta)
   if(!esJefatura){
     document.getElementById('tab-clientes').style.display='none';
     document.getElementById('tab-equipos').style.display='block';
@@ -3336,7 +3364,7 @@ async function toggleJornada(){
 let fichajesGlobal = [];
 
 async function loadFichajes(){
-  const esJefatura = ['admin','gerencia'].includes(usuarioActual.rol);
+  const esJefatura = esGerencia();
   if(!esJefatura) return;
   
   const fechaInput = document.getElementById('fFiltroFecha');
@@ -3992,7 +4020,7 @@ function renderCli(lista){
   document.getElementById('cliCount').textContent=lista.length+' cliente(s)';
   const el=document.getElementById('clientesList');
   if(!lista.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">Sin clientes</div></div>`;return;}
-  const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
+  const isAdmin=puedeGestionarClientes();
   el.innerHTML=lista.map(c=>{
     const eqs=equipos.filter(e=>e.cliente_id===c.id);
     const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
@@ -4064,6 +4092,7 @@ function toggleExp(id){expandidos.has(id)?expandidos.delete(id):expandidos.add(i
 function filtrarCli(q){renderCli(clisFiltrados().filter(c=>c.nombre.toLowerCase().includes(q.toLowerCase())));}
 
 async function guardarCli(){
+  if(!exigirPermiso(puedeGestionarClientes(),'Solo supervisión o gerencia puede modificar clientes')) return;
   const id=document.getElementById('cliId').value;
   const nom=document.getElementById('cNom').value.trim();
   if(!nom){showToast('Nombre obligatorio',true);return;}
@@ -4081,12 +4110,14 @@ async function guardarCli(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 async function elimCli(id,nom){
+  if(!exigirPermiso(puedeGestionarClientes(),'Solo supervisión o gerencia puede eliminar clientes')) return;
   if(!confirm(`¿Eliminar "${nom}"?`))return;
   try{await api(`clientes?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones()]);}
   catch(e){showToast('Error',true);}
 }
 function abrirModalCli(id=null){
+  if(!exigirPermiso(puedeGestionarClientes(),'Solo supervisión o gerencia puede gestionar clientes')) return;
   ['cliId','cNom','cCont','cTel','cEmail','cDir','cNot'].forEach(x=>document.getElementById(x).value='');
   selEmp('ChillerSystem');
   if(id){
@@ -4134,7 +4165,7 @@ function badgeEst(e){
 function renderEq(lista){
   document.getElementById('eqCount').textContent=lista.length+' equipo(s)';
   const tb=document.getElementById('eqBody');
-  const isAdmin=usuarioActual&&usuarioActual.rol==='admin';
+  const isAdmin=puedeGestionarMaestros();
   if(!lista.length){tb.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Sin equipos</div></div></td></tr>`;return;}
   tb.innerHTML=lista.map(e=>{
     const c=clientes.find(x=>x.id===e.cliente_id);
@@ -4159,6 +4190,7 @@ function renderEq(lista){
 function filtrarEq(q){renderEq(eqsFiltrados().filter(e=>e.nombre.toLowerCase().includes(q.toLowerCase())||(e.marca||'').toLowerCase().includes(q.toLowerCase())));}
 
 async function guardarEq(){
+  if(!exigirPermiso(puedeGestionarMaestros(),'Solo gerencia puede modificar equipos')) return;
   const id=document.getElementById('eqId').value;
   const nom=document.getElementById('eNom').value.trim();
   const cid=document.getElementById('eCliId').value;
@@ -4191,12 +4223,14 @@ async function guardarEq(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 async function elimEq(id,nom){
+  if(!exigirPermiso(puedeGestionarMaestros(),'Solo gerencia puede eliminar equipos')) return;
   if(!confirm(`¿Eliminar "${nom}"?`))return;
   try{await api(`equipos?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await Promise.all([loadEquipos(),loadClientes(),loadIntervenciones()]);}
   catch(e){showToast('Error',true);}
 }
 function abrirModalEq(id=null,cliPre=null){
+  if(!exigirPermiso(puedeGestionarMaestros(),'Solo gerencia puede gestionar equipos')) return;
   ['eqId','eNom','eMarca','eModelo','eNserie','eUbic','eNotas','eUltPrev','eCapacidad'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('eUnidadCap').value='';
   document.getElementById('eTipo').value='';document.getElementById('eEst').value='Operativo';
@@ -4318,8 +4352,8 @@ function renderIntervItem(i){
   let html='<div class="interv-item" style="margin-bottom:'+(esCorrectivo?'10px':'6px')+';'+(esCorrectivo?'border-left:3px solid '+(tieneResolucion?'var(--green)':'var(--red)')+';padding-left:10px;':'')+'">';
 
   // ENCABEZADO con botones editar/eliminar
-  const puedeEditar=usuarioActual&&(usuarioActual.rol==='admin'||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
-  const puedeEliminar=usuarioActual&&(usuarioActual.rol==='admin'||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
+  const puedeEditar=usuarioActual&&(esGerencia()||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
+  const puedeEliminar=usuarioActual&&(esGerencia()||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
   html+='<div class="interv-header" style="justify-content:flex-start;">';
   html+=esCorrectivo?'<span class="badge b-correctivo">🔴 Correctivo</span>':'<span class="badge b-preventivo2">'+i.tipo+'</span>';
   html+='<span class="interv-fecha">'+fmtF(i.fecha)+'</span>';
@@ -4477,9 +4511,9 @@ function renderHist(){
 }
 
 async function guardarInterv(){
-  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&usuarioActual.rol!=='admin'){
+  if(usuarioActual&&!esGerencia()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -4585,9 +4619,9 @@ function agregarCompletarFotos(files){
 }
 
 async function guardarCompletarDatos(){
-  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&usuarioActual.rol!=='admin'){
+  if(usuarioActual&&!esGerencia()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -4726,6 +4760,7 @@ function renderUsers(){
 }
 
 async function guardarUser(){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede modificar usuarios')) return;
   const id=document.getElementById('userId').value;
   const nom=document.getElementById('uNom').value.trim();
   const usr=document.getElementById('uUser').value.trim();
@@ -4761,11 +4796,13 @@ async function guardarUser(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 async function elimUser(id,nom){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede eliminar usuarios')) return;
   if(!confirm('¿Eliminar usuario "'+nom+'"?'))return;
   try{await api('usuarios?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await loadUsuarios();}catch(e){showToast('Error',true);}
 }
 function abrirModalUser(id=null){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede gestionar usuarios')) return;
   ['userId','uNom','uUser','uPass'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('uRol').value='tecnico';document.getElementById('uActivo').value='true';
   if(id){
@@ -5446,9 +5483,9 @@ function guardarServiceEq(){
   guardarServiceEq._running=false;
 }
 async function guardarSoloPreventivo(){
-  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&usuarioActual.rol!=='admin'){
+  if(usuarioActual&&!esGerencia()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -5631,9 +5668,9 @@ async function guardarSoloPreventivo(){
 }
 
 async function guardarPlanilla(){
-  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&usuarioActual.rol!=='admin'){
+  if(usuarioActual&&!esGerencia()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -6107,6 +6144,7 @@ ${a.nombre_firmante?`<div style="font-size:11px;color:#555;margin-top:4px;">Firm
 }
 
 async function aprobarPreventivo(id){
+  if(!exigirPermiso(puedeVerAprobaciones(),'Solo supervisión o gerencia puede aprobar preventivos')) return;
   const aprobacion=aprobaciones.find(a=>a.id===id);
   if(!aprobacion) return;
   showToast('Aprobando...');
@@ -6157,6 +6195,7 @@ function aprobarGrupoPreventivosClick(btn){
 }
 
 async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
+  if(!exigirPermiso(puedeVerAprobaciones(),'Solo supervisión o gerencia puede aprobar preventivos')) return;
   if(!Array.isArray(grupoIds)){
     try{grupoIds=JSON.parse(grupoIds);}catch(e){grupoIds=[idPrincipal];}
   }
@@ -6193,6 +6232,7 @@ async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
 }
 
 async function eliminarAprobacion(idRepresentante,btn){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede eliminar aprobaciones')) return;
   let ids=[idRepresentante];
   if(btn&&btn.dataset.grupoIds){
     try{ const parsed=JSON.parse(btn.dataset.grupoIds); if(Array.isArray(parsed)&&parsed.length) ids=parsed; }catch(e){}
@@ -6295,9 +6335,9 @@ function abrirResolverCorrectivo(id){
 }
 
 async function guardarResolucionCorrectivo(){
-  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&usuarioActual.rol!=='admin'){
+  if(usuarioActual&&!esGerencia()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -6431,8 +6471,8 @@ function setFiltro(v,btn){
 function puedeVerGaleria(){return !esTecnico();}
 function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
 function showTab(id,btn){
-  if(id==='mipanel'&&(!usuarioActual||usuarioActual.id!==DAVID_USER_ID)){showToast('No tenés acceso a esta sección',true);return;}
-  if(id==='cronograma'&&(!usuarioActual||usuarioActual.id!==DAVID_USER_ID)){showToast('No tenés acceso a esta sección',true);return;}
+  if(!puedeVerModulo(id)){showToast('⛔ No tenés acceso a este módulo',true);return;}
+  aplicarPermisosUI();
   ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel','cronograma'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   const navBar=document.getElementById('navBar');
   if(navBar) navBar.style.display=id==='inicio'?'none':'flex';
@@ -6656,6 +6696,7 @@ function renderEventuales(lista){
 }
 
 function abrirModalEventual(id=null){
+  if(!exigirPermiso(puedeGestionarEventuales(),'Solo administración o gerencia puede gestionar eventuales')) return;
   ['eventualId','eNomEvt','eContEvt','eTelEvt','eEmailEvt','eDirEvt','eNotEvt'].forEach(x=>document.getElementById(x).value='');
   selEmpE('ChillerSystem');
   if(id){
@@ -6682,6 +6723,7 @@ function selEmpE(v){
 }
 
 async function guardarEventual(){
+  if(!exigirPermiso(puedeGestionarEventuales(),'Solo administración o gerencia puede modificar eventuales')) return;
   const id=document.getElementById('eventualId').value;
   const nom=document.getElementById('eNomEvt').value.trim();
   if(!nom){showToast('Nombre obligatorio',true);return;}
@@ -6734,9 +6776,10 @@ function abrirTrabajoEvt(cliId){
 }
 
 async function guardarTrabajoEvt(){
-  if(usuarioActual&&usuarioActual.rol!=='admin'&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(!exigirPermiso(puedeGestionarEventuales(),'Solo administración o gerencia puede registrar trabajos eventuales')) return;
+  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&usuarioActual.rol!=='admin'){
+  if(usuarioActual&&!esGerencia()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -7432,6 +7475,7 @@ function calcularTotal(){
 }
 
 function abrirModalPpto(id=null){
+  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede crear o editar presupuestos')) return;
   seccionesActuales=[];preciosActuales={};
   ['pptoId','pNumero','pClienteNombre','pClienteDireccion','pContacto','pReferencia','pFormaPago','pPlazo','pValidez','pNotas'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('pMoneda').value='ARS';
@@ -7478,6 +7522,7 @@ function abrirModalPpto(id=null){
 }
 
 async function guardarPpto(estado){
+  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede editar presupuestos')) return;
   const id=document.getElementById('pptoId').value;
   const numero=document.getElementById('pNumero').value.trim();
   const clienteNombre=document.getElementById('pClienteNombre').value.trim();
@@ -8525,6 +8570,7 @@ function _epElegir(opcion) {
 }
 
 async function guardarPptoComercial(){
+  if(!exigirPermiso(usuarioActual&&usuarioActual.id===DAVID_USER_ID,'No tenés acceso a este panel comercial')) return;
   const numero=document.getElementById('mpNumero').value.trim();
   const cliente=document.getElementById('mpCliente').value.trim();
   const detalle=document.getElementById('mpDetalle').value.trim();
@@ -8609,6 +8655,7 @@ function cpHandleDrop(files){
 }
 
 function abrirModalCargarPpto(){
+  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede cargar presupuestos')) return;
   ['cpNumero','cpClienteNombre','cpReferencia','cpMonto','cpMontoOpcional'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('cpFecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('cpMoneda').value='ARS';
@@ -8635,6 +8682,7 @@ async function subirArchivoPpto(file){
 }
 
 async function guardarCargarPpto(){
+  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede cargar presupuestos')) return;
   const numero=document.getElementById('cpNumero').value.trim();
   const clienteNombre=document.getElementById('cpClienteNombre').value.trim();
   const fecha=document.getElementById('cpFecha').value;
@@ -9234,6 +9282,7 @@ async function sincronizarCronograma(pId, nuevoEstado, ppto){
 }
 
 async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
+  if(!exigirPermiso(puedeAvanzarEstadoPpto(),'No tenés permiso para avanzar el estado del presupuesto')) return;
   const siguiente=siguienteEstado[estadoActual];
   if(!siguiente) return;
   let ppto=presupuestos.find(x=>x.id===pId);
@@ -9317,6 +9366,7 @@ async function toggleFacturacion(pptoId,tipo,checked){
 }
 
 async function retrocederEstadoPpto(pId,estadoActual,numero){
+  if(!exigirPermiso(puedeAvanzarEstadoPpto(),'No tenés permiso para retroceder el estado del presupuesto')) return;
   const estadoAnterior={
     'en_revision':'borrador',
     'enviado':'en_revision',
@@ -9342,6 +9392,7 @@ async function retrocederEstadoPpto(pId,estadoActual,numero){
 }
 
 async function rechazarPpto(pId,numero){
+  if(!exigirPermiso(puedeAvanzarEstadoPpto(),'No tenés permiso para rechazar presupuestos')) return;
   if(!confirm('❌ Rechazar Presupuesto #'+numero+'\n\nEl estado pasará a "Rechazado por cliente".\n¿Confirmar?')) return;
   const ppto=presupuestos.find(x=>x.id===pId);
   const historial=[...(ppto&&ppto.historial_estados||[])];
@@ -9358,6 +9409,7 @@ async function rechazarPpto(pId,numero){
 }
 
 async function reactivarPpto(pId,numero){
+  if(!exigirPermiso(puedeAvanzarEstadoPpto(),'No tenés permiso para reactivar presupuestos')) return;
   if(!confirm('↩️ Reactivar Presupuesto #'+numero+'\n\nEl estado volverá a "Enviado al cliente".\n¿Confirmar?')) return;
   const ppto=presupuestos.find(x=>x.id===pId);
   const historial=[...(ppto&&ppto.historial_estados||[])];
@@ -9779,6 +9831,7 @@ function abrirModalInforme(id=null){
 }
 
 async function guardarInforme(estado){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede modificar informes')) return;
   const id=document.getElementById('informeId').value;
   const numero=document.getElementById('iNumero').value.trim();
   const clienteNombre=document.getElementById('iClienteNombre').value.trim();
@@ -9826,6 +9879,7 @@ async function aprobarInforme(id){
 }
 
 async function elimInforme(id){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede eliminar informes')) return;
   if(!confirm('¿Eliminar este informe?'))return;
   try{await api('informes?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await loadInformes();}catch(e){showToast('Error',true);}
@@ -10065,6 +10119,7 @@ function instalarApp(){
   }
 }
 async function resetearPasswordUsuario(authUserId, email, nombre){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede resetear contraseñas')) return;
   if(!authUserId){
     showToast('Usuario sin link a Auth — no se puede resetear','error');
     return;
@@ -10612,6 +10667,7 @@ function renderConfigTareas(){
 }
 
 async function toggleTareaActiva(id, activa){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede configurar tareas')) return;
   try{
     await api(`tareas_configuracion?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({activa:!activa}),headers:{...H,'Prefer':'return=minimal'}});
     await loadTareasConfig();
@@ -10621,6 +10677,7 @@ async function toggleTareaActiva(id, activa){
 }
 
 async function guardarFrecuenciaTarea(id, dias){
+  if(!exigirPermiso(esGerencia(),'Solo gerencia puede configurar tareas')) return;
   const d=parseInt(dias);
   if(!d||d<1)return;
   try{
