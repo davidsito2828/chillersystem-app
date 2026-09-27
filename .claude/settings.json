@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/Users/Usuario/Desktop/chillersystem-app\" status)",
+      "Bash(git -C \"c:/Users/Usuario/Desktop/chillersystem-app\" pull --ff-only)",
+      "Bash(git -C \"c:/Users/Usuario/Desktop/chillersystem-app\" add index.html ls.jpeg)",
+      "Bash(git -C c:/Users/Usuario/Desktop/chillersystem-app commit -m ' *)",
+      "Bash(git -C \"c:/Users/Usuario/Desktop/chillersystem-app\" pull --rebase)",
+      "Bash(git -C \"c:/Users/Usuario/Desktop/chillersystem-app\" push)"
+    ]
+  }
+}
