@@ -330,6 +330,34 @@ body{
 .inicio-card-icon{font-size:24px;margin-bottom:6px;}
 .inicio-card-label{font-size:11px;font-weight:700;color:var(--text);}
 
+/* ── TABLERO OPERATIVO INICIAL ── */
+.inicio-dashboard{display:flex;flex-direction:column;gap:16px;}
+.inicio-dashboard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.inicio-dashboard-kicker{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);font-weight:800;}
+.inicio-dashboard-title{font-size:21px;font-weight:800;letter-spacing:-.5px;margin-top:2px;}
+.inicio-dashboard-date{font-size:12px;color:var(--text-dim);margin-top:3px;}
+.inicio-dashboard-actions{display:flex;gap:7px;flex-wrap:wrap;}
+.inicio-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+.inicio-kpi{background:var(--bg2);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:var(--r);padding:13px 14px;box-shadow:var(--shadow);min-width:0;}
+.inicio-kpi.warn{border-left-color:var(--yellow)}.inicio-kpi.danger{border-left-color:var(--red)}.inicio-kpi.success{border-left-color:var(--green)}
+.inicio-kpi-label{font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.inicio-kpi-value{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:800;line-height:1.15;margin-top:6px;}
+.inicio-kpi-note{font-size:11px;color:var(--text-dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.inicio-dashboard-columns{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(260px,.7fr);gap:14px;}
+.inicio-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow);}
+.inicio-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.inicio-section-title{font-size:12px;font-weight:800;}.inicio-section-meta{font-size:10px;color:var(--text-dim);}
+.inicio-priority{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--border-dim);min-width:0;}
+.inicio-priority:last-child{border-bottom:none}.inicio-priority-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--yellow)}
+.inicio-priority-dot.danger{background:var(--red)}.inicio-priority-dot.info{background:var(--accent)}
+.inicio-priority-main{min-width:0;flex:1}.inicio-priority-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.inicio-priority-detail{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.inicio-priority-action{flex:0 0 auto;background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:6px;padding:4px 8px;font:600 10px inherit;cursor:pointer;white-space:nowrap;}.inicio-priority-action:hover{background:#eff6ff;border-color:#bfdbfe;}
+.inicio-empty{padding:28px 16px;text-align:center;color:var(--text-dim);font-size:12px;}.inicio-empty strong{display:block;color:var(--green);font-size:13px;margin-bottom:3px;}
+.inicio-quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px;}.inicio-quick{display:flex;align-items:center;gap:9px;border:1px solid var(--border);background:var(--bg2);border-radius:var(--r);padding:10px;cursor:pointer;text-align:left;font:inherit;color:var(--text);}.inicio-quick:hover{border-color:var(--accent);background:#f8faff;}.inicio-quick-icon{font-size:20px;line-height:1;}.inicio-quick-label{font-size:11px;font-weight:700;}.inicio-quick-note{font-size:10px;color:var(--text-dim);margin-top:1px;}
+.inicio-activity{display:flex;flex-direction:column;gap:8px;padding:12px 14px;}.inicio-activity-row{display:flex;align-items:center;gap:8px;font-size:11px;}.inicio-activity-date{font-family:'IBM Plex Mono',monospace;color:var(--text-dim);font-size:10px;width:62px;}.inicio-activity-main{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.inicio-activity-main strong{font-weight:700;}.inicio-activity-type{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;}
+@media(max-width:800px){.inicio-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.inicio-dashboard-columns{grid-template-columns:1fr;}}
+@media(max-width:430px){.inicio-kpi{padding:11px 10px}.inicio-kpi-value{font-size:22px}.inicio-kpi-note{font-size:10px}.inicio-dashboard-title{font-size:18px}.inicio-quick-grid{grid-template-columns:1fr 1fr;gap:6px;padding:9px}.inicio-quick{padding:8px}.inicio-quick-icon{font-size:17px}}
+
 /* ── SPLASH DE BIENVENIDA (overlay, capa visual encima de la app ya inicializada) ── */
 #inicioSplash{
   display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;
@@ -1153,7 +1181,7 @@ tbody tr:hover{background:#f8faff;}
         <span class="inicio-empresa-pill-actual" id="inicioEmpresaPill">—</span>
         <span class="inicio-cambiar-empresa" onclick="inicioVolverEstadoA()">Cambiar empresa</span>
       </div>
-      <div class="inicio-grid" id="inicioGrid"></div>
+      <div id="inicioDashboard"></div>
     </div>
   </div>
 </div>
@@ -3951,6 +3979,7 @@ function closeLB(){document.getElementById('lightbox').classList.remove('open');
 async function loadClientes(){
   clientes=await api('clientes?select=*&order=nombre.asc');
   updateStats(); renderCli(clisFiltrados());
+  if(document.getElementById('inicioEstadoB').style.display!=='none') renderInicioDashboard();
 }
 function clisFiltrados(){const base=clientes.filter(c=>c.tipo_cliente!=='eventual');return filtroEmp==='todas'?base:base.filter(c=>c.empresa===filtroEmp);}
 function updateStats(){
@@ -4084,6 +4113,7 @@ function selEmp(v){
 async function loadEquipos(){
   equipos=await api('equipos?select=*&order=nombre.asc');
   updateStats();renderEq(eqsFiltrados());poblarSelects();
+  if(document.getElementById('inicioEstadoB').style.display!=='none') renderInicioDashboard();
 }
 function eqsFiltrados(){
   if(filtroEmp==='todas')return equipos;
@@ -4204,6 +4234,7 @@ function abrirModalEq(id=null,cliPre=null){
 async function loadIntervenciones(){
   intervenciones=await api('intervenciones?select=*&order=fecha.desc');
   renderHist();
+  if(document.getElementById('inicioEstadoB').style.display!=='none') renderInicioDashboard();
 }
 function renderHistClientes(lista){
   document.getElementById('histDetalle').style.display='none';
@@ -6393,6 +6424,7 @@ function setFiltro(v,btn){
   document.querySelectorAll('.empresa-pill').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderCli(clisFiltrados());renderEq(eqsFiltrados());
+  if(document.getElementById('inicioEstadoB').style.display!=='none') renderInicioDashboard();
   if(histClienteActual) volverHistClientes(); else renderHist();
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
@@ -6425,7 +6457,7 @@ function inicioElegirEmpresa(empresa){
   if(pill) pill.click();
   const icono=empresa==='ChillerSystem'?'🏭':'🔧';
   document.getElementById('inicioEmpresaPill').textContent=icono+' '+empresa;
-  renderInicioGrid();
+  renderInicioDashboard();
   document.getElementById('inicioEstadoA').style.display='none';
   document.getElementById('inicioEstadoB').style.display='block';
 }
@@ -6433,6 +6465,56 @@ function inicioElegirEmpresa(empresa){
 function inicioVolverEstadoA(){
   document.getElementById('inicioEstadoB').style.display='none';
   document.getElementById('inicioEstadoA').style.display='block';
+}
+
+function inicioAbrirModulo(id){
+  const btn=document.getElementById('tab-'+id);
+  if(btn) showTab(id,btn);
+}
+
+function inicioEquipoDesdeTablero(id){
+  inicioAbrirModulo('equipos');
+  const eq=equipos.find(e=>e.id===id);
+  if(eq) setTimeout(()=>abrirModalInterv(null,id),0);
+}
+
+function inicioCorrectivoDesdeTablero(id){
+  inicioAbrirModulo('historial');
+  setTimeout(()=>abrirResolverCorrectivo(id),0);
+}
+
+function renderInicioDashboard(){
+  const el=document.getElementById('inicioDashboard');
+  if(!el)return;
+  const baseEquipos=eqsFiltrados();
+  const ids=new Set(baseEquipos.map(e=>e.id));
+  const baseInterv=intervenciones.filter(i=>ids.has(i.equipo_id));
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const hoyIso=hoy.toISOString().slice(0,10);
+  const vencidos=baseEquipos.filter(e=>e.estado!=='Inactivo'&&!e.ignorar_alarma&&e.proximo_preventivo&&diasHabilesHasta(e.proximo_preventivo)<0);
+  const fueraServicio=baseEquipos.filter(e=>e.estado==='Fuera de servicio');
+  const proximos=baseEquipos.filter(e=>e.estado!=='Inactivo'&&!e.ignorar_alarma&&e.proximo_preventivo&&diasHabilesHasta(e.proximo_preventivo)>=0&&diasHabilesHasta(e.proximo_preventivo)<=5);
+  const correctivos=baseInterv.filter(i=>i.necesita_correctivo&&!i.correctivo_resuelto);
+  const actividadHoy=baseInterv.filter(i=>i.fecha===hoyIso).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  const prioridades=[];
+  fueraServicio.slice(0,4).forEach(e=>prioridades.push({level:'danger',icon:'🔴',name:e.nombre,detail:`${(clientes.find(c=>c.id===e.cliente_id)||{}).nombre||'Sin cliente'} · Fuera de servicio`,action:`inicioEquipoDesdeTablero('${e.id}')`,label:'Intervenir'}));
+  vencidos.filter(e=>!fueraServicio.includes(e)).slice(0,4).forEach(e=>prioridades.push({level:'danger',icon:'⏱',name:e.nombre,detail:`${(clientes.find(c=>c.id===e.cliente_id)||{}).nombre||'Sin cliente'} · Preventivo vencido ${Math.abs(diasHabilesHasta(e.proximo_preventivo))}dh`,action:`inicioEquipoDesdeTablero('${e.id}')`,label:'Programar'}));
+  correctivos.slice(0,4).forEach(i=>{const e=equipos.find(x=>x.id===i.equipo_id);prioridades.push({level:'warning',icon:'🛠',name:e?e.nombre:'Correctivo pendiente',detail:`${e?(clientes.find(c=>c.id===e.cliente_id)||{}).nombre||'Sin cliente':'Sin equipo'} · ${i.fecha||'sin fecha'}`,action:`inicioCorrectivoDesdeTablero('${i.id}')`,label:'Resolver'});});
+  proximos.filter(e=>!vencidos.includes(e)).slice(0,4).forEach(e=>prioridades.push({level:'warning',icon:'🟡',name:e.nombre,detail:`${(clientes.find(c=>c.id===e.cliente_id)||{}).nombre||'Sin cliente'} · Preventivo en ${diasHabilesHasta(e.proximo_preventivo)}dh`,action:`inicioEquipoDesdeTablero('${e.id}')`,label:'Ver equipo'}));
+  const salud=baseEquipos.length?Math.round((baseEquipos.filter(e=>e.estado==='Operativo').length/baseEquipos.length)*100):0;
+  const saludClass=salud>=80?'success':salud<50?'danger':'warn';
+  const estadoPresupuestos=(presupuestos||[]).filter(p=>['aprobado_cliente','en_ejecucion','en_revision','enviado'].includes(p.estado_flujo)).length;
+  const selected=filtroEmp==='todas'?'Todas las empresas':filtroEmp;
+  const puedeVerPptos=puedeVerPresupuestos();
+  const dateLabel=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+  const prioridadHtml=prioridades.length?prioridades.slice(0,8).map(p=>`<div class="inicio-priority"><span class="inicio-priority-dot ${p.level==='danger'?'danger':''}">${p.icon}</span><div class="inicio-priority-main"><div class="inicio-priority-name">${escapeHtml(p.name)}</div><div class="inicio-priority-detail">${escapeHtml(p.detail)}</div></div><button class="inicio-priority-action" onclick="${p.action}">${p.label}</button></div>`).join(''):'<div class="inicio-empty"><strong>✓ Sin prioridades críticas</strong>La operación no tiene alertas pendientes en este momento.</div>';
+  const actividadHtml=actividadHoy.length?actividadHoy.slice(0,5).map(i=>{const e=equipos.find(x=>x.id===i.equipo_id);return `<div class="inicio-activity-row"><span class="inicio-activity-date">${i.fecha||'—'}</span><div class="inicio-activity-main"><strong>${escapeHtml(e?e.nombre:'Equipo')}</strong> · ${escapeHtml(i.tecnico||'Sin técnico')}</div><span class="inicio-activity-type ${i.tipo==='Correctivo'?'b-correctivo':'b-preventivo2'}">${escapeHtml(i.tipo||'Trabajo')}</span></div>`;}).join(''):'<div class="inicio-empty" style="padding:18px 0;">No hay intervenciones registradas para hoy.</div>';
+  el.innerHTML=`<div class="inicio-dashboard">
+    <div class="inicio-dashboard-head"><div><div class="inicio-dashboard-kicker">Tablero operativo · ${escapeHtml(selected)}</div><div class="inicio-dashboard-title">Qué requiere atención hoy</div><div class="inicio-dashboard-date">${escapeHtml(dateLabel)} · datos sincronizados desde la operación</div></div><div class="inicio-dashboard-actions"><button class="btn-secondary" onclick="inicioAbrirModulo('equipos')">⚙️ Ver equipos</button><button class="btn-primary" onclick="inicioAbrirModulo('service')">＋ Registrar trabajo</button></div></div>
+    <div class="inicio-kpi-grid"><div class="inicio-kpi ${fueraServicio.length?'danger':'success'}"><div class="inicio-kpi-label">Fuera de servicio</div><div class="inicio-kpi-value" style="color:${fueraServicio.length?'var(--red)':'var(--green)'}">${fueraServicio.length}</div><div class="inicio-kpi-note">de ${baseEquipos.length} equipos</div></div><div class="inicio-kpi ${vencidos.length?'danger':'success'}"><div class="inicio-kpi-label">Preventivos vencidos</div><div class="inicio-kpi-value" style="color:${vencidos.length?'var(--red)':'var(--green)'}">${vencidos.length}</div><div class="inicio-kpi-note">prioridad de planificación</div></div><div class="inicio-kpi ${correctivos.length?'warn':'success'}"><div class="inicio-kpi-label">Correctivos abiertos</div><div class="inicio-kpi-value" style="color:${correctivos.length?'var(--yellow)':'var(--green)'}">${correctivos.length}</div><div class="inicio-kpi-note">sin resolución registrada</div></div><div class="inicio-kpi ${saludClass}"><div class="inicio-kpi-label">Salud operativa</div><div class="inicio-kpi-value" style="color:${salud>=80?'var(--green)':salud<50?'var(--red)':'var(--yellow)'}">${salud}%</div><div class="inicio-kpi-note">${baseEquipos.filter(e=>e.estado==='Operativo').length} operativos</div></div></div>
+    <div class="inicio-dashboard-columns"><div class="inicio-section"><div class="inicio-section-head"><div class="inicio-section-title">Prioridades de la jornada</div><div class="inicio-section-meta">${prioridades.length} pendiente(s)</div></div>${prioridadHtml}</div><div class="inicio-section"><div class="inicio-section-head"><div class="inicio-section-title">Accesos rápidos</div><div class="inicio-section-meta">módulos operativos</div></div><div class="inicio-quick-grid"><button class="inicio-quick" onclick="inicioAbrirModulo('service')"><span class="inicio-quick-icon">🔧</span><span><span class="inicio-quick-label">Registrar service</span><span class="inicio-quick-note">preventivo o correctivo</span></span></button><button class="inicio-quick" onclick="inicioAbrirModulo('equipos')"><span class="inicio-quick-icon">⚙️</span><span><span class="inicio-quick-label">Buscar equipo</span><span class="inicio-quick-note">estado y próximo preventivo</span></span></button><button class="inicio-quick" onclick="inicioAbrirModulo('historial')"><span class="inicio-quick-icon">📋</span><span><span class="inicio-quick-label">Historial técnico</span><span class="inicio-quick-note">últimas intervenciones</span></span></button>${puedeVerPptos?`<button class="inicio-quick" onclick="inicioAbrirModulo('presupuestos')"><span class="inicio-quick-icon">💼</span><span><span class="inicio-quick-label">Presupuestos</span><span class="inicio-quick-note">${estadoPresupuestos} en seguimiento</span></span></button>`:''}</div></div></div>
+    <div class="inicio-section"><div class="inicio-section-head"><div class="inicio-section-title">Actividad registrada hoy</div><div class="inicio-section-meta">${actividadHoy.length} intervención(es)</div></div><div class="inicio-activity">${actividadHtml}</div></div>
+  </div>`;
 }
 
 function inicioMenuClasico(){
@@ -6464,6 +6546,8 @@ function inicioSplashCerrar(){
 
 function inicioSplashElegirEmpresa(empresa){
   inicioElegirEmpresa(empresa);
+  const tab=document.getElementById('tabInicio');
+  if(tab) showTab('inicio',tab);
   inicioSplashCerrar();
 }
 
