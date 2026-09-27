@@ -2585,7 +2585,7 @@ async function iniciarApp(){
   }
   try{
     await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones(),loadPresupuestos(),loadInformes(),loadTareasConfig()]);
-    if(isAdmin){await loadUsuarios();await loadAprobaciones();}
+    if(!esTecnico()){await loadUsuarios();await loadAprobaciones();}
     await loadNotificaciones();
     setStatus(true); calcAlertas();
     restaurarEstadoService();
