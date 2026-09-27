@@ -2646,8 +2646,10 @@ function puedeVerAprobaciones(){return !esTecnico();}
 function puedeVerModulo(id){
   const modulos=['inicio','clientes','equipos','historial','service','eventual','presupuestos','informes',
     'tareas','aprobaciones','galeria','estadisticas','fichajes','usuarios','mipanel','cronograma'];
-  const restringidosParaTecnicos=['presupuestos','estadisticas','mipanel'];
-  return modulos.includes(id)&&(!esTecnico()||!restringidosParaTecnicos.includes(id));
+  if(!modulos.includes(id)) return false;
+  if(id==='mipanel'||id==='cronograma') return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;
+  const restringidosParaTecnicos=['presupuestos','estadisticas'];
+  return !esTecnico()||!restringidosParaTecnicos.includes(id);
 }
 function puedeAccion(id){
   const acceso={'clientes.manage':puedeGestionarClientes(),'equipos.manage':puedeGestionarMaestros(),
@@ -8567,7 +8569,7 @@ function _epElegir(opcion) {
 }
 
 async function guardarPptoComercial(){
-  if(!exigirPermiso(puedeVerModulo('mipanel'),'No tenés acceso a este panel comercial')) return;
+  if(!exigirPermiso(usuarioActual&&usuarioActual.id===DAVID_USER_ID,'No tenés acceso a este panel comercial')) return;
   const numero=document.getElementById('mpNumero').value.trim();
   const cliente=document.getElementById('mpCliente').value.trim();
   const detalle=document.getElementById('mpDetalle').value.trim();
