@@ -2637,20 +2637,17 @@ function esTecnico(){return !!usuarioActual&&(usuarioActual.jerarquia==='tecnico
 function puedeGestionarMaestros(){return esGerencia();}
 function puedeGestionarClientes(){return esGerencia()||esSupervisorAdmin();}
 function puedeGestionarEventuales(){return esGerencia()||esAdministrativo();}
-function puedeVerPresupuestos(){return esGerencia()||esSupervisorAdmin()||esAdministrativo();}
+function puedeVerPresupuestos(){return !esTecnico();}
 function puedeEditarPresupuestos(){return esGerencia();}
 function puedeAvanzarEstadoPpto(){return esGerencia()||esAdministrativo();}
-function puedeVerInformes(){return puedeVerPresupuestos();}
+function puedeVerInformes(){return !esTecnico();}
 function puedeVerTareas(){return !esTecnico();}
-function puedeVerAprobaciones(){return esGerencia()||esSupervisorAdmin();}
+function puedeVerAprobaciones(){return !esTecnico();}
 function puedeVerModulo(id){
-  const acceso={inicio:true,equipos:true,historial:true,service:true,galeria:!esTecnico(),
-    clientes:puedeGestionarClientes(),eventual:puedeGestionarEventuales(),presupuestos:puedeVerPresupuestos(),
-    informes:puedeVerInformes(),tareas:puedeVerTareas(),aprobaciones:puedeVerAprobaciones(),
-    estadisticas:esGerencia()||esSupervisorAdmin(),fichajes:esGerencia(),
-    usuarios:esGerencia(),mipanel:!!usuarioActual&&usuarioActual.id===DAVID_USER_ID,
-    cronograma:!!usuarioActual&&usuarioActual.id===DAVID_USER_ID};
-  return !!acceso[id];
+  const modulos=['inicio','clientes','equipos','historial','service','eventual','presupuestos','informes',
+    'tareas','aprobaciones','galeria','estadisticas','fichajes','usuarios','mipanel','cronograma'];
+  const restringidosParaTecnicos=['presupuestos','estadisticas','mipanel'];
+  return modulos.includes(id)&&(!esTecnico()||!restringidosParaTecnicos.includes(id));
 }
 function puedeAccion(id){
   const acceso={'clientes.manage':puedeGestionarClientes(),'equipos.manage':puedeGestionarMaestros(),
@@ -8570,7 +8567,7 @@ function _epElegir(opcion) {
 }
 
 async function guardarPptoComercial(){
-  if(!exigirPermiso(usuarioActual&&usuarioActual.id===DAVID_USER_ID,'No tenés acceso a este panel comercial')) return;
+  if(!exigirPermiso(puedeVerModulo('mipanel'),'No tenés acceso a este panel comercial')) return;
   const numero=document.getElementById('mpNumero').value.trim();
   const cliente=document.getElementById('mpCliente').value.trim();
   const detalle=document.getElementById('mpDetalle').value.trim();
