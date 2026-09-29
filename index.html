@@ -2581,7 +2581,7 @@ tbody tr:hover{background:#f8faff;}
     <div class="form-grid">
       <div class="form-group full"><label class="form-label">Nombre completo *</label><input class="form-input" id="uNom" placeholder="Ej: Juan Pérez"/></div>
       <div class="form-group"><label class="form-label">Usuario *</label><input class="form-input" id="uUser" placeholder="Ej: jperez"/></div>
-      <div class="form-group"><label class="form-label">Contraseña *</label><input class="form-input" id="uPass" type="password" placeholder="Mínimo 4 caracteres"/></div>
+      <div class="form-group" id="uPassGroup"><label class="form-label">Contraseña *</label><input class="form-input" id="uPass" type="password" placeholder="Mínimo 4 caracteres"/></div>
       <div class="form-group"><label class="form-label">Rol</label>
         <select class="form-select" id="uRol"><option value="tecnico">Técnico</option><option value="admin">Administrador</option></select>
       </div>
@@ -4751,7 +4751,6 @@ async function guardarUser(){
   const pass=document.getElementById('uPass').value;
   if(!nom||!usr){showToast('Nombre y usuario obligatorios',true);return;}
   const data={nombre:nom,usuario:usr,rol:document.getElementById('uRol').value,activo:document.getElementById('uActivo').value==='true'};
-  if(pass) data['password']=pass;
   try{
     if(id) await api('usuarios?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
     else{
@@ -4774,7 +4773,8 @@ async function guardarUser(){
       }catch(eAuth){
         showToast('Atención: el usuario se guardó, pero no se pudo crear su acceso (sin conexión). Usá "Ejecutar Migración" en Usuarios para reintentar.',true);
       }
-      await api('usuarios',{method:'POST',body:JSON.stringify({...data,password:pass,email,auth_user_id:authUserId}),headers:{...H,'Prefer':'return=minimal'}});
+      // password:'' — la contraseña real vive solo en Supabase Auth, nunca en esta tabla
+      await api('usuarios',{method:'POST',body:JSON.stringify({...data,password:'',email,auth_user_id:authUserId}),headers:{...H,'Prefer':'return=minimal'}});
     }
     showToast('Usuario guardado ✓','success');cerrar('mUser');await loadUsuarios();
   }catch(e){showToast('Error: '+e.message,true);}
@@ -4789,6 +4789,7 @@ function abrirModalUser(id=null){
   if(!exigirPermiso(esGerencia(),'Solo gerencia puede gestionar usuarios')) return;
   ['userId','uNom','uUser','uPass'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('uRol').value='tecnico';document.getElementById('uActivo').value='true';
+  document.getElementById('uPassGroup').style.display=id?'none':'';
   if(id){
     const u=usuarios.find(x=>x.id===id);
     document.getElementById('tUser').textContent='Editar Usuario';
