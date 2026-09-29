@@ -2648,7 +2648,7 @@ function puedeVerModulo(id){
     'tareas','aprobaciones','galeria','estadisticas','fichajes','usuarios','mipanel','cronograma'];
   if(!modulos.includes(id)) return false;
   if(id==='mipanel'||id==='cronograma') return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;
-  const restringidosParaTecnicos=['presupuestos','estadisticas'];
+  const restringidosParaTecnicos=['presupuestos','estadisticas','clientes','informes','aprobaciones','fichajes','usuarios'];
   return !esTecnico()||!restringidosParaTecnicos.includes(id);
 }
 function puedeAccion(id){
