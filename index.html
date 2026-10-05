@@ -2631,6 +2631,7 @@ let notificaciones=[]; // notificaciones de facturación
 // ── Helpers de jerarquía y permisos de interfaz ─────────────────────────────
 // No crea roles: consume únicamente rol/jerarquia que ya entrega la tabla usuarios.
 function esGerencia(){return !!usuarioActual&&(usuarioActual.jerarquia==='gerencia'||usuarioActual.rol==='admin');}
+function esDavid(){return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;}
 function esSupervisorAdmin(){return !!usuarioActual&&usuarioActual.jerarquia==='supervisor_admin';}
 function esAdministrativo(){return !!usuarioActual&&usuarioActual.jerarquia==='administrativo';}
 function esTecnico(){return !!usuarioActual&&(usuarioActual.jerarquia==='tecnico'||usuarioActual.rol==='tecnico');}
@@ -4337,7 +4338,7 @@ function renderIntervItem(i){
 
   // ENCABEZADO con botones editar/eliminar
   const puedeEditar=usuarioActual&&(esGerencia()||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
-  const puedeEliminar=usuarioActual&&(esGerencia()||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
+  const puedeEliminar=esDavid();
   html+='<div class="interv-header" style="justify-content:flex-start;">';
   html+=esCorrectivo?'<span class="badge b-correctivo">🔴 Correctivo</span>':'<span class="badge b-preventivo2">'+i.tipo+'</span>';
   html+='<span class="interv-fecha">'+fmtF(i.fecha)+'</span>';
@@ -4664,6 +4665,7 @@ async function guardarCompletarDatos(){
 }
 
 async function elimInterv(id){
+  if(!exigirPermiso(esDavid(),'Solo el propietario puede eliminar intervenciones')) return;
   if(!confirm('¿Eliminar esta intervención? Esta acción no se puede deshacer.'))return;
   try{
     // Eliminar tareas_realizadas asociadas (Mejora 3)
@@ -6669,7 +6671,7 @@ function renderEventuales(lista){
                 <span class="interv-fecha">${fmtF(t.fecha)}</span>
                 ${t.tecnico?`<span class="interv-tecnico">· ${t.tecnico}</span>`:''}
                 ${t.descripcion?`<span style="font-size:11px;color:var(--text-dim);margin-left:6px;">${t.descripcion.substring(0,60)}${t.descripcion.length>60?'...':''}</span>`:''}
-                <button class="btn-danger" onclick="elimInterv('${t.id}')" style="padding:2px 7px;font-size:11px;margin-left:auto;">🗑</button>
+                ${esDavid()?`<button class="btn-danger" onclick="elimInterv('${t.id}')" style="padding:2px 7px;font-size:11px;margin-left:auto;">🗑</button>`:''}
               </div>
               ${fotosHTML(t.fotos)}
             </div>`).join('')}
