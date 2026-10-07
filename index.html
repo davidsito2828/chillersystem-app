@@ -3961,32 +3961,60 @@ async function subirFotos(files,carpeta){
 function verFotosInterv(intervId){
   const interv=intervenciones.find(x=>x.id===intervId);
   if(!interv||!interv.fotos||!interv.fotos.length) return;
-  const html='<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.remove()">'+
+  const puedeQuitar=esDavid();
+  const html='<div id="fotosIntervModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.remove()">'+
     '<div style="max-width:600px;margin:0 auto;">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'+
     '<div style="color:#fff;font-weight:700;font-size:16px;">📷 Fotos del trabajo</div>'+
     '<button onclick="this.closest(\'[style*=position]\').remove()" style="background:none;border:none;color:#fff;font-size:24px;cursor:pointer;">✕</button>'+
     '</div>'+
     '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">'+
-    interv.fotos.map(url=>'<img src="'+url+'" onclick="openLB(\''+url+'\')" style="width:100%;height:150px;object-fit:cover;border-radius:8px;cursor:pointer;"/>').join('')+
+    interv.fotos.map((url,idx)=>{
+      const img='<img src="'+url+'" onclick="openLB(\''+url+'\')" style="width:100%;height:150px;object-fit:cover;border-radius:8px;cursor:pointer;"/>';
+      if(!puedeQuitar) return img;
+      return '<div style="position:relative;">'+img+
+        '<button onclick="event.stopPropagation();borrarFoto(\'intervenciones\',\''+intervId+'\','+idx+',\''+url+'\')" title="Quitar foto" style="position:absolute;top:6px;right:6px;width:26px;height:26px;padding:0;border:none;border-radius:50%;background:rgba(220,38,38,0.9);color:#fff;font-size:14px;line-height:26px;cursor:pointer;">✕</button></div>';
+    }).join('')+
     '</div></div></div>';
   document.body.insertAdjacentHTML('beforeend',html);
 }
 
-function fotosHTML(fotos){
+function fotosHTML(fotos,tabla,id){
   if(!fotos||!fotos.length)return '';
+  const puedeQuitar=esDavid()&&tabla&&id;
   return '<div style="margin-top:8px;">'+
     '<div style="font-size:10px;color:#3b82f6;font-weight:700;letter-spacing:1px;margin-bottom:6px;">📷 '+fotos.length+' FOTO(S)</div>'+
     '<div class="fotos-grid">'+
-    fotos.map(u=>
-      '<img class="foto-thumb" src="'+u+'" onclick="openLB(\''+u+'\')" loading="lazy"'+
+    fotos.map((u,idx)=>{
+      const img='<img class="foto-thumb" src="'+u+'" onclick="openLB(\''+u+'\')" loading="lazy"'+
       ' style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid #3b82f6;cursor:pointer;transition:transform 0.2s;"'+
-      ' onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'"/>'
-    ).join('')+
+      ' onmouseover="this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'"/>';
+      if(!puedeQuitar) return img;
+      return '<div style="position:relative;display:inline-block;">'+img+
+        '<button onclick="event.stopPropagation();borrarFoto(\''+tabla+'\',\''+id+'\','+idx+',\''+u+'\')" title="Quitar foto" style="position:absolute;top:2px;right:2px;width:20px;height:20px;padding:0;border:none;border-radius:50%;background:rgba(220,38,38,0.9);color:#fff;font-size:11px;line-height:20px;cursor:pointer;">✕</button></div>';
+    }).join('')+
     '</div></div>';
 }
 function openLB(url){document.getElementById('lbImg').src=url;document.getElementById('lightbox').classList.add('open');}
 function closeLB(){document.getElementById('lightbox').classList.remove('open');}
+async function borrarFoto(tabla,id,idx,url){
+  if(!exigirPermiso(esDavid(),'Solo el propietario puede quitar fotos')) return;
+  const reg=(tabla==='equipos'?equipos:intervenciones).find(x=>x.id===id);
+  const fotos=(reg&&reg.fotos)||[];
+  if(fotos[idx]!==url){showToast('La lista cambió, recargá e intentá de nuevo',true);return;}
+  if(!confirm('¿Quitar esta foto? No se puede deshacer.'))return;
+  try{
+    const listaNueva=fotos.filter((_,k)=>k!==idx);
+    await api(tabla+'?id=eq.'+id,{method:'PATCH',body:JSON.stringify({fotos:listaNueva}),headers:{...H,'Prefer':'return=minimal'}});
+    if(tabla==='equipos') await loadEquipos(); else await loadIntervenciones();
+    renderCli(clisFiltrados());
+    if(histClienteActual) renderHistDetalle();
+    renderEventuales(eventualesFiltrados());
+    const modal=document.getElementById('fotosIntervModal');
+    if(modal){modal.remove();if(tabla==='intervenciones') verFotosInterv(id);}
+    showToast('Foto quitada','success');
+  }catch(e){showToast('Error: '+e.message,true);}
+}
 
 // ── CLIENTES ──
 async function loadClientes(){
@@ -4043,7 +4071,7 @@ function renderCli(lista){
                 <div class="equipo-nombre">⚙️ ${escapeHtml(eq.nombre)}</div>
                 <div class="equipo-meta">${[eq.tipo,eq.marca,eq.modelo].map(escapeHtml).filter(Boolean).join(' · ')||'Sin detalles'}</div>
                 <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px;">${proxPrevHTML(eq)}${(()=>{const {badge_estacional,badge_trimestral}=getTareasEquipo(eq.tipo||'',eq.ultimo_preventivo||null);const bs=badge_estacional?'<span style="display:inline-flex;align-items:center;background:var(--yellow-bg);border:1px solid var(--yellow-border);color:#92400e;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">🍂 Estacionales pendientes</span>':'';const bt=badge_trimestral&&!badge_estacional?'<span style="display:inline-flex;align-items:center;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">⚙️ Trimestral vencido</span>':'';return bs+bt;})()}</div>
-                ${fotosHTML(eq.fotos)}
+                ${fotosHTML(eq.fotos,'equipos',eq.id)}
               </div>
               <span class="badge ${badgeEst(eq.estado)}">${eq.estado||'Operativo'}</span>
               <div style="display:flex;gap:4px;flex-wrap:wrap;">
@@ -4063,7 +4091,7 @@ function renderCli(lista){
                 ${i.descripcion?`<div class="interv-desc">${i.descripcion}</div>`:''}
                 ${i.solucion?`<div class="interv-sol">✓ ${i.solucion}</div>`:''}
                 ${i.repuestos?`<div class="interv-rep">🔩 ${i.repuestos}</div>`:''}
-                ${fotosHTML(i.fotos)}
+                ${fotosHTML(i.fotos,'intervenciones',i.id)}
               </div>`).join('')}
             </div>`:''}
           </div>`;
@@ -4395,7 +4423,7 @@ function renderIntervItem(i){
       html+='<div><span style="color:var(--green);font-weight:700;font-size:12px;">Resuelto el '+fmtF(resolucion.fecha)+'</span>';
       if(resolucion.tecnico) html+=' <span style="color:var(--text-dim);font-size:11px;">por '+resolucion.tecnico+'</span>';
       if(resolucion.solucion||resolucion.descripcion) html+='<div style="color:var(--green);opacity:0.8;font-size:11px;margin-top:2px;">'+(resolucion.solucion||resolucion.descripcion)+'</div>';
-      if(resolucion.fotos&&resolucion.fotos.length) html+=fotosHTML(resolucion.fotos);
+      if(resolucion.fotos&&resolucion.fotos.length) html+=fotosHTML(resolucion.fotos,'intervenciones',resolucion.id);
       html+='</div></div>';
     }else if(!tieneResolucion){
       html+='<div style="margin-top:4px;"><span style="color:var(--red);font-size:11px;font-style:italic;">🔴 Pendiente de resolución</span></div>';
@@ -6673,7 +6701,7 @@ function renderEventuales(lista){
                 ${t.descripcion?`<span style="font-size:11px;color:var(--text-dim);margin-left:6px;">${t.descripcion.substring(0,60)}${t.descripcion.length>60?'...':''}</span>`:''}
                 ${esDavid()?`<button class="btn-danger" onclick="elimInterv('${t.id}')" style="padding:2px 7px;font-size:11px;margin-left:auto;">🗑</button>`:''}
               </div>
-              ${fotosHTML(t.fotos)}
+              ${fotosHTML(t.fotos,'intervenciones',t.id)}
             </div>`).join('')}
           ${trabajos.length>3?`<div style="font-size:11px;color:var(--text-dim);text-align:center;padding:4px;">... y ${trabajos.length-3} más</div>`:''}
         </div>`:''}
