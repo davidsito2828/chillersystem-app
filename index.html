@@ -2610,6 +2610,8 @@ const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 const AUTH_DOMAIN='chillersystem.app';
 const DAVID_USER_ID='6c2c577e-89f2-4fc4-9824-f21d40cb17f0';
 // Mi Panel es el pipeline comercial personal de David — NO es un permiso por rol, es exclusivo de esta persona.
+// Referente técnico (Lucas Roda): puede agregar, editar y quitar equipos.
+const REFERENTE_TECNICO_ID='ad551b62-1f60-499d-a55e-1f2efc158cb6';
 // ══ SESIÓN JWT ══ La anon key es pública por diseño; las políticas RLS la protegen.
 let _authToken=null; let _refreshToken=null; let _tokenExpiry=null;
 const H={'Content-Type':'application/json','apikey':SKEY,'Authorization':'Bearer '+SKEY};
@@ -2632,10 +2634,11 @@ let notificaciones=[]; // notificaciones de facturación
 // No crea roles: consume únicamente rol/jerarquia que ya entrega la tabla usuarios.
 function esGerencia(){return !!usuarioActual&&(usuarioActual.jerarquia==='gerencia'||usuarioActual.rol==='admin');}
 function esDavid(){return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;}
+function esReferenteTecnico(){return !!usuarioActual&&usuarioActual.id===REFERENTE_TECNICO_ID;}
 function esSupervisorAdmin(){return !!usuarioActual&&usuarioActual.jerarquia==='supervisor_admin';}
 function esAdministrativo(){return !!usuarioActual&&usuarioActual.jerarquia==='administrativo';}
 function esTecnico(){return !!usuarioActual&&(usuarioActual.jerarquia==='tecnico'||usuarioActual.rol==='tecnico');}
-function puedeGestionarMaestros(){return esGerencia();}
+function puedeGestionarMaestros(){return esGerencia()||esReferenteTecnico();}
 function puedeGestionarClientes(){return esGerencia()||esSupervisorAdmin();}
 function puedeGestionarEventuales(){return esGerencia()||esAdministrativo();}
 function puedeVerPresupuestos(){return !esTecnico();}
@@ -4203,7 +4206,7 @@ function renderEq(lista){
 function filtrarEq(q){renderEq(eqsFiltrados().filter(e=>e.nombre.toLowerCase().includes(q.toLowerCase())||(e.marca||'').toLowerCase().includes(q.toLowerCase())));}
 
 async function guardarEq(){
-  if(!exigirPermiso(puedeGestionarMaestros(),'Solo gerencia puede modificar equipos')) return;
+  if(!exigirPermiso(puedeGestionarMaestros(),'No tenés permiso para gestionar equipos')) return;
   const id=document.getElementById('eqId').value;
   const nom=document.getElementById('eNom').value.trim();
   const cid=document.getElementById('eCliId').value;
@@ -4236,14 +4239,21 @@ async function guardarEq(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 async function elimEq(id,nom){
-  if(!exigirPermiso(puedeGestionarMaestros(),'Solo gerencia puede eliminar equipos')) return;
+  if(!exigirPermiso(puedeGestionarMaestros(),'No tenés permiso para gestionar equipos')) return;
+  // intervenciones.equipo_id tiene ON DELETE CASCADE: borrar el equipo borra su historial y fotos
+  if(!esDavid()){
+    let r;
+    try{r=await api('intervenciones?equipo_id=eq.'+id+'&select=id&limit=1');}catch(e){r=null;}
+    if(!Array.isArray(r)){showToast('No se pudo verificar el historial del equipo, no se borró',true);return;}
+    if(r.length){showToast('Este equipo tiene historial de intervenciones. Solo el propietario puede eliminarlo.',true);return;}
+  }
   if(!confirm(`¿Eliminar "${nom}"?`))return;
   try{await api(`equipos?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await Promise.all([loadEquipos(),loadClientes(),loadIntervenciones()]);}
   catch(e){showToast('Error',true);}
 }
 function abrirModalEq(id=null,cliPre=null){
-  if(!exigirPermiso(puedeGestionarMaestros(),'Solo gerencia puede gestionar equipos')) return;
+  if(!exigirPermiso(puedeGestionarMaestros(),'No tenés permiso para gestionar equipos')) return;
   ['eqId','eNom','eMarca','eModelo','eNserie','eUbic','eNotas','eUltPrev','eCapacidad'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('eUnidadCap').value='';
   document.getElementById('eTipo').value='';document.getElementById('eEst').value='Operativo';
