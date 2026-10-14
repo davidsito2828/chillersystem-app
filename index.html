@@ -2632,18 +2632,20 @@ let notificaciones=[]; // notificaciones de facturación
 
 // ── Helpers de jerarquía y permisos de interfaz ─────────────────────────────
 // No crea roles: consume únicamente rol/jerarquia que ya entrega la tabla usuarios.
-function esGerencia(){return !!usuarioActual&&(usuarioActual.jerarquia==='gerencia'||usuarioActual.rol==='admin');}
+function esGerencia(){return !!usuarioActual&&usuarioActual.jerarquia==='gerencia';}
 function esDavid(){return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;}
 function esReferenteTecnico(){return !!usuarioActual&&usuarioActual.id===REFERENTE_TECNICO_ID;}
 function esSupervisorAdmin(){return !!usuarioActual&&usuarioActual.jerarquia==='supervisor_admin';}
 function esAdministrativo(){return !!usuarioActual&&usuarioActual.jerarquia==='administrativo';}
 function esTecnico(){return !!usuarioActual&&(usuarioActual.jerarquia==='tecnico'||usuarioActual.rol==='tecnico');}
-function puedeGestionarMaestros(){return esGerencia()||esReferenteTecnico();}
-function puedeGestionarClientes(){return esGerencia()||esSupervisorAdmin();}
-function puedeGestionarEventuales(){return esGerencia()||esAdministrativo();}
+function esOficina(){return esGerencia()||esSupervisorAdmin()||esAdministrativo();}
+function puedeAdministrar(){return esGerencia()||esReferenteTecnico();}
+function puedeGestionarMaestros(){return esOficina()||esReferenteTecnico();}
+function puedeGestionarClientes(){return esOficina();}
+function puedeGestionarEventuales(){return esOficina();}
 function puedeVerPresupuestos(){return !esTecnico();}
-function puedeEditarPresupuestos(){return esGerencia();}
-function puedeAvanzarEstadoPpto(){return esGerencia()||esAdministrativo();}
+function puedeEditarPresupuestos(){return esOficina();}
+function puedeAvanzarEstadoPpto(){return esOficina();}
 function puedeVerInformes(){return !esTecnico();}
 function puedeVerTareas(){return !esTecnico();}
 function puedeVerAprobaciones(){return !esTecnico();}
@@ -2658,8 +2660,8 @@ function puedeVerModulo(id){
 function puedeAccion(id){
   const acceso={'clientes.manage':puedeGestionarClientes(),'equipos.manage':puedeGestionarMaestros(),
     'eventual.manage':puedeGestionarEventuales(),'presupuestos.edit':puedeEditarPresupuestos(),
-    'presupuestos.advance':puedeAvanzarEstadoPpto(),'informes.manage':esGerencia(),
-    'tareas.manage':esGerencia(),'aprobaciones.manage':esGerencia()};
+    'presupuestos.advance':puedeAvanzarEstadoPpto(),'informes.manage':esOficina(),
+    'tareas.manage':puedeAdministrar(),'aprobaciones.manage':esOficina()};
   return !!acceso[id];
 }
 function exigirPermiso(check,mensaje='No tenés permiso para realizar esta acción'){
@@ -2668,7 +2670,7 @@ function exigirPermiso(check,mensaje='No tenés permiso para realizar esta acci�
 function aplicarPermisosUI(){
   document.querySelectorAll('[data-module]').forEach(el=>{el.style.display=puedeVerModulo(el.dataset.module)?'':'none';});
   document.querySelectorAll('[data-permission]').forEach(el=>{el.style.display=puedeAccion(el.dataset.permission)?'':'none';});
-  document.getElementById('empresaFilter').style.display=esGerencia()?'flex':'none';
+  document.getElementById('empresaFilter').style.display=esOficina()?'flex':'none';
 }
 
 // ── Constantes flujo presupuestos ─────────
@@ -3096,7 +3098,7 @@ async function iniciarApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appScreen').style.display='block';
   document.getElementById('userNombre').textContent=usuarioActual.nombre;
-  const esJefatura=esGerencia();
+  const esJefatura=esOficina();
   document.getElementById('userRolBadge').textContent=esGerencia()?'Gerencia':(esSupervisorAdmin()?'Supervisión':(esAdministrativo()?'Administración':'Técnico'));
   document.getElementById('userRolBadge').className=esJefatura?'rol-admin':'rol-tecnico';
   aplicarPermisosUI();
@@ -3352,7 +3354,7 @@ async function toggleJornada(){
 let fichajesGlobal = [];
 
 async function loadFichajes(){
-  const esJefatura = esGerencia();
+  const esJefatura = esOficina();
   if(!esJefatura) return;
   
   const fechaInput = document.getElementById('fFiltroFecha');
@@ -3463,7 +3465,7 @@ function renderFichajes(){
     }
     
     const mapsLink = `https://www.google.com/maps?q=${item.lat},${item.lng}`;
-    const btnEliminar = (item.tipo_registro === 'ficha' && item.id && esGerencia())
+    const btnEliminar = (item.tipo_registro === 'ficha' && item.id && puedeAdministrar())
       ? `<button onclick="eliminarJornada('${item.id}')" style="padding:6px 10px;background:#dc2626;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-left:8px;flex-shrink:0;" title="Eliminar registro">🗑️</button>`
       : '';
 
@@ -3492,7 +3494,7 @@ function renderFichajes(){
 async function eliminarJornada(jornadaId){
   debug('[elimJornada] llamada con id:', jornadaId);
   debug('[elimJornada] esGerencia():', esGerencia(), '| rol:', usuarioActual?.rol);
-  if(!esGerencia()){showToast('⛔ Solo gerencia puede eliminar jornadas',true);return;}
+  if(!puedeAdministrar()){showToast('⛔ No tenés permiso para eliminar jornadas',true);return;}
   const resultado=confirm('¿Eliminar este registro de jornada?\n\nEsta acción NO se puede deshacer.');
   debug('[elimJornada] confirm devolvió:', resultado);
   if(!resultado) return;
@@ -4108,7 +4110,7 @@ function toggleExp(id){expandidos.has(id)?expandidos.delete(id):expandidos.add(i
 function filtrarCli(q){renderCli(clisFiltrados().filter(c=>c.nombre.toLowerCase().includes(q.toLowerCase())));}
 
 async function guardarCli(){
-  if(!exigirPermiso(puedeGestionarClientes(),'Solo supervisión o gerencia puede modificar clientes')) return;
+  if(!exigirPermiso(puedeGestionarClientes(),'No tenés permiso para modificar clientes')) return;
   const id=document.getElementById('cliId').value;
   const nom=document.getElementById('cNom').value.trim();
   if(!nom){showToast('Nombre obligatorio',true);return;}
@@ -4126,14 +4128,14 @@ async function guardarCli(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 async function elimCli(id,nom){
-  if(!exigirPermiso(puedeGestionarClientes(),'Solo supervisión o gerencia puede eliminar clientes')) return;
+  if(!exigirPermiso(puedeGestionarClientes(),'No tenés permiso para eliminar clientes')) return;
   if(!confirm(`¿Eliminar "${nom}"?`))return;
   try{await api(`clientes?id=eq.${id}`,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await Promise.all([loadClientes(),loadEquipos(),loadIntervenciones()]);}
   catch(e){showToast('Error',true);}
 }
 function abrirModalCli(id=null){
-  if(!exigirPermiso(puedeGestionarClientes(),'Solo supervisión o gerencia puede gestionar clientes')) return;
+  if(!exigirPermiso(puedeGestionarClientes(),'No tenés permiso para gestionar clientes')) return;
   ['cliId','cNom','cCont','cTel','cEmail','cDir','cNot'].forEach(x=>document.getElementById(x).value='');
   selEmp('ChillerSystem');
   if(id){
@@ -4375,7 +4377,7 @@ function renderIntervItem(i){
   let html='<div class="interv-item" style="margin-bottom:'+(esCorrectivo?'10px':'6px')+';'+(esCorrectivo?'border-left:3px solid '+(tieneResolucion?'var(--green)':'var(--red)')+';padding-left:10px;':'')+'">';
 
   // ENCABEZADO con botones editar/eliminar
-  const puedeEditar=usuarioActual&&(esGerencia()||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
+  const puedeEditar=usuarioActual&&(esOficina()||(i.tecnico&&i.tecnico===usuarioActual.nombre)||!i.tecnico);
   const puedeEliminar=esDavid();
   html+='<div class="interv-header" style="justify-content:flex-start;">';
   html+=esCorrectivo?'<span class="badge b-correctivo">🔴 Correctivo</span>':'<span class="badge b-preventivo2">'+i.tipo+'</span>';
@@ -4534,9 +4536,9 @@ function renderHist(){
 }
 
 async function guardarInterv(){
-  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esOficina()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&!esGerencia()){
+  if(usuarioActual&&!esOficina()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -4642,9 +4644,9 @@ function agregarCompletarFotos(files){
 }
 
 async function guardarCompletarDatos(){
-  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esOficina()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&!esGerencia()){
+  if(usuarioActual&&!esOficina()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -4759,7 +4761,7 @@ function renderUsers(){
     const delBtn=u.usuario!=='admin'?`<button class="btn-danger" onclick="elimUser('${u.id}','${u.nombre.replace(/'/g,'')}')">🗑</button>`:'';
     const uEmail=`${(u.usuario||'').toLowerCase().replace(/\s+/g,'')}@${AUTH_DOMAIN}`;
     const uNom=u.nombre.replace(/'/g,'');
-    const puedeResetear=esGerencia()||esAdministrativo();
+    const puedeResetear=esGerencia();
     const tieneLinkAuth=!!u.auth_user_id;
     let resetBtn;
     if(!puedeResetear){
@@ -5508,9 +5510,9 @@ function guardarServiceEq(){
   guardarServiceEq._running=false;
 }
 async function guardarSoloPreventivo(){
-  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esOficina()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&!esGerencia()){
+  if(usuarioActual&&!esOficina()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -5693,9 +5695,9 @@ async function guardarSoloPreventivo(){
 }
 
 async function guardarPlanilla(){
-  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esOficina()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&!esGerencia()){
+  if(usuarioActual&&!esOficina()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -5863,7 +5865,7 @@ function renderAprobaciones(){
           :`<div style="display:flex;gap:5px;flex-wrap:wrap;">
               <a href="${urlInforme}" target="_blank" class="btn-secondary" style="padding:4px 10px;font-size:11px;text-decoration:none;">📄 Ver informe</a>
               <button class="btn-primary" style="padding:4px 10px;font-size:11px;" onclick="mostrarModalWhatsApp('${a.id}')">📲 WhatsApp</button>
-              ${esGerencia()?`<button onclick="eliminarAprobacion('${a.id}',this)" data-grupo-ids='${grupoIdsJson.replace(/'/g,"&#39;")}' style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">🗑️</button>`:''}
+              ${puedeAdministrar()?`<button onclick="eliminarAprobacion('${a.id}',this)" data-grupo-ids='${grupoIdsJson.replace(/'/g,"&#39;")}' style="padding:4px 10px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">🗑️</button>`:''}
             </div>`
         }
       </td>
@@ -6257,7 +6259,7 @@ async function aprobarGrupoPreventivos(grupoIds,idPrincipal){
 }
 
 async function eliminarAprobacion(idRepresentante,btn){
-  if(!exigirPermiso(esGerencia(),'Solo gerencia puede eliminar aprobaciones')) return;
+  if(!exigirPermiso(puedeAdministrar(),'No tenés permiso para eliminar aprobaciones')) return;
   let ids=[idRepresentante];
   if(btn&&btn.dataset.grupoIds){
     try{ const parsed=JSON.parse(btn.dataset.grupoIds); if(Array.isArray(parsed)&&parsed.length) ids=parsed; }catch(e){}
@@ -6360,9 +6362,9 @@ function abrirResolverCorrectivo(id){
 }
 
 async function guardarResolucionCorrectivo(){
-  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(usuarioActual&&!esOficina()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&!esGerencia()){
+  if(usuarioActual&&!esOficina()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -6494,7 +6496,7 @@ function setFiltro(v,btn){
   if(document.getElementById('tab-service').style.display!=='none') mostrarTabService();
 }
 function puedeVerGaleria(){return !esTecnico();}
-function puedeVerEstadisticas(){return esGerencia()||esSupervisorAdmin();}
+function puedeVerEstadisticas(){return esOficina();}
 function showTab(id,btn){
   if(!puedeVerModulo(id)){showToast('⛔ No tenés acceso a este módulo',true);return;}
   aplicarPermisosUI();
@@ -6721,7 +6723,7 @@ function renderEventuales(lista){
 }
 
 function abrirModalEventual(id=null){
-  if(!exigirPermiso(puedeGestionarEventuales(),'Solo administración o gerencia puede gestionar eventuales')) return;
+  if(!exigirPermiso(puedeGestionarEventuales(),'No tenés permiso para gestionar eventuales')) return;
   ['eventualId','eNomEvt','eContEvt','eTelEvt','eEmailEvt','eDirEvt','eNotEvt'].forEach(x=>document.getElementById(x).value='');
   selEmpE('ChillerSystem');
   if(id){
@@ -6748,7 +6750,7 @@ function selEmpE(v){
 }
 
 async function guardarEventual(){
-  if(!exigirPermiso(puedeGestionarEventuales(),'Solo administración o gerencia puede modificar eventuales')) return;
+  if(!exigirPermiso(puedeGestionarEventuales(),'No tenés permiso para modificar eventuales')) return;
   const id=document.getElementById('eventualId').value;
   const nom=document.getElementById('eNomEvt').value.trim();
   if(!nom){showToast('Nombre obligatorio',true);return;}
@@ -6801,10 +6803,10 @@ function abrirTrabajoEvt(cliId){
 }
 
 async function guardarTrabajoEvt(){
-  if(!exigirPermiso(puedeGestionarEventuales(),'Solo administración o gerencia puede registrar trabajos eventuales')) return;
-  if(usuarioActual&&!esGerencia()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
+  if(!exigirPermiso(puedeGestionarEventuales(),'No tenés permiso para registrar trabajos eventuales')) return;
+  if(usuarioActual&&!esOficina()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
-  if(usuarioActual&&!esGerencia()){
+  if(usuarioActual&&!esOficina()){
     showToast('Ubicando GPS...',false);
     try {
       coords = await getUbicacionActual();
@@ -7500,7 +7502,7 @@ function calcularTotal(){
 }
 
 function abrirModalPpto(id=null){
-  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede crear o editar presupuestos')) return;
+  if(!exigirPermiso(puedeEditarPresupuestos(),'No tenés permiso para crear o editar presupuestos')) return;
   seccionesActuales=[];preciosActuales={};
   ['pptoId','pNumero','pClienteNombre','pClienteDireccion','pContacto','pReferencia','pFormaPago','pPlazo','pValidez','pNotas'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('pMoneda').value='ARS';
@@ -7547,7 +7549,7 @@ function abrirModalPpto(id=null){
 }
 
 async function guardarPpto(estado){
-  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede editar presupuestos')) return;
+  if(!exigirPermiso(puedeEditarPresupuestos(),'No tenés permiso para editar presupuestos')) return;
   const id=document.getElementById('pptoId').value;
   const numero=document.getElementById('pNumero').value.trim();
   const clienteNombre=document.getElementById('pClienteNombre').value.trim();
@@ -8680,7 +8682,7 @@ function cpHandleDrop(files){
 }
 
 function abrirModalCargarPpto(){
-  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede cargar presupuestos')) return;
+  if(!exigirPermiso(puedeEditarPresupuestos(),'No tenés permiso para cargar presupuestos')) return;
   ['cpNumero','cpClienteNombre','cpReferencia','cpMonto','cpMontoOpcional'].forEach(x=>document.getElementById(x).value='');
   document.getElementById('cpFecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('cpMoneda').value='ARS';
@@ -8707,7 +8709,7 @@ async function subirArchivoPpto(file){
 }
 
 async function guardarCargarPpto(){
-  if(!exigirPermiso(puedeEditarPresupuestos(),'Solo gerencia puede cargar presupuestos')) return;
+  if(!exigirPermiso(puedeEditarPresupuestos(),'No tenés permiso para cargar presupuestos')) return;
   const numero=document.getElementById('cpNumero').value.trim();
   const clienteNombre=document.getElementById('cpClienteNombre').value.trim();
   const fecha=document.getElementById('cpFecha').value;
@@ -9856,7 +9858,7 @@ function abrirModalInforme(id=null){
 }
 
 async function guardarInforme(estado){
-  if(!exigirPermiso(esGerencia(),'Solo gerencia puede modificar informes')) return;
+  if(!exigirPermiso(esOficina(),'No tenés permiso para modificar informes')) return;
   const id=document.getElementById('informeId').value;
   const numero=document.getElementById('iNumero').value.trim();
   const clienteNombre=document.getElementById('iClienteNombre').value.trim();
@@ -9904,7 +9906,7 @@ async function aprobarInforme(id){
 }
 
 async function elimInforme(id){
-  if(!exigirPermiso(esGerencia(),'Solo gerencia puede eliminar informes')) return;
+  if(!exigirPermiso(puedeAdministrar(),'No tenés permiso para eliminar informes')) return;
   if(!confirm('¿Eliminar este informe?'))return;
   try{await api('informes?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
     showToast('Eliminado');await loadInformes();}catch(e){showToast('Error',true);}
@@ -10692,7 +10694,7 @@ function renderConfigTareas(){
 }
 
 async function toggleTareaActiva(id, activa){
-  if(!exigirPermiso(esGerencia(),'Solo gerencia puede configurar tareas')) return;
+  if(!exigirPermiso(puedeAdministrar(),'No tenés permiso para configurar tareas')) return;
   try{
     await api(`tareas_configuracion?id=eq.${id}`,{method:'PATCH',body:JSON.stringify({activa:!activa}),headers:{...H,'Prefer':'return=minimal'}});
     await loadTareasConfig();
@@ -10702,7 +10704,7 @@ async function toggleTareaActiva(id, activa){
 }
 
 async function guardarFrecuenciaTarea(id, dias){
-  if(!exigirPermiso(esGerencia(),'Solo gerencia puede configurar tareas')) return;
+  if(!exigirPermiso(puedeAdministrar(),'No tenés permiso para configurar tareas')) return;
   const d=parseInt(dias);
   if(!d||d<1)return;
   try{
