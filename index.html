@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="ventas.js" defer></script>
 <style>
 /* ═══════════════════════════════════════════════════════
    CHILLERSYSTEM — CORPORATE LIGHT UI
@@ -1158,6 +1159,7 @@ tbody tr:hover{background:#f8faff;}
     <button class="nav-btn" id="tabInformes" data-module="informes" onclick="showTab('informes',this)">📊 Informes</button>
     <button class="nav-btn" id="tabEstadisticas" data-module="estadisticas" onclick="showTab('estadisticas',this)">📈 Estadísticas</button>
     <button class="nav-btn" id="tabTareas" data-module="tareas" onclick="showTab('tareas',this)">⚙️ Config. tareas</button>
+    <button class="nav-btn" id="tabVentas" data-module="ventas" onclick="showTab('ventas',this)">💰 Ventas</button>
   </div>
   <div class="nav-group nav-group-admin"><span class="nav-group-label">Administración</span>
     <button class="nav-btn" id="tabUsers" data-module="usuarios" onclick="showTab('usuarios',this)">👥 Usuarios</button>
@@ -2255,6 +2257,9 @@ tbody tr:hover{background:#f8faff;}
   <div id="mpPlanilla" style="padding:0 16px 24px;"></div>
 </div>
 
+<!-- ═══ VENTAS (CRM) — contenido renderizado por ventas.js ═══ -->
+<div id="tab-ventas" class="panel" style="display:none;"></div>
+
 <div id="tab-cronograma" class="panel" style="display:none;">
   <div class="panel-header">
     <div>
@@ -2609,6 +2614,7 @@ const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
 const AUTH_DOMAIN='chillersystem.app';
 const DAVID_USER_ID='6c2c577e-89f2-4fc4-9824-f21d40cb17f0';
+const VENTAS_PUBLICADO=false; // poner true cuando el módulo esté listo para todos
 // Mi Panel es el pipeline comercial personal de David — NO es un permiso por rol, es exclusivo de esta persona.
 // Referente técnico (Lucas Roda): puede agregar, editar y quitar equipos.
 const REFERENTE_TECNICO_ID='ad551b62-1f60-499d-a55e-1f2efc158cb6';
@@ -2657,6 +2663,7 @@ function puedeVerModulo(id){
   const modulos=['inicio','clientes','equipos','historial','service','eventual','presupuestos','informes',
     'tareas','aprobaciones','galeria','estadisticas','fichajes','usuarios','mipanel','cronograma','ventas'];
   if(!modulos.includes(id)) return false;
+  if(id==='ventas'&&!VENTAS_PUBLICADO) return esGerencia();
   if(id==='mipanel'||id==='cronograma') return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;
   if(esVendedor()) return id==='ventas';
   const restringidosParaTecnicos=['presupuestos','estadisticas','clientes','informes','aprobaciones','fichajes','usuarios','ventas'];
@@ -3109,6 +3116,8 @@ async function iniciarApp(){
   aplicarPermisosUI();
   // Ventas todavía no tiene pantalla: no dejar visible el panel de Clientes que se abre por defecto
   if(esVendedor()){document.getElementById('tab-clientes').style.display='none';document.getElementById('tabCli').classList.remove('active');}
+  // Vendedor cae directo en Ventas (si el módulo ya está publicado para su cargo)
+  if(esVendedor()&&puedeVerModulo('ventas')) showTab('ventas',document.getElementById('tabVentas'));
   // EXIGIR GPS PARA TÉCNICOS (jefatura se lo salta)
   if(!esJefatura){
     document.getElementById('tab-clientes').style.display='none';
@@ -6513,7 +6522,7 @@ function puedeVerEstadisticas(){return esOficina();}
 function showTab(id,btn){
   if(!puedeVerModulo(id)){showToast('⛔ No tenés acceso a este módulo',true);return;}
   aplicarPermisosUI();
-  ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel','cronograma'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
+  ['inicio','clientes','equipos','historial','usuarios','service','eventual','presupuestos','informes','tareas','aprobaciones','galeria','estadisticas','fichajes','mipanel','cronograma','ventas'].forEach(t=>{const el=document.getElementById('tab-'+t);if(el)el.style.display=t===id?'block':'none';});
   const navBar=document.getElementById('navBar');
   if(navBar) navBar.style.display='flex';
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -6529,6 +6538,7 @@ function showTab(id,btn){
   if(id==='estadisticas'){renderEstadisticas();}
   if(id==='mipanel'){const f=document.getElementById('mpFecha');if(f&&!f.value)f.value=new Date().toISOString().split('T')[0];cargarDatosMiPanel();}
   if(id==='cronograma'){loadCronograma();}
+  if(id==='ventas'&&window.Ventas){Ventas.mostrar();}
 }
 
 // ── INICIO (dashboard opcional) — delega 100% en los botones reales, sin lógica de roles propia ──

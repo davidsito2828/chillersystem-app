@@ -1,7 +1,8 @@
-const CACHE_NAME = 'chillersystem-v21'; // fix geolocation blocking and report visualizer null-safety
+const CACHE_NAME = 'chillersystem-v22'; // módulo Ventas: ventas.js
 const ASSETS = [
   '/',
   '/index.html',
+  '/ventas.js',
   'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap'
 ];
 
