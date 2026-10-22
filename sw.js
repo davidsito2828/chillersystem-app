@@ -1,8 +1,9 @@
-const CACHE_NAME = 'chillersystem-v22'; // módulo Ventas: ventas.js
+const CACHE_NAME = 'chillersystem-v23'; // Ventas: Tablero y Nueva oportunidad (ventas-oportunidades.js)
 const ASSETS = [
   '/',
   '/index.html',
   '/ventas.js',
+  '/ventas-oportunidades.js',
   'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap'
 ];
 
