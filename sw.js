@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v26'; // Ventas: leads (tablero, alta, ficha) y conversión a oportunidad (ventas-leads.js)
+const CACHE_NAME = 'chillersystem-v27'; // Ventas: listado de leads con Excel y agenda (ventas-agenda.js)
 const ASSETS = [
   '/',
   '/index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   '/ventas-ficha.js',
   '/ventas-listado.js',
   '/ventas-leads.js',
+  '/ventas-agenda.js',
   'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap'
 ];
 

@@ -1,6 +1,9 @@
 // ══════════════════════════════════════════
-//  VENTAS — Listado de oportunidades: filtros, orden por columna y exportación a Excel (ExcelJS)
-//  Se carga con defer después de ventas-ficha.js y registra la pantalla 'listado' en window.Ventas.
+//  VENTAS — Listados de oportunidades y de leads: filtros, orden por columna y exportación a
+//  Excel (con los helpers de Ventas.comun). Se carga con defer después de ventas-ficha.js y
+//  registra las pantallas 'listado' y 'leads-listado' (interna, resalta "Leads").
+//  Los datos de leads (estados, fecha AR de created_at) vienen de V.leads (ventas-leads.js, que se
+//  carga después): se usan recién al dibujar o exportar, no al cargar este archivo.
 //  Reutiliza las globales de index.html: api, escapeHtml, showToast, esGerencia, ExcelJS (CDN).
 // ══════════════════════════════════════════
 (function(){
@@ -9,14 +12,23 @@
   if(!V){console.error('[ventas] ventas-listado.js necesita ventas.js cargado antes');return;}
   const {fmtFecha,hoyAR,fmtMonto,ESTADOS,etiquetaEstado,nombreResponsable,mensajeError}=V.util;
   const C=V.comun;
+  const {fechaExcel,numeroExcel,textoExcel}=C;
+  const LD=()=>V.leads;
 
   const RUTA_LISTADO='crm_oportunidades?select=*,crm_prospectos(id,nombre,tipo_cliente_id,contacto_nombre,telefono,email,referido_por_id,crm_tipos_cliente(nombre),crm_referidores(nombre)),crm_tipos_servicio(nombre),usuarios(nombre)&order=fecha_ingreso.desc,id.asc';
-  const MSG_SIN_EXCELJS='No se pudo cargar la librería de Excel. Revisá la conexión.';
+  const RUTA_LEADS='crm_leads?select=*,crm_prospectos(id,nombre,tipo_cliente_id,contacto_nombre,telefono,email,referido_por_id,crm_tipos_cliente(nombre),crm_referidores(nombre)),usuarios(nombre)&order=created_at.desc,id.asc';
 
-  // ── Funciones puras (probadas en Node) ──
+  // ── Funciones puras comunes ──
   const pr=o=>(o&&o.crm_prospectos)||{};
   function comparar(a,b){return a.localeCompare(b,'es',{sensitivity:'base'});}
+  // Al tocar la columna activa se invierte; una columna nueva empieza ascendente
+  function siguienteOrden(actual,col){
+    if(actual.col===col) return {col,dir:actual.dir==='asc'?'desc':'asc'};
+    return {col,dir:'asc'};
+  }
+  const incluye=(v,q)=>String(v||'').toLowerCase().includes(q);
 
+  // ── Oportunidades (probadas en Node) ──
   // Texto que se compara al ordenar por cada columna (igual que valorColumna del original)
   function valorColumna(o,col){
     switch(col){
@@ -37,7 +49,7 @@
   function filtrarListado(lista,{busqueda='',estado='',responsable='',tipoCliente=''}={}){
     const q=String(busqueda||'').trim().toLowerCase();
     return (lista||[]).filter(o=>
-      (!q||String(pr(o).nombre||'').toLowerCase().includes(q)||String(o.numero_referencia||'').toLowerCase().includes(q)||String(o.comentarios||'').toLowerCase().includes(q))&&
+      (!q||incluye(pr(o).nombre,q)||incluye(o.numero_referencia,q)||incluye(o.comentarios,q))&&
       (!estado||o.estado===estado)&&
       (!responsable||o.responsable_id===responsable)&&
       (!tipoCliente||pr(o).tipo_cliente_id===tipoCliente));
@@ -51,24 +63,6 @@
       return signo*comparar(valorColumna(a,col),valorColumna(b,col));
     });
   }
-
-  // Al tocar la columna activa se invierte; una columna nueva empieza ascendente
-  function siguienteOrden(actual,col){
-    if(actual.col===col) return {col,dir:actual.dir==='asc'?'desc':'asc'};
-    return {col,dir:'asc'};
-  }
-
-  // 'YYYY-MM-DD' → Date en UTC (Excel la guarda sin corrimiento de día) o null
-  function fechaExcel(iso){
-    const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso==null?'':String(iso));
-    return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):null;
-  }
-  function numeroExcel(v){
-    if(v==null||v==='') return null;
-    const n=Number(v);
-    return Number.isFinite(n)?n:null;
-  }
-  const textoExcel=v=>v==null?'':String(v);
 
   const COLUMNAS_EXCEL=[
     {key:'numero_referencia',header:'N° de referencia',width:16},
@@ -90,7 +84,6 @@
     {key:'comision',header:'Comisión',width:14,tipo:'monto'},
     {key:'responsable',header:'Responsable',width:20}
   ];
-  const FORMATOS={fecha:'dd/mm/yyyy',monto:'#,##0',entero:'0'};
 
   // Una fila por oportunidad, con fechas como Date y montos/cantidades como número
   function filasExcel(lista){
@@ -118,25 +111,69 @@
       };
     });
   }
-
   // Libro con la hoja 'Oportunidades' (recibe ExcelJS para poder probarlo en Node)
   function construirLibro(ExcelJSLib,lista){
-    const wb=new ExcelJSLib.Workbook();
-    const ws=wb.addWorksheet('Oportunidades');
-    ws.columns=COLUMNAS_EXCEL.map(c=>({key:c.key,header:c.header,width:c.width,style:FORMATOS[c.tipo]?{numFmt:FORMATOS[c.tipo]}:{}}));
-    filasExcel(lista).forEach(f=>ws.addRow(f));
-    const enc=ws.getRow(1);
-    enc.font={bold:true};
-    enc.eachCell(cel=>{cel.numFmt='General';});
-    ws.autoFilter={from:{row:1,column:1},to:{row:1,column:COLUMNAS_EXCEL.length}};
-    return wb;
+    return C.libroExcel(ExcelJSLib,{hoja:'Oportunidades',columnas:COLUMNAS_EXCEL,filas:filasExcel(lista)});
   }
   function nombreArchivo(){return 'oportunidades_ventas_'+hoyAR()+'.xlsx';}
 
-  // ══════════════════════════════════════════
-  //  PANTALLA: LISTADO
-  // ══════════════════════════════════════════
-  const ls={cargando:false,error:'',oportunidades:[],responsables:[],busqueda:'',estado:'',resp:'',tipo:'',orden:{col:'fecha_ingreso',dir:'desc'},exportando:false,seq:0};
+  // ── Leads (probadas en Node) ──
+  // Columna "Fecha ingreso" = created_at; se ordena por el timestamp completo (como el original)
+  function valorColumnaLead(l,col){
+    switch(col){
+      case 'fecha_ingreso': return l.created_at||'';
+      case 'cliente': return pr(l).nombre||'';
+      case 'tipo_cliente': return (pr(l).crm_tipos_cliente&&pr(l).crm_tipos_cliente.nombre)||'';
+      case 'estado': return l.estado||'';
+      case 'proxima_fecha_contacto': return l.proxima_fecha_contacto||'';
+      case 'responsable': return (l.usuarios&&l.usuarios.nombre)||'';
+    }
+    return '';
+  }
+  function filtrarListadoLeads(lista,{busqueda='',estado='',responsable='',tipoCliente=''}={}){
+    const q=String(busqueda||'').trim().toLowerCase();
+    return (lista||[]).filter(l=>
+      (!q||incluye(pr(l).nombre,q)||incluye(l.notas,q))&&
+      (!estado||l.estado===estado)&&
+      (!responsable||l.responsable_id===responsable)&&
+      (!tipoCliente||pr(l).tipo_cliente_id===tipoCliente));
+  }
+  function ordenarListadoLeads(lista,col,dir){
+    const signo=dir==='asc'?1:-1;
+    return (lista||[]).slice().sort((a,b)=>signo*comparar(valorColumnaLead(a,col),valorColumnaLead(b,col)));
+  }
+  const COLUMNAS_EXCEL_LEADS=[
+    {key:'fecha_ingreso',header:'Fecha de ingreso',width:14,tipo:'fecha'},
+    {key:'cliente',header:'Cliente',width:30},
+    {key:'tipo_cliente',header:'Tipo de cliente',width:18},
+    {key:'contacto',header:'Contacto',width:22},
+    {key:'telefono',header:'Teléfono',width:18},
+    {key:'estado',header:'Estado',width:24},
+    {key:'proximo_contacto',header:'Próximo contacto',width:14,tipo:'fecha'},
+    {key:'notas',header:'Notas',width:40},
+    {key:'responsable',header:'Responsable',width:20}
+  ];
+  // Fecha de ingreso = día de created_at en hora argentina
+  function filasExcelLeads(lista){
+    return (lista||[]).map(l=>{
+      const p=pr(l);
+      return {
+        fecha_ingreso:fechaExcel(LD().fechaARDeTimestamp(l.created_at)),
+        cliente:textoExcel(p.nombre),
+        tipo_cliente:textoExcel(p.crm_tipos_cliente&&p.crm_tipos_cliente.nombre),
+        contacto:textoExcel(p.contacto_nombre),
+        telefono:textoExcel(p.telefono),
+        estado:LD().etiquetaEstadoLead(l.estado),
+        proximo_contacto:fechaExcel(l.proxima_fecha_contacto),
+        notas:textoExcel(l.notas),
+        responsable:nombreResponsable(l)
+      };
+    });
+  }
+  function construirLibroLeads(ExcelJSLib,lista){
+    return C.libroExcel(ExcelJSLib,{hoja:'Leads',columnas:COLUMNAS_EXCEL_LEADS,filas:filasExcelLeads(lista)});
+  }
+  function nombreArchivoLeads(){return 'leads_ventas_'+hoyAR()+'.xlsx';}
 
   C.agregarCss(`
 .vt-ls-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
@@ -145,6 +182,7 @@
 .vt-ls-tit{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);margin:14px 0 8px;}
 .vt-ls-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);}
 .vt-ls-tabla{width:100%;min-width:1280px;border-collapse:collapse;font-size:12px;}
+.vt-ls-tabla.vt-ls-leads{min-width:900px;}
 .vt-ls-tabla th{background:var(--bg3);color:var(--text-dim);font-weight:600;text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
 .vt-ls-tabla td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
 .vt-ls-tabla tbody tr:last-child td{border-bottom:0;}
@@ -152,68 +190,154 @@
 .vt-ls-orden:hover{color:var(--accent);}
 .vt-ls-com{max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .vt-ls-tabla .vt-link{white-space:nowrap;}
+.vt-ls-volver{margin-bottom:12px;}
+.vt-badge-lead-por_contactar{background:#f1f5f9;color:#334155;}
+.vt-badge-lead-en_conversacion{background:#fef3c7;color:#b45309;}
+.vt-badge-lead-convertido{background:#d1fae5;color:#047857;}
+.vt-badge-lead-sin_interes{background:#ffe4e6;color:#be123c;}
 `);
-
-  async function entrarListado(){
-    const seq=++ls.seq;
-    ls.cargando=true;ls.error='';V.repintar();
-    try{
-      const [ops,resp]=await Promise.all([
-        C.cargarTodo(RUTA_LISTADO),
-        esGerencia()?C.cargarResponsables():Promise.resolve([]),
-        C.cargarCatalogosActivos(['crm_tipos_cliente'])
-      ]);
-      if(seq!==ls.seq) return;
-      ls.oportunidades=ops;
-      ls.responsables=resp;
-    }catch(e){
-      if(seq!==ls.seq) return;
-      console.error('[ventas] Error cargando el listado',e);
-      ls.error='No se pudo cargar el listado: '+mensajeError(e);
-    }finally{
-      if(seq===ls.seq) ls.cargando=false;
-    }
-    if(seq===ls.seq&&V.vistaActual().vista==='listado') V.repintar();
-  }
-
-  function visibles(){
-    const filtrados=filtrarListado(ls.oportunidades,{busqueda:ls.busqueda,estado:ls.estado,responsable:esGerencia()?ls.resp:'',tipoCliente:ls.tipo});
-    return ordenarListado(filtrados,ls.orden.col,ls.orden.dir);
-  }
-
-  function htmlListado(){
-    if(ls.cargando&&!ls.oportunidades.length) return `<div data-vt-pantalla="listado"><div class="vt-msg">Cargando…</div></div>`;
-    if(ls.error) return `<div data-vt-pantalla="listado"><div class="vt-msg vt-error">${escapeHtml(ls.error)}</div></div>`;
-    const opt=(v,t,sel)=>`<option value="${escapeHtml(v)}"${v===sel?' selected':''}>${escapeHtml(t)}</option>`;
-    return `
-<div data-vt-pantalla="listado">
-  <div class="vt-toolbar">
-    <div class="vt-ls-filtros">
-      <input type="text" class="form-input" data-vt-ls="busqueda" placeholder="Buscar por cliente, N° o comentarios..." value="${escapeHtml(ls.busqueda)}" autocomplete="off">
-      <select class="form-select" data-vt-ls="estado"><option value="">Todos los estados</option>${ESTADOS.map(e=>opt(e.valor,e.etiqueta,ls.estado)).join('')}</select>
-      ${esGerencia()?`<select class="form-select" data-vt-ls="resp"><option value="">Todos los responsables</option>${ls.responsables.map(r=>opt(r.id,r.nombre,ls.resp)).join('')}</select>`:''}
-      <select class="form-select" data-vt-ls="tipo"><option value="">Todos los tipos de cliente</option>${C.catalogo('crm_tipos_cliente').map(t=>opt(t.id,t.nombre,ls.tipo)).join('')}</select>
-    </div>
-    <button type="button" class="btn-secondary" data-vt-ls-exportar${ls.exportando?' disabled':''}>${ls.exportando?'Generando…':'Exportar a Excel'}</button>
-  </div>
-  <div data-vt-ls-res>${htmlResultados()}</div>
-</div>`;
-  }
 
   const fecha=f=>f?fmtFecha(f):'-';
   const txt=v=>escapeHtml(v==null?'-':v);
+  const opt=(v,t,sel)=>`<option value="${escapeHtml(v)}"${v===sel?' selected':''}>${escapeHtml(t)}</option>`;
 
-  function htmlResultados(){
-    const lista=visibles();
-    const th=(col,etq)=>{
-      const ind=ls.orden.col!==col?'':ls.orden.dir==='asc'?' ▲':' ▼';
-      const aria=ls.orden.col!==col?'none':ls.orden.dir==='asc'?'ascending':'descending';
-      return `<th aria-sort="${aria}"><button type="button" class="vt-ls-orden" data-vt-orden="${col}">${escapeHtml(etq)}${ind}</button></th>`;
-    };
-    const filas=lista.map(o=>{
-      const p=pr(o);
-      const telEmail=[p.telefono,p.email].filter(Boolean).join(' / ')||'-';
+  // ══════════════════════════════════════════
+  //  Pantalla de listado genérica: carga paginada, filtros (búsqueda, estado, responsable solo
+  //  para gerencia, tipo de cliente), orden por encabezado y "Exportar a Excel" de lo visible.
+  //  cfg: {id, interna?, resaltar?, ruta, error, cabecera?, placeholder, estados(), filtrar, ordenar,
+  //        htmlTabla(lista, th), vacio, excel(lista) → {hoja, columnas, filas, archivo}}
+  // ══════════════════════════════════════════
+  function crearPantallaListado(cfg){
+    const st={cargando:false,error:'',datos:[],responsables:[],busqueda:'',estado:'',resp:'',tipo:'',
+      orden:{col:'fecha_ingreso',dir:'desc'},exportando:false,seq:0};
+    const enVista=()=>V.vistaActual().vista===cfg.id;
+
+    async function entrar(){
+      const seq=++st.seq;
+      st.cargando=true;st.error='';V.repintar();
+      try{
+        const [datos,resp]=await Promise.all([
+          C.cargarTodo(cfg.ruta),
+          esGerencia()?C.cargarResponsables():Promise.resolve([]),
+          C.cargarCatalogosActivos(['crm_tipos_cliente'])
+        ]);
+        if(seq!==st.seq) return;
+        st.datos=datos;
+        st.responsables=resp;
+      }catch(e){
+        if(seq!==st.seq) return;
+        console.error('[ventas] Error cargando '+cfg.id,e);
+        st.error=cfg.error+mensajeError(e);
+      }finally{
+        if(seq===st.seq) st.cargando=false;
+      }
+      if(seq===st.seq&&enVista()) V.repintar();
+    }
+
+    function visibles(){
+      const f=cfg.filtrar(st.datos,{busqueda:st.busqueda,estado:st.estado,responsable:esGerencia()?st.resp:'',tipoCliente:st.tipo});
+      return cfg.ordenar(f,st.orden.col,st.orden.dir);
+    }
+
+    function html(){
+      const cab=cfg.cabecera||'';
+      const envolver=c=>`<div data-vt-pantalla="${escapeHtml(cfg.id)}">${cab}${c}</div>`;
+      if(st.cargando&&!st.datos.length) return envolver('<div class="vt-msg">Cargando…</div>');
+      if(st.error) return envolver(`<div class="vt-msg vt-error">${escapeHtml(st.error)}</div>`);
+      return envolver(`
+  <div class="vt-toolbar">
+    <div class="vt-ls-filtros">
+      <input type="text" class="form-input" data-vt-ls="busqueda" placeholder="${escapeHtml(cfg.placeholder)}" value="${escapeHtml(st.busqueda)}" autocomplete="off">
+      <select class="form-select" data-vt-ls="estado"><option value="">Todos los estados</option>${cfg.estados().map(e=>opt(e.valor,e.etiqueta,st.estado)).join('')}</select>
+      ${esGerencia()?`<select class="form-select" data-vt-ls="resp"><option value="">Todos los responsables</option>${st.responsables.map(r=>opt(r.id,r.nombre,st.resp)).join('')}</select>`:''}
+      <select class="form-select" data-vt-ls="tipo"><option value="">Todos los tipos de cliente</option>${C.catalogo('crm_tipos_cliente').map(t=>opt(t.id,t.nombre,st.tipo)).join('')}</select>
+    </div>
+    <button type="button" class="btn-secondary" data-vt-ls-exportar${st.exportando?' disabled':''}>${st.exportando?'Generando…':'Exportar a Excel'}</button>
+  </div>
+  <div data-vt-ls-res>${htmlResultados()}</div>`);
+    }
+
+    function th(col,etq){
+      const ind=st.orden.col!==col?'':st.orden.dir==='asc'?' ▲':' ▼';
+      const aria=st.orden.col!==col?'none':st.orden.dir==='asc'?'ascending':'descending';
+      return `<th aria-sort="${aria}"><button type="button" class="vt-ls-orden" data-vt-orden="${escapeHtml(col)}">${escapeHtml(etq)}${ind}</button></th>`;
+    }
+
+    function htmlResultados(){
+      const lista=visibles();
       return `
+  <div class="vt-ls-tit">Listado (${lista.length})</div>
+  <div class="vt-ls-wrap">${cfg.htmlTabla(lista,th)}</div>
+  ${lista.length?'':`<p class="vt-msg">${escapeHtml(cfg.vacio)}</p>`}`;
+    }
+
+    // Redibuja solo la tabla (no los filtros, así la búsqueda no pierde el foco)
+    function repintarResultados(){
+      const b=C.cuerpo();
+      const r=b&&b.querySelector('[data-vt-ls-res]');
+      if(r) r.innerHTML=htmlResultados(); else V.repintar();
+    }
+
+    async function exportar(){
+      if(st.exportando||!C.excelDisponible()) return;
+      const lista=visibles();
+      st.exportando=true;V.repintar();
+      try{
+        await C.exportarExcel(cfg.excel(lista));
+      }finally{
+        st.exportando=false;
+        if(enVista()) V.repintar();
+      }
+    }
+
+    function aplicarFiltro(el){
+      const k=el.dataset.vtLs;
+      if(k==='busqueda') st.busqueda=el.value;
+      else if(k==='estado') st.estado=el.value;
+      else if(k==='resp') st.resp=el.value;
+      else if(k==='tipo') st.tipo=el.value;
+      else return;
+      repintarResultados();
+    }
+
+    V.registrarPantalla({
+      id:cfg.id,
+      interna:!!cfg.interna,
+      resaltar:cfg.resaltar,
+      html,
+      entrar,
+      on:{
+        click(e){
+          const o=e.target.closest('[data-vt-orden]');
+          if(o){st.orden=siguienteOrden(st.orden,o.dataset.vtOrden);repintarResultados();return;}
+          const x=e.target.closest('[data-vt-ls-exportar]');
+          if(x&&!x.disabled) exportar();
+        },
+        input(e){if(e.target.matches('[data-vt-ls="busqueda"]')) aplicarFiltro(e.target);},
+        change(e){if(e.target.matches('select[data-vt-ls]')) aplicarFiltro(e.target);},
+        keydown(e){if(e.key==='Enter'&&e.target.matches('[data-vt-ls="busqueda"]')) e.preventDefault();}
+      }
+    });
+  }
+
+  // ══════════════════════════════════════════
+  //  PANTALLA: LISTADO DE OPORTUNIDADES
+  // ══════════════════════════════════════════
+  crearPantallaListado({
+    id:'listado',
+    ruta:RUTA_LISTADO,
+    error:'No se pudo cargar el listado: ',
+    placeholder:'Buscar por cliente, N° o comentarios...',
+    estados:()=>ESTADOS,
+    filtrar:filtrarListado,
+    ordenar:ordenarListado,
+    vacio:'No hay oportunidades que coincidan.',
+    excel:lista=>({hoja:'Oportunidades',columnas:COLUMNAS_EXCEL,filas:filasExcel(lista),archivo:nombreArchivo()}),
+    htmlTabla(lista,th){
+      const filas=lista.map(o=>{
+        const p=pr(o);
+        const telEmail=[p.telefono,p.email].filter(Boolean).join(' / ')||'-';
+        return `
       <tr>
         <td><button type="button" class="vt-link" data-vt-ficha="${escapeHtml(o.id)}">${escapeHtml(o.numero_referencia||'Ver')}</button></td>
         <td>${escapeHtml(fecha(o.fecha_ingreso))}</td>
@@ -232,10 +356,8 @@
         <td>${escapeHtml(o.comision_monto?fmtMonto(o.comision_monto,o.moneda):'-')}</td>
         <td>${escapeHtml(nombreResponsable(o))}</td>
       </tr>`;
-    }).join('');
-    return `
-  <div class="vt-ls-tit">Listado (${lista.length})</div>
-  <div class="vt-ls-wrap">
+      }).join('');
+      return `
     <table class="vt-ls-tabla">
       <thead><tr>
         ${th('numero_referencia','N°')}${th('fecha_ingreso','Fecha ingreso')}${th('cliente','Cliente')}${th('tipo_cliente','Tipo cliente')}
@@ -245,74 +367,52 @@
         ${th('responsable','Responsable')}
       </tr></thead>
       <tbody>${filas}</tbody>
-    </table>
-  </div>
-  ${lista.length?'':'<p class="vt-msg">No hay oportunidades que coincidan.</p>'}`;
-  }
-
-  // Redibuja solo la tabla (no los filtros, así la búsqueda no pierde el foco)
-  function repintarResultados(){
-    const b=C.cuerpo();
-    const r=b&&b.querySelector('[data-vt-ls-res]');
-    if(r) r.innerHTML=htmlResultados(); else V.repintar();
-  }
-
-  // Descarga igual que exportarSeguimientoExcel de index.html (Blob + enlace con download)
-  function descargar(buf,nombre){
-    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download=nombre;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  async function exportar(){
-    if(ls.exportando) return;
-    if(!window.ExcelJS){showToast(MSG_SIN_EXCELJS,true);return;}
-    const lista=visibles();
-    ls.exportando=true;V.repintar();
-    try{
-      const buf=await construirLibro(window.ExcelJS,lista).xlsx.writeBuffer();
-      descargar(buf,nombreArchivo());
-    }catch(e){
-      console.error('[ventas] Error exportando el listado',e);
-      showToast('Error al generar el Excel: '+mensajeError(e),true);
-    }finally{
-      ls.exportando=false;
-      if(V.vistaActual().vista==='listado') V.repintar();
-    }
-  }
-
-  function aplicarFiltro(el){
-    const k=el.dataset.vtLs;
-    if(k==='busqueda') ls.busqueda=el.value;
-    else if(k==='estado') ls.estado=el.value;
-    else if(k==='resp') ls.resp=el.value;
-    else if(k==='tipo') ls.tipo=el.value;
-    else return;
-    repintarResultados();
-  }
-
-  V.registrarPantalla({
-    id:'listado',
-    html:htmlListado,
-    entrar:entrarListado,
-    on:{
-      click(e){
-        const o=e.target.closest('[data-vt-orden]');
-        if(o){ls.orden=siguienteOrden(ls.orden,o.dataset.vtOrden);repintarResultados();return;}
-        const x=e.target.closest('[data-vt-ls-exportar]');
-        if(x&&!x.disabled) exportar();
-      },
-      input(e){if(e.target.matches('[data-vt-ls="busqueda"]')) aplicarFiltro(e.target);},
-      change(e){if(e.target.matches('select[data-vt-ls]')) aplicarFiltro(e.target);},
-      keydown(e){if(e.key==='Enter'&&e.target.matches('[data-vt-ls="busqueda"]')) e.preventDefault();}
+    </table>`;
     }
   });
 
-  V.listado={filtrarListado,ordenarListado,siguienteOrden,valorColumna,filasExcel,construirLibro,fechaExcel,nombreArchivo,COLUMNAS_EXCEL};
+  // ══════════════════════════════════════════
+  //  PANTALLA: LISTADO DE LEADS (interna, resalta "Leads")
+  // ══════════════════════════════════════════
+  crearPantallaListado({
+    id:'leads-listado',
+    interna:true,
+    resaltar:'leads',
+    ruta:RUTA_LEADS,
+    error:'No se pudo cargar el listado de leads: ',
+    cabecera:'<div class="vt-ls-volver"><button type="button" class="btn-secondary" data-vt-ir="leads">← Volver a Leads</button></div>',
+    placeholder:'Buscar por cliente o notas...',
+    estados:()=>LD().ESTADOS_LEAD,
+    filtrar:filtrarListadoLeads,
+    ordenar:ordenarListadoLeads,
+    vacio:'No hay leads que coincidan.',
+    excel:lista=>({hoja:'Leads',columnas:COLUMNAS_EXCEL_LEADS,filas:filasExcelLeads(lista),archivo:nombreArchivoLeads()}),
+    htmlTabla(lista,th){
+      const filas=lista.map(l=>{
+        const p=pr(l);
+        return `
+      <tr>
+        <td>${escapeHtml(fecha(LD().fechaARDeTimestamp(l.created_at)))}</td>
+        <td><button type="button" class="vt-link" data-vt-ficha-lead="${escapeHtml(l.id)}">${escapeHtml(p.nombre||'Ver')}</button></td>
+        <td>${txt(p.crm_tipos_cliente&&p.crm_tipos_cliente.nombre)}</td>
+        <td>${txt(p.contacto_nombre)}</td>
+        <td><span class="vt-badge vt-badge-lead-${escapeHtml(l.estado)}">${escapeHtml(LD().etiquetaEstadoLead(l.estado))}</span></td>
+        <td>${escapeHtml(fecha(l.proxima_fecha_contacto))}</td>
+        <td>${escapeHtml(nombreResponsable(l))}</td>
+      </tr>`;
+      }).join('');
+      return `
+    <table class="vt-ls-tabla vt-ls-leads">
+      <thead><tr>
+        ${th('fecha_ingreso','Fecha ingreso')}${th('cliente','Cliente')}${th('tipo_cliente','Tipo cliente')}
+        <th>Contacto</th>
+        ${th('estado','Estado')}${th('proxima_fecha_contacto','Próximo contacto')}${th('responsable','Responsable')}
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>`;
+    }
+  });
+
+  V.listado={filtrarListado,ordenarListado,siguienteOrden,valorColumna,filasExcel,construirLibro,fechaExcel,nombreArchivo,COLUMNAS_EXCEL,
+    valorColumnaLead,filtrarListadoLeads,ordenarListadoLeads,filasExcelLeads,construirLibroLeads,nombreArchivoLeads,COLUMNAS_EXCEL_LEADS};
 })();

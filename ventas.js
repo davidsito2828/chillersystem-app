@@ -284,6 +284,67 @@
     return {inicio,activo:()=>!!drag};
   }
 
+  // ── Exportación a Excel (ExcelJS desde el CDN de index.html) ──
+  // Compartida por los listados de oportunidades y de leads. columnas: [{key, header, width, tipo?}]
+  // con tipo 'fecha' | 'monto' | 'entero'; filas: objetos con esas claves (fechas como Date en UTC).
+  const MSG_SIN_EXCELJS='No se pudo cargar la librería de Excel. Revisá la conexión.';
+  const MIME_XLSX='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const FORMATOS_EXCEL={fecha:'dd/mm/yyyy',monto:'#,##0',entero:'0'};
+  // 'YYYY-MM-DD' → Date en UTC (Excel la guarda sin corrimiento de día) o null
+  function fechaExcel(iso){
+    const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso==null?'':String(iso));
+    return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):null;
+  }
+  function numeroExcel(v){
+    if(v==null||v==='') return null;
+    const n=Number(v);
+    return Number.isFinite(n)?n:null;
+  }
+  function textoExcel(v){return v==null?'':String(v);}
+  // Libro con una hoja: encabezado en negrita con filtro automático (recibe ExcelJS para poder probarlo en Node)
+  function libroExcel(ExcelJSLib,{hoja,columnas,filas}){
+    const wb=new ExcelJSLib.Workbook();
+    const ws=wb.addWorksheet(hoja);
+    ws.columns=columnas.map(c=>({key:c.key,header:c.header,width:c.width,style:FORMATOS_EXCEL[c.tipo]?{numFmt:FORMATOS_EXCEL[c.tipo]}:{}}));
+    (filas||[]).forEach(f=>ws.addRow(f));
+    const enc=ws.getRow(1);
+    enc.font={bold:true};
+    enc.eachCell(cel=>{cel.numFmt='General';});
+    ws.autoFilter={from:{row:1,column:1},to:{row:1,column:columnas.length}};
+    return wb;
+  }
+  // Descarga igual que exportarSeguimientoExcel de index.html (Blob + enlace con download)
+  function descargarArchivo(buf,nombre,tipo=MIME_XLSX){
+    const blob=new Blob([buf],{type:tipo});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=nombre;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  // Avisa y devuelve false si ExcelJS no cargó
+  function excelDisponible(){
+    if(window.ExcelJS) return true;
+    showToast(MSG_SIN_EXCELJS,true);
+    return false;
+  }
+  // Arma el libro y lo descarga; devuelve true si salió bien (los errores se avisan acá)
+  async function exportarExcel({hoja,columnas,filas,archivo}){
+    if(!excelDisponible()) return false;
+    try{
+      const buf=await libroExcel(window.ExcelJS,{hoja,columnas,filas}).xlsx.writeBuffer();
+      descargarArchivo(buf,archivo);
+      return true;
+    }catch(e){
+      console.error('[ventas] Error generando el Excel '+archivo,e);
+      showToast('Error al generar el Excel: '+mensajeError(e),true);
+      return false;
+    }
+  }
+
   // ── SelectConCrear: desplegable de catálogo con "+ Crear nuevo…" inline ──
   const CREAR='__crear__';
   // actual {id,nombre}: valor ya guardado que puede estar inactivo; se ofrece igual para no perderlo al editar
@@ -614,6 +675,7 @@
   window.Ventas={
     mostrar,ir,repintar,registrarPantalla,vistaActual,
     util:{fmtFecha,hoyAR,fmtMonto,normalizarTelAR,waLink,ESTADOS,etiquetaEstado,nombreResponsable,nombreUsuarioSeguimiento,tiempoRelativo,mensajeError},
-    comun:{cargarCatalogosActivos,catalogo,nombreEnCatalogo,cargarResponsables,cargarTodo,crearArrastre,htmlSelectConCrear,htmlBotonWhatsApp,agregarCss,contenedor,cuerpo}
+    comun:{cargarCatalogosActivos,catalogo,nombreEnCatalogo,cargarResponsables,cargarTodo,crearArrastre,
+      fechaExcel,numeroExcel,textoExcel,libroExcel,descargarArchivo,excelDisponible,exportarExcel,htmlSelectConCrear,htmlBotonWhatsApp,agregarCss,contenedor,cuerpo}
   };
 })();

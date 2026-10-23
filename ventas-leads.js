@@ -130,7 +130,7 @@
       ${esGerencia()?`<select class="form-select" data-vt-ld-filtro="resp"><option value="">Todos los responsables</option>${optResp}</select>`:''}
     </div>
     <div class="vt-ld-acc">
-      <button type="button" class="vt-sub-btn" disabled title="Próximamente">Ver listado <small>Próximamente</small></button>
+      <button type="button" class="btn-secondary" data-vt-ir="leads-listado">Ver listado</button>
       <button type="button" class="btn-primary" data-vt-ir="nuevo-lead">+ Nuevo lead</button>
     </div>
   </div>
