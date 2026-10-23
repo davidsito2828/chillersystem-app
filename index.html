@@ -2621,7 +2621,7 @@ const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
 const AUTH_DOMAIN='chillersystem.app';
 const DAVID_USER_ID='6c2c577e-89f2-4fc4-9824-f21d40cb17f0';
-const VENTAS_PUBLICADO=false; // poner true cuando el módulo esté listo para todos
+const VENTAS_PUBLICADO=false; // false: Ventas lo ven gerencia y los agentes de ventas (prueba controlada); true: también supervisión y administrativos
 // Mi Panel es el pipeline comercial personal de David — NO es un permiso por rol, es exclusivo de esta persona.
 // Referente técnico (Lucas Roda): puede agregar, editar y quitar equipos.
 const REFERENTE_TECNICO_ID='ad551b62-1f60-499d-a55e-1f2efc158cb6';
@@ -2670,7 +2670,7 @@ function puedeVerModulo(id){
   const modulos=['inicio','clientes','equipos','historial','service','eventual','presupuestos','informes',
     'tareas','aprobaciones','galeria','estadisticas','fichajes','usuarios','mipanel','cronograma','ventas'];
   if(!modulos.includes(id)) return false;
-  if(id==='ventas'&&!VENTAS_PUBLICADO) return esGerencia();
+  if(id==='ventas'&&!VENTAS_PUBLICADO) return esGerencia()||esVendedor();
   if(id==='mipanel'||id==='cronograma') return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;
   if(esVendedor()) return id==='ventas';
   const restringidosParaTecnicos=['presupuestos','estadisticas','clientes','informes','aprobaciones','fichajes','usuarios','ventas'];
