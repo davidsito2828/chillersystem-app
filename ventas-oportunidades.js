@@ -131,18 +131,18 @@
   const tb={cargando:false,error:'',oportunidades:[],responsables:[],novedades:new Map(),filtroResp:'',filtroTipo:'',moviendo:new Set(),drag:null};
 
   // Las novedades no son críticas: si fallan, el tablero se muestra igual sin panel
-  function cargarNoCritico(ruta){
-    return api(ruta).then(r=>Array.isArray(r)?r:[]).catch(e=>{console.warn('[ventas] No se pudo cargar '+ruta.split('?')[0],e);return [];});
+  function cargarNoCritico(ruta,paginado=false){
+    return (paginado?C.cargarTodo(ruta):api(ruta)).then(r=>Array.isArray(r)?r:[]).catch(e=>{console.warn('[ventas] No se pudo cargar '+ruta.split('?')[0],e);return [];});
   }
 
   async function entrarTablero(){
     tb.cargando=true;tb.error='';V.repintar();
     try{
       const [ops,resp,,seguimientos,vistas]=await Promise.all([
-        api('crm_oportunidades?select=*,crm_prospectos(id,nombre,tipo_cliente_id,contacto_nombre,telefono),crm_tipos_servicio(nombre),usuarios(nombre)&order=created_at.desc'),
+        C.cargarTodo('crm_oportunidades?select=*,crm_prospectos(id,nombre,tipo_cliente_id,contacto_nombre,telefono),crm_tipos_servicio(nombre),usuarios(nombre)&order=created_at.desc,id.asc'),
         esGerencia()?C.cargarResponsables():Promise.resolve([]),
         C.cargarCatalogosActivos(['crm_tipos_cliente']),
-        cargarNoCritico('crm_seguimientos?select=oportunidad_id,usuario_id,usuario_nombre_libre,tipo_contacto,nota,created_at,usuarios(nombre)'),
+        cargarNoCritico('crm_seguimientos?select=oportunidad_id,usuario_id,usuario_nombre_libre,tipo_contacto,nota,created_at,usuarios(nombre)&order=created_at.desc,id.asc',true),
         cargarNoCritico('crm_vistas?select=oportunidad_id,last_viewed_at&usuario_id=eq.'+encodeURIComponent(usuarioActual.id))
       ]);
       tb.oportunidades=Array.isArray(ops)?ops:[];

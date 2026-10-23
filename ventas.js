@@ -191,6 +191,20 @@
     return Array.isArray(filas)?filas:[];
   }
 
+  // Trae una consulta completa en páginas de tam filas (&limit/&offset) hasta que una página
+  // venga incompleta. La ruta debe tener un order determinístico (con id como desempate) para
+  // que las páginas no se pisen. Si una página falla, el error se propaga.
+  async function cargarTodo(ruta,tam=1000){
+    const sep=ruta.includes('?')?'&':'?';
+    const todo=[];
+    for(let offset=0;;offset+=tam){
+      const pagina=await api(ruta+sep+'limit='+tam+'&offset='+offset);
+      const filas=Array.isArray(pagina)?pagina:[];
+      for(const f of filas) todo.push(f);
+      if(filas.length<tam) return todo;
+    }
+  }
+
   // ── SelectConCrear: desplegable de catálogo con "+ Crear nuevo…" inline ──
   const CREAR='__crear__';
   // actual {id,nombre}: valor ya guardado que puede estar inactivo; se ofrece igual para no perderlo al editar
@@ -521,6 +535,6 @@
   window.Ventas={
     mostrar,ir,repintar,registrarPantalla,vistaActual,
     util:{fmtFecha,hoyAR,fmtMonto,normalizarTelAR,waLink,ESTADOS,etiquetaEstado,nombreResponsable,nombreUsuarioSeguimiento,tiempoRelativo,mensajeError},
-    comun:{cargarCatalogosActivos,catalogo,nombreEnCatalogo,cargarResponsables,htmlSelectConCrear,htmlBotonWhatsApp,agregarCss,contenedor,cuerpo}
+    comun:{cargarCatalogosActivos,catalogo,nombreEnCatalogo,cargarResponsables,cargarTodo,htmlSelectConCrear,htmlBotonWhatsApp,agregarCss,contenedor,cuerpo}
   };
 })();
