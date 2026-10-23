@@ -164,6 +164,8 @@
         if(b&&el.contains(b)&&!b.disabled){ir(b.dataset.vtIr);return;}
         const fi=e.target.closest('[data-vt-ficha]');
         if(fi&&el.contains(fi)&&!fi.disabled&&pantallas.ficha){ir('ficha',{id:fi.dataset.vtFicha});return;}
+        const fl=e.target.closest('[data-vt-ficha-lead]');
+        if(fl&&el.contains(fl)&&!fl.disabled&&pantallas['ficha-lead']){ir('ficha-lead',{id:fl.dataset.vtFichaLead});return;}
         if(sccClick(e)) return;
         if(waClick(e)) return;
       }
@@ -203,6 +205,83 @@
       for(const f of filas) todo.push(f);
       if(filas.length<tam) return todo;
     }
+  }
+
+  // ── Arrastre de tarjetas entre columnas (eventos de puntero: mouse y touch) ──
+  // Compartido por los tableros de oportunidades y de leads. Se agarra desde la agarradera
+  // [data-vt-drag] de una .vt-card que lleva su id en atributoId; se suelta sobre una .vt-col con
+  // data-estado. bloqueado(id) impide arrastrar una tarjeta ocupada; onSoltar(id, estado) decide qué hacer.
+  const UMBRAL=5, BORDE=48, PASO=14;
+  function crearArrastre({atributoId,bloqueado=()=>false,onSoltar}){
+    let drag=null;
+
+    function inicio(e){
+      const h=e.target.closest('[data-vt-drag]');
+      if(!h||drag) return;
+      if(e.pointerType==='mouse'&&e.button!==0) return;
+      const card=h.closest('.vt-card');
+      const id=card&&card.getAttribute(atributoId);
+      if(!id||bloqueado(id)) return;
+      drag={id,card,handle:h,pointerId:e.pointerId,x0:e.clientX,y0:e.clientY,activo:false,ghost:null,col:null};
+      try{h.setPointerCapture(e.pointerId);}catch(_){/* sin captura: igual funciona dentro del contenedor */}
+    }
+
+    function mover(e){
+      const d=drag;
+      if(!d||e.pointerId!==d.pointerId) return;
+      if(!d.activo){
+        if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)<UMBRAL) return;
+        const r=d.card.getBoundingClientRect();
+        d.ghost=d.card.cloneNode(true);
+        d.ghost.classList.add('vt-ghost');
+        d.ghost.removeAttribute(atributoId);
+        d.ghost.style.width=r.width+'px';
+        d.ghost.style.left=r.left+'px';
+        d.ghost.style.top=r.top+'px';
+        document.body.appendChild(d.ghost);
+        d.card.classList.add('vt-dragging');
+        d.activo=true;
+      }
+      e.preventDefault();
+      d.ghost.style.transform=`translate(${e.clientX-d.x0}px,${e.clientY-d.y0}px)`;
+      const bajo=document.elementFromPoint(e.clientX,e.clientY);
+      const col=bajo?bajo.closest('#tab-ventas .vt-col'):null;
+      if(col!==d.col){
+        if(d.col) d.col.classList.remove('vt-col-over');
+        if(col) col.classList.add('vt-col-over');
+        d.col=col;
+      }
+      // Auto-scroll horizontal del tablero y vertical de la página cerca de los bordes
+      const board=d.card.closest('.vt-board');
+      if(board){
+        const br=board.getBoundingClientRect();
+        if(e.clientX<br.left+BORDE) board.scrollLeft-=PASO;
+        else if(e.clientX>br.right-BORDE) board.scrollLeft+=PASO;
+      }
+      if(e.clientY<BORDE) window.scrollBy(0,-PASO);
+      else if(e.clientY>window.innerHeight-BORDE) window.scrollBy(0,PASO);
+    }
+
+    function fin(e,cancelado){
+      const d=drag;
+      if(!d||(e&&e.pointerId!==undefined&&e.pointerId!==d.pointerId)) return;
+      drag=null;
+      try{d.handle.releasePointerCapture(d.pointerId);}catch(_){/* ya liberada */}
+      if(d.ghost) d.ghost.remove();
+      d.card.classList.remove('vt-dragging');
+      if(d.col) d.col.classList.remove('vt-col-over');
+      if(!d.activo||cancelado||!d.col) return;
+      const destino=d.col.dataset.estado;
+      if(destino) onSoltar(d.id,destino);
+    }
+
+    // Mover/soltar se escuchan en document: si el tablero se repinta durante el arrastre, la captura
+    // del puntero se pierde y los eventos ya no pasan por #tab-ventas.
+    document.addEventListener('pointermove',e=>{if(drag) mover(e);},{passive:false});
+    document.addEventListener('pointerup',e=>{if(drag) fin(e,false);});
+    document.addEventListener('pointercancel',e=>{if(drag) fin(e,true);});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&drag) fin(null,true);});
+    return {inicio,activo:()=>!!drag};
   }
 
   // ── SelectConCrear: desplegable de catálogo con "+ Crear nuevo…" inline ──
@@ -535,6 +614,6 @@
   window.Ventas={
     mostrar,ir,repintar,registrarPantalla,vistaActual,
     util:{fmtFecha,hoyAR,fmtMonto,normalizarTelAR,waLink,ESTADOS,etiquetaEstado,nombreResponsable,nombreUsuarioSeguimiento,tiempoRelativo,mensajeError},
-    comun:{cargarCatalogosActivos,catalogo,nombreEnCatalogo,cargarResponsables,cargarTodo,htmlSelectConCrear,htmlBotonWhatsApp,agregarCss,contenedor,cuerpo}
+    comun:{cargarCatalogosActivos,catalogo,nombreEnCatalogo,cargarResponsables,cargarTodo,crearArrastre,htmlSelectConCrear,htmlBotonWhatsApp,agregarCss,contenedor,cuerpo}
   };
 })();

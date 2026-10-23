@@ -123,12 +123,14 @@
 .vt-bp-item{display:block;width:100%;text-align:left;padding:10px 12px;font-size:13px;color:var(--text);background:none;border:0;border-bottom:1px solid var(--border);cursor:pointer;font-family:inherit;}
 .vt-bp-item:last-child{border-bottom:0;}
 .vt-bp-item:hover{background:#eff6ff;}
+.vt-np-lead{font-size:13px;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--r);padding:8px 12px;margin:0 0 14px;}
+.vt-np-lead.vt-np-lead-aviso{color:#92400e;background:#fffbeb;border-color:#fde68a;}
 `);
 
   // ══════════════════════════════════════════
   //  PANTALLA: TABLERO
   // ══════════════════════════════════════════
-  const tb={cargando:false,error:'',oportunidades:[],responsables:[],novedades:new Map(),filtroResp:'',filtroTipo:'',moviendo:new Set(),drag:null};
+  const tb={cargando:false,error:'',oportunidades:[],responsables:[],novedades:new Map(),filtroResp:'',filtroTipo:'',moviendo:new Set()};
 
   // Las novedades no son críticas: si fallan, el tablero se muestra igual sin panel
   function cargarNoCritico(ruta,paginado=false){
@@ -254,74 +256,8 @@
     if(res) await res.seguimiento;
   }
 
-  // ── Arrastre con eventos de puntero (funciona con mouse y touch) ──
-  const UMBRAL=5, BORDE=48, PASO=14;
-
-  function dragInicio(e){
-    const h=e.target.closest('[data-vt-drag]');
-    if(!h||tb.drag) return;
-    if(e.pointerType==='mouse'&&e.button!==0) return;
-    const card=h.closest('.vt-card');
-    if(!card||tb.moviendo.has(card.dataset.opId)) return;
-    tb.drag={id:card.dataset.opId,card,handle:h,pointerId:e.pointerId,x0:e.clientX,y0:e.clientY,activo:false,ghost:null,dx:0,dy:0,col:null};
-    try{h.setPointerCapture(e.pointerId);}catch(_){/* sin captura: igual funciona dentro del contenedor */}
-  }
-
-  function dragMover(e){
-    const d=tb.drag;
-    if(!d||e.pointerId!==d.pointerId) return;
-    if(!d.activo){
-      if(Math.hypot(e.clientX-d.x0,e.clientY-d.y0)<UMBRAL) return;
-      const r=d.card.getBoundingClientRect();
-      d.ghost=d.card.cloneNode(true);
-      d.ghost.classList.add('vt-ghost');
-      d.ghost.removeAttribute('data-op-id');
-      d.ghost.style.width=r.width+'px';
-      d.ghost.style.left=r.left+'px';
-      d.ghost.style.top=r.top+'px';
-      document.body.appendChild(d.ghost);
-      d.card.classList.add('vt-dragging');
-      d.activo=true;
-    }
-    e.preventDefault();
-    d.ghost.style.transform=`translate(${e.clientX-d.x0}px,${e.clientY-d.y0}px)`;
-    const bajo=document.elementFromPoint(e.clientX,e.clientY);
-    const col=bajo?bajo.closest('#tab-ventas .vt-col'):null;
-    if(col!==d.col){
-      if(d.col) d.col.classList.remove('vt-col-over');
-      if(col) col.classList.add('vt-col-over');
-      d.col=col;
-    }
-    // Auto-scroll horizontal del tablero y vertical de la página cerca de los bordes
-    const board=d.card.closest('.vt-board');
-    if(board){
-      const br=board.getBoundingClientRect();
-      if(e.clientX<br.left+BORDE) board.scrollLeft-=PASO;
-      else if(e.clientX>br.right-BORDE) board.scrollLeft+=PASO;
-    }
-    if(e.clientY<BORDE) window.scrollBy(0,-PASO);
-    else if(e.clientY>window.innerHeight-BORDE) window.scrollBy(0,PASO);
-  }
-
-  function dragFin(e,cancelado){
-    const d=tb.drag;
-    if(!d||(e&&e.pointerId!==undefined&&e.pointerId!==d.pointerId)) return;
-    tb.drag=null;
-    try{d.handle.releasePointerCapture(d.pointerId);}catch(_){/* ya liberada */}
-    if(d.ghost) d.ghost.remove();
-    d.card.classList.remove('vt-dragging');
-    if(d.col) d.col.classList.remove('vt-col-over');
-    if(!d.activo||cancelado||!d.col) return;
-    const destino=d.col.dataset.estado;
-    if(destino) moverOportunidad(d.id,destino);
-  }
-
-  // Mover/soltar se escuchan en document: si el tablero se repinta durante el arrastre, la captura
-  // del puntero se pierde y los eventos ya no pasan por #tab-ventas.
-  document.addEventListener('pointermove',e=>{if(tb.drag) dragMover(e);},{passive:false});
-  document.addEventListener('pointerup',e=>{if(tb.drag) dragFin(e,false);});
-  document.addEventListener('pointercancel',e=>{if(tb.drag) dragFin(e,true);});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&tb.drag) dragFin(null,true);});
+  // Arrastre compartido con el tablero de leads (motor en ventas.js)
+  const arrastre=C.crearArrastre({atributoId:'data-op-id',bloqueado:id=>tb.moviendo.has(id),onSoltar:moverOportunidad});
 
   V.registrarPantalla({
     id:'tablero',
@@ -341,47 +277,219 @@
           if(card) moverOportunidad(card.dataset.opId,m.value);
         }
       },
-      pointerdown:dragInicio
+      pointerdown:arrastre.inicio
     }
   });
 
   // ══════════════════════════════════════════
-  //  PANTALLA: NUEVA OPORTUNIDAD
+  //  SELECTOR DE PROSPECTO (buscar existente o crear uno nuevo)
+  //  Compartido por Nueva oportunidad y Nuevo lead (ventas-leads.js). st es el estado de la
+  //  pantalla: {prospectos, prospecto, modo, creandoProspecto}. Se dibuja dentro de
+  //  [data-vt-np-prospecto] y al elegir un prospecto limpia el error [data-vt-np-error] del formulario.
   // ══════════════════════════════════════════
-  const np={cargando:false,error:'',prospectos:[],responsables:[],prospecto:null,modo:'buscar',guardando:false,creandoProspecto:false};
+  function mostrarError(sel,msg){
+    const p=C.cuerpo()&&C.cuerpo().querySelector(sel);
+    if(!p) return;
+    p.textContent=msg||'';
+    p.hidden=!msg;
+  }
 
-  async function entrarNueva(){
-    Object.assign(np,{cargando:true,error:'',prospectos:[],responsables:[],prospecto:null,modo:'buscar',guardando:false,creandoProspecto:false});
+  function crearSelectorProspecto(st){
+    function html(){
+      if(st.prospecto){
+        return `<div class="vt-np-sel"><span>${escapeHtml(st.prospecto.nombre)}</span><button type="button" class="btn-danger" data-vt-np="quitar">Quitar</button></div>`;
+      }
+      const modos=`<div class="vt-np-modos">
+      <button type="button" class="vt-sub-btn${st.modo==='buscar'?' vt-activo':''}" data-vt-np="modo-buscar">Buscar existente</button>
+      <button type="button" class="vt-sub-btn${st.modo==='crear'?' vt-activo':''}" data-vt-np="modo-crear">Crear prospecto nuevo</button>
+    </div>`;
+      if(st.modo==='buscar'){
+        return modos+`<div class="vt-bp">
+        <input class="form-input" type="text" data-vt-bp-input placeholder="Buscar prospecto por nombre..." autocomplete="off">
+        <div class="vt-bp-lista" data-vt-bp-lista hidden></div>
+      </div>`;
+      }
+      // No es un <form>: va embebido dentro del <form> de la pantalla (no se anidan forms)
+      return modos+`<div class="vt-np-nuevo" data-vt-np-nuevo>
+      <input class="form-input" type="text" data-p="nombre" placeholder="Nombre del prospecto" maxlength="160">
+      ${C.htmlSelectConCrear({nombre:'p_tipo_cliente_id',tabla:'crm_tipos_cliente',placeholder:'Tipo de cliente'})}
+      <input class="form-input" type="text" data-p="contacto_nombre" placeholder="Persona de contacto" maxlength="120">
+      <input class="form-input" type="tel" data-p="telefono" placeholder="Teléfono" maxlength="40">
+      <input class="form-input" type="email" data-p="email" placeholder="Email" maxlength="160">
+      ${C.htmlSelectConCrear({nombre:'p_referido_por_id',tabla:'crm_referidores',placeholder:'Referido por (opcional)'})}
+      <textarea class="form-textarea vt-ancho" data-p="notas" rows="2" placeholder="Notas (opcional)"></textarea>
+      <div class="vt-ancho"><button type="button" class="btn-primary" data-vt-np="crear-prospecto"${st.creandoProspecto?' disabled':''}>${st.creandoProspecto?'Creando...':'Crear prospecto'}</button></div>
+      <p class="vt-error vt-ancho" data-vt-np-perror hidden></p>
+    </div>`;
+    }
+
+    function pintar(){
+      const box=C.cuerpo()&&C.cuerpo().querySelector('[data-vt-np-prospecto]');
+      if(box) box.innerHTML=html();
+      return box;
+    }
+
+    // ── Buscador de prospectos (filtro en memoria) ──
+    function pintarLista(input){
+      const lista=input.closest('.vt-bp').querySelector('[data-vt-bp-lista]');
+      const q=input.value.trim().toLowerCase();
+      const filtrados=q?st.prospectos.filter(p=>String(p.nombre).toLowerCase().includes(q)):st.prospectos;
+      lista.innerHTML=filtrados.length
+        ?filtrados.map(p=>`<button type="button" class="vt-bp-item" data-vt-bp-id="${escapeHtml(p.id)}">${escapeHtml(p.nombre)}</button>`).join('')
+        :'<div class="vt-msg">Sin resultados</div>';
+      lista.hidden=false;
+    }
+
+    async function crearProspecto(){
+      if(st.creandoProspecto) return;
+      const box=C.cuerpo().querySelector('[data-vt-np-nuevo]');
+      if(!box) return;
+      const val=k=>{const el=box.querySelector('[data-p="'+k+'"]');return el?el.value.trim():'';};
+      const sel=n=>{const el=box.querySelector('select[name="'+n+'"]');return el&&el.value&&el.value!=='__crear__'?el.value:'';};
+      mostrarError('[data-vt-np-perror]','');
+      const nombre=val('nombre');
+      if(!nombre){mostrarError('[data-vt-np-perror]','El nombre es obligatorio.');return;}
+      const btn=box.querySelector('[data-vt-np="crear-prospecto"]');
+      st.creandoProspecto=true;
+      if(btn){btn.disabled=true;btn.textContent='Creando...';}
+      try{
+        const filas=await api('crm_prospectos?select=id,nombre',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({
+          nombre,
+          tipo_cliente_id:sel('p_tipo_cliente_id')||null,
+          contacto_nombre:val('contacto_nombre')||null,
+          telefono:val('telefono')||null,
+          email:val('email')||null,
+          referido_por_id:sel('p_referido_por_id')||null,
+          notas:val('notas')||null
+        })});
+        const fila=Array.isArray(filas)?filas[0]:null;
+        if(!fila) throw new Error('row-level security');
+        st.prospectos.push(fila);
+        st.prospectos.sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es',{sensitivity:'base'}));
+        st.prospecto=fila;
+        st.creandoProspecto=false;
+        pintar();
+      }catch(e){
+        console.error('[ventas] Error creando prospecto',e);
+        st.creandoProspecto=false;
+        if(btn){btn.disabled=false;btn.textContent='Crear prospecto';}
+        mostrarError('[data-vt-np-perror]','Error al crear el prospecto: '+mensajeError(e,{permiso:'No tenés permiso para crear prospectos'}));
+      }
+    }
+
+    // Manejadores: devuelven true si el evento era del selector
+    function click(e){
+      const it=e.target.closest('[data-vt-bp-id]');
+      if(it){
+        const p=st.prospectos.find(x=>x.id===it.dataset.vtBpId);
+        if(p){st.prospecto=p;pintar();mostrarError('[data-vt-np-error]','');}
+        return true;
+      }
+      const b=e.target.closest('[data-vt-np]');
+      if(!b) return false;
+      if(b.disabled) return true;
+      const acc=b.dataset.vtNp;
+      if(acc==='quitar'){st.prospecto=null;pintar();}
+      else if(acc==='modo-buscar'||acc==='modo-crear'){
+        st.modo=acc==='modo-crear'?'crear':'buscar';
+        const box=pintar();
+        const foco=box&&box.querySelector(st.modo==='crear'?'[data-p="nombre"]':'[data-vt-bp-input]');
+        if(foco) foco.focus();
+      }
+      else if(acc==='crear-prospecto') crearProspecto();
+      return true;
+    }
+    function input(e){
+      if(!e.target.matches('[data-vt-bp-input]')) return false;
+      pintarLista(e.target);
+      return true;
+    }
+    function keydown(e){
+      if(e.key!=='Enter') return false;
+      // Enter dentro del buscador o del alta de prospecto no debe enviar el formulario de la pantalla
+      if(e.target.matches('[data-vt-bp-input]')){e.preventDefault();return true;}
+      if(e.target.closest('[data-vt-np-nuevo]')&&e.target.tagName!=='TEXTAREA'){e.preventDefault();crearProspecto();return true;}
+      return false;
+    }
+    return {html,pintar,click,input,focusin:input,keydown};
+  }
+
+  function ocultarListaProspectos(){
+    const b=C.cuerpo();
+    if(!b) return;
+    b.querySelectorAll('[data-vt-bp-lista]').forEach(l=>{l.hidden=true;});
+  }
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('.vt-bp')) ocultarListaProspectos();});
+
+  // ══════════════════════════════════════════
+  //  PANTALLA: NUEVA OPORTUNIDAD
+  //  Parámetros opcionales {leadId, prospectoId}: viene de "Convertir a oportunidad" de un lead;
+  //  precarga el prospecto y al guardar marca ese lead como convertido.
+  // ══════════════════════════════════════════
+  const MSG_LEAD_NO_MARCADO='La oportunidad se creó, pero no se pudo marcar el lead como convertido.';
+  const MSG_LEAD_YA_CONVERTIDO='La oportunidad se creó, pero el lead ya estaba convertido (o enlazado a otra oportunidad) y no se modificó.';
+  const np={cargando:false,error:'',prospectos:[],responsables:[],prospecto:null,modo:'buscar',guardando:false,creandoProspecto:false,
+    leadId:null,leadYaConvertido:false,seq:0};
+  const selNp=crearSelectorProspecto(np);
+  const leadConvertido=l=>!!l&&(!!l.oportunidad_id||l.estado==='convertido');
+
+  async function entrarNueva(params){
+    const leadId=params&&params.leadId?String(params.leadId):null;
+    const prospectoId=params&&params.prospectoId?String(params.prospectoId):null;
+    const seq=++np.seq;
+    Object.assign(np,{cargando:true,error:'',prospectos:[],responsables:[],prospecto:null,modo:'buscar',guardando:false,creandoProspecto:false,
+      leadId,leadYaConvertido:false});
     V.repintar();
     try{
-      const [prospectos,resp]=await Promise.all([
+      const [prospectos,resp,,lead]=await Promise.all([
         api('crm_prospectos?select=id,nombre&order=nombre.asc'),
         esGerencia()?C.cargarResponsables():Promise.resolve([]),
-        C.cargarCatalogosActivos(['crm_tipos_servicio','crm_tipos_cliente','crm_referidores'])
+        C.cargarCatalogosActivos(['crm_tipos_servicio','crm_tipos_cliente','crm_referidores']),
+        // Solo para avisar si el lead ya estaba convertido; si falla no impide cargar el formulario
+        leadId?api('crm_leads?select=id,estado,oportunidad_id&id=eq.'+encodeURIComponent(leadId)).catch(e=>{console.warn('[ventas] No se pudo leer el lead',e);return null;}):Promise.resolve(null)
       ]);
+      if(seq!==np.seq) return;
       np.prospectos=Array.isArray(prospectos)?prospectos:[];
       np.responsables=resp;
+      np.leadYaConvertido=leadConvertido(Array.isArray(lead)?lead[0]:null);
+      if(prospectoId){
+        np.prospecto=np.prospectos.find(p=>p.id===prospectoId)||null;
+        if(!np.prospecto){
+          const filas=await api('crm_prospectos?select=id,nombre&id=eq.'+encodeURIComponent(prospectoId));
+          if(seq!==np.seq) return;
+          np.prospecto=(Array.isArray(filas)&&filas[0])||null;
+        }
+      }
     }catch(e){
+      if(seq!==np.seq) return;
       console.error('[ventas] Error cargando el formulario',e);
       np.error='No se pudo cargar el formulario: '+mensajeError(e);
     }finally{
-      np.cargando=false;
+      if(seq===np.seq) np.cargando=false;
     }
-    if(enVista('nueva')) V.repintar();
+    if(seq===np.seq&&enVista('nueva')) V.repintar();
   }
 
   function htmlNueva(){
-    const cab=`<button type="button" class="btn-secondary" data-vt-ir="tablero">← Volver al tablero</button><h2 class="vt-h2">Nueva oportunidad</h2>`;
+    const volver=np.leadId
+      ?`<button type="button" class="btn-secondary" data-vt-ficha-lead="${escapeHtml(np.leadId)}">← Volver al lead</button>`
+      :`<button type="button" class="btn-secondary" data-vt-ir="tablero">← Volver al tablero</button>`;
+    const cab=`${volver}<h2 class="vt-h2">Nueva oportunidad</h2>`;
     if(np.cargando) return `<div class="vt-np" data-vt-pantalla="nueva">${cab}<div class="vt-msg">Cargando…</div></div>`;
     if(np.error) return `<div class="vt-np" data-vt-pantalla="nueva">${cab}<div class="vt-msg vt-error">${escapeHtml(np.error)}</div></div>`;
     const optResp=np.responsables.map(r=>`<option value="${escapeHtml(r.id)}">${escapeHtml(r.nombre)}</option>`).join('');
+    const avisoLead=!np.leadId?''
+      :np.leadYaConvertido
+        ?`<p class="vt-np-lead vt-np-lead-aviso" data-vt-np-lead>Este lead ya está convertido o enlazado a otra oportunidad: la oportunidad nueva no se va a enlazar con él.</p>`
+        :`<p class="vt-np-lead" data-vt-np-lead>Se va a crear a partir de un lead. Al guardar, ese lead queda marcado como convertido.</p>`;
     return `
 <div class="vt-np" data-vt-pantalla="nueva">
   ${cab}
+  ${avisoLead}
   <form data-vt-form="nueva-op" autocomplete="off">
     <div class="form-group">
       <label class="form-label">Prospecto (cliente que cotiza)</label>
-      <div data-vt-np-prospecto>${htmlProspecto()}</div>
+      <div data-vt-np-prospecto>${selNp.html()}</div>
     </div>
     <div class="vt-np-grid">
       <div class="form-group"><label class="form-label">N° de referencia (opcional)</label>
@@ -412,98 +520,19 @@
 </div>`;
   }
 
-  function htmlProspecto(){
-    if(np.prospecto){
-      return `<div class="vt-np-sel"><span>${escapeHtml(np.prospecto.nombre)}</span><button type="button" class="btn-danger" data-vt-np="quitar">Quitar</button></div>`;
-    }
-    const modos=`<div class="vt-np-modos">
-      <button type="button" class="vt-sub-btn${np.modo==='buscar'?' vt-activo':''}" data-vt-np="modo-buscar">Buscar existente</button>
-      <button type="button" class="vt-sub-btn${np.modo==='crear'?' vt-activo':''}" data-vt-np="modo-crear">Crear prospecto nuevo</button>
-    </div>`;
-    if(np.modo==='buscar'){
-      return modos+`<div class="vt-bp">
-        <input class="form-input" type="text" data-vt-bp-input placeholder="Buscar prospecto por nombre..." autocomplete="off">
-        <div class="vt-bp-lista" data-vt-bp-lista hidden></div>
-      </div>`;
-    }
-    // No es un <form>: va embebido dentro del <form> de la oportunidad (no se anidan forms)
-    return modos+`<div class="vt-np-nuevo" data-vt-np-nuevo>
-      <input class="form-input" type="text" data-p="nombre" placeholder="Nombre del prospecto" maxlength="160">
-      ${C.htmlSelectConCrear({nombre:'p_tipo_cliente_id',tabla:'crm_tipos_cliente',placeholder:'Tipo de cliente'})}
-      <input class="form-input" type="text" data-p="contacto_nombre" placeholder="Persona de contacto" maxlength="120">
-      <input class="form-input" type="tel" data-p="telefono" placeholder="Teléfono" maxlength="40">
-      <input class="form-input" type="email" data-p="email" placeholder="Email" maxlength="160">
-      ${C.htmlSelectConCrear({nombre:'p_referido_por_id',tabla:'crm_referidores',placeholder:'Referido por (opcional)'})}
-      <textarea class="form-textarea vt-ancho" data-p="notas" rows="2" placeholder="Notas (opcional)"></textarea>
-      <div class="vt-ancho"><button type="button" class="btn-primary" data-vt-np="crear-prospecto"${np.creandoProspecto?' disabled':''}>${np.creandoProspecto?'Creando...':'Crear prospecto'}</button></div>
-      <p class="vt-error vt-ancho" data-vt-np-perror hidden></p>
-    </div>`;
-  }
-
-  function pintarProspecto(){
-    const box=C.cuerpo()&&C.cuerpo().querySelector('[data-vt-np-prospecto]');
-    if(box) box.innerHTML=htmlProspecto();
-    return box;
-  }
-
-  function mostrarError(sel,msg){
-    const p=C.cuerpo()&&C.cuerpo().querySelector(sel);
-    if(!p) return;
-    p.textContent=msg||'';
-    p.hidden=!msg;
-  }
-
-  // ── Buscador de prospectos (filtro en memoria) ──
-  function pintarListaProspectos(input){
-    const lista=input.closest('.vt-bp').querySelector('[data-vt-bp-lista]');
-    const q=input.value.trim().toLowerCase();
-    const filtrados=q?np.prospectos.filter(p=>String(p.nombre).toLowerCase().includes(q)):np.prospectos;
-    lista.innerHTML=filtrados.length
-      ?filtrados.map(p=>`<button type="button" class="vt-bp-item" data-vt-bp-id="${escapeHtml(p.id)}">${escapeHtml(p.nombre)}</button>`).join('')
-      :'<div class="vt-msg">Sin resultados</div>';
-    lista.hidden=false;
-  }
-  function ocultarListaProspectos(){
-    const b=C.cuerpo();
-    if(!b) return;
-    b.querySelectorAll('[data-vt-bp-lista]').forEach(l=>{l.hidden=true;});
-  }
-  document.addEventListener('pointerdown',e=>{if(!e.target.closest('.vt-bp')) ocultarListaProspectos();});
-
-  async function crearProspecto(){
-    if(np.creandoProspecto) return;
-    const box=C.cuerpo().querySelector('[data-vt-np-nuevo]');
-    if(!box) return;
-    const val=k=>{const el=box.querySelector('[data-p="'+k+'"]');return el?el.value.trim():'';};
-    const sel=n=>{const el=box.querySelector('select[name="'+n+'"]');return el&&el.value&&el.value!=='__crear__'?el.value:'';};
-    mostrarError('[data-vt-np-perror]','');
-    const nombre=val('nombre');
-    if(!nombre){mostrarError('[data-vt-np-perror]','El nombre es obligatorio.');return;}
-    const btn=box.querySelector('[data-vt-np="crear-prospecto"]');
-    np.creandoProspecto=true;
-    if(btn){btn.disabled=true;btn.textContent='Creando...';}
+  // Marca el lead como convertido y lo enlaza con la oportunidad nueva. El filtro evita pisar un lead
+  // que ya estaba convertido o enlazado. Devuelve '' si salió bien o el aviso a mostrar.
+  async function marcarLeadConvertido(leadId,oportunidadId){
     try{
-      const filas=await api('crm_prospectos?select=id,nombre',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({
-        nombre,
-        tipo_cliente_id:sel('p_tipo_cliente_id')||null,
-        contacto_nombre:val('contacto_nombre')||null,
-        telefono:val('telefono')||null,
-        email:val('email')||null,
-        referido_por_id:sel('p_referido_por_id')||null,
-        notas:val('notas')||null
-      })});
-      const fila=Array.isArray(filas)?filas[0]:null;
-      if(!fila) throw new Error('row-level security');
-      np.prospectos.push(fila);
-      np.prospectos.sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es',{sensitivity:'base'}));
-      np.prospecto=fila;
-      np.creandoProspecto=false;
-      pintarProspecto();
+      const filas=await api('crm_leads?id=eq.'+encodeURIComponent(leadId)+'&oportunidad_id=is.null&estado=neq.convertido',
+        {method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify({estado:'convertido',oportunidad_id:oportunidadId})});
+      if(Array.isArray(filas)&&filas[0]) return '';
+      // No se actualizó ninguna fila: o ya estaba convertido, o no hay permiso (RLS)
+      const leads=await api('crm_leads?select=id,estado,oportunidad_id&id=eq.'+encodeURIComponent(leadId));
+      return leadConvertido(Array.isArray(leads)?leads[0]:null)?MSG_LEAD_YA_CONVERTIDO:MSG_LEAD_NO_MARCADO;
     }catch(e){
-      console.error('[ventas] Error creando prospecto',e);
-      np.creandoProspecto=false;
-      if(btn){btn.disabled=false;btn.textContent='Crear prospecto';}
-      mostrarError('[data-vt-np-perror]','Error al crear el prospecto: '+mensajeError(e,{permiso:'No tenés permiso para crear prospectos'}));
+      console.error('[ventas] Error marcando el lead como convertido',e);
+      return MSG_LEAD_NO_MARCADO;
     }
   }
 
@@ -533,6 +562,7 @@
       responsable_id:responsableId,
       comentarios:v('comentarios')?f.comentarios.value:null
     };
+    const leadId=np.leadId;
     const btn=form.querySelector('[data-vt-np-guardar]');
     np.guardando=true;
     if(btn){btn.disabled=true;btn.textContent='Guardando...';}
@@ -552,8 +582,11 @@
     try{
       await api('crm_seguimientos',{method:'POST',body:JSON.stringify({oportunidad_id:fila.id,nota:'Oportunidad creada.',usuario_id:usuarioActual.id})});
     }catch(e){console.warn('[ventas] No se pudo registrar el seguimiento inicial',e);}
+    // Conversión de lead: a diferencia del original, si no se pudo marcar el lead se avisa
+    const avisoLead=leadId?await marcarLeadConvertido(leadId,fila.id):'';
     np.guardando=false;
-    showToast('Oportunidad creada','success');
+    if(avisoLead) showToast(avisoLead,true);
+    else showToast('Oportunidad creada','success');
     V.ir('ficha',{id:fila.id}); // como el original: después del alta se abre la ficha
   }
 
@@ -562,37 +595,10 @@
     html:htmlNueva,
     entrar:entrarNueva,
     on:{
-      click(e){
-        const it=e.target.closest('[data-vt-bp-id]');
-        if(it){
-          const p=np.prospectos.find(x=>x.id===it.dataset.vtBpId);
-          if(p){np.prospecto=p;pintarProspecto();mostrarError('[data-vt-np-error]','');}
-          return;
-        }
-        const b=e.target.closest('[data-vt-np]');
-        if(!b||b.disabled) return;
-        const acc=b.dataset.vtNp;
-        if(acc==='quitar'){np.prospecto=null;pintarProspecto();}
-        else if(acc==='modo-buscar'||acc==='modo-crear'){
-          np.modo=acc==='modo-crear'?'crear':'buscar';
-          const box=pintarProspecto();
-          const foco=box&&box.querySelector(np.modo==='crear'?'[data-p="nombre"]':'[data-vt-bp-input]');
-          if(foco) foco.focus();
-        }
-        else if(acc==='crear-prospecto') crearProspecto();
-      },
-      input(e){
-        if(e.target.matches('[data-vt-bp-input]')) pintarListaProspectos(e.target);
-      },
-      focusin(e){
-        if(e.target.matches('[data-vt-bp-input]')) pintarListaProspectos(e.target);
-      },
-      keydown(e){
-        if(e.key!=='Enter') return;
-        // Enter dentro del buscador o del alta de prospecto no debe enviar el formulario de la oportunidad
-        if(e.target.matches('[data-vt-bp-input]')){e.preventDefault();return;}
-        if(e.target.closest('[data-vt-np-nuevo]')&&e.target.tagName!=='TEXTAREA'){e.preventDefault();crearProspecto();}
-      },
+      click(e){selNp.click(e);},
+      input(e){selNp.input(e);},
+      focusin(e){selNp.focusin(e);},
+      keydown(e){selNp.keydown(e);},
       submit(e){
         const form=e.target.closest('form[data-vt-form="nueva-op"]');
         if(!form) return;
@@ -602,5 +608,5 @@
     }
   });
 
-  V.oportunidades={filtrarOportunidades,agruparPorEstado,moverOportunidad,cambiarEstado,calcularNovedades,itemsNovedades};
+  V.oportunidades={filtrarOportunidades,agruparPorEstado,moverOportunidad,cambiarEstado,calcularNovedades,itemsNovedades,crearSelectorProspecto};
 })();
