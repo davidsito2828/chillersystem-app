@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chillersystem-v27'; // Ventas: listado de leads con Excel y agenda (ventas-agenda.js)
+const CACHE_NAME = 'chillersystem-v28'; // Ventas: resumen ejecutivo y novedades de facturación (ventas-resumen.js, ventas-facturacion.js)
 const ASSETS = [
   '/',
   '/index.html',
@@ -8,6 +8,8 @@ const ASSETS = [
   '/ventas-listado.js',
   '/ventas-leads.js',
   '/ventas-agenda.js',
+  '/ventas-resumen.js',
+  '/ventas-facturacion.js',
   'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap'
 ];
 
