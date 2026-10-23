@@ -8,7 +8,7 @@
   'use strict';
   const V=window.Ventas;
   if(!V){console.error('[ventas] ventas-oportunidades.js necesita ventas.js cargado antes');return;}
-  const {fmtFecha,hoyAR,fmtMonto,ESTADOS,etiquetaEstado,nombreResponsable,mensajeError}=V.util;
+  const {fmtFecha,hoyAR,fmtMonto,ESTADOS,etiquetaEstado,nombreResponsable,nombreUsuarioSeguimiento,tiempoRelativo,mensajeError}=V.util;
   const C=V.comun;
 
   const MSG_PERMISO_OP='No tenés permiso para modificar esta oportunidad';
@@ -24,6 +24,55 @@
     ESTADOS.forEach(e=>{grupos[e.valor]=[];});
     (lista||[]).forEach(o=>{if(grupos[o.estado]) grupos[o.estado].push(o);});
     return grupos;
+  }
+
+  // Novedades (igual que utils/novedades.ts del original): cuenta todo seguimiento (manual o
+  // automático de cambio de estado, sea de quien sea, incluidos los propios) creado después de
+  // la última vez que este usuario abrió la ficha. Sin vista registrada, cuentan todos.
+  // Devuelve Map oportunidad_id → {oportunidadId, cantidad, ultimo}.
+  function calcularNovedades({seguimientos=[],vistas=[]}={}){
+    const vistoPor=new Map((vistas||[]).map(v=>[v.oportunidad_id,v.last_viewed_at]));
+    const novedades=new Map();
+    for(const s of (seguimientos||[])){
+      const ultimaVista=vistoPor.get(s.oportunidad_id);
+      if(ultimaVista&&new Date(s.created_at)<=new Date(ultimaVista)) continue;
+      const existente=novedades.get(s.oportunidad_id);
+      if(!existente) novedades.set(s.oportunidad_id,{oportunidadId:s.oportunidad_id,cantidad:1,ultimo:s});
+      else{
+        existente.cantidad+=1;
+        if(new Date(s.created_at)>new Date(existente.ultimo.created_at)) existente.ultimo=s;
+      }
+    }
+    return novedades;
+  }
+  // Ítems del panel: solo oportunidades cargadas (visibles por RLS), la más reciente primero
+  function itemsNovedades(novedades,oportunidades){
+    const porId=new Map((oportunidades||[]).map(o=>[o.id,o]));
+    return [...novedades.values()]
+      .map(n=>{
+        const o=porId.get(n.oportunidadId);
+        if(!o) return null;
+        return {oportunidadId:n.oportunidadId,prospectoNombre:(o.crm_prospectos&&o.crm_prospectos.nombre)||'-',
+          cantidad:n.cantidad,usuario:nombreUsuarioSeguimiento(n.ultimo),nota:n.ultimo.nota,creadoEn:n.ultimo.created_at};
+      })
+      .filter(Boolean)
+      .sort((a,b)=>new Date(b.creadoEn)-new Date(a.creadoEn));
+  }
+
+  // Cambio de estado compartido (tablero y ficha): PATCH con return=representation; si RLS no
+  // devuelve la fila, lanza error. Devuelve {fila, seguimiento}: seguimiento es la promesa del
+  // registro automático, que nunca rechaza (si falla, solo console.warn).
+  async function cambiarEstado(id,anterior,nuevo){
+    if(!ESTADOS.some(e=>e.valor===nuevo)) throw new Error('Estado inválido');
+    const filas=await api('crm_oportunidades?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify({estado:nuevo})});
+    const fila=Array.isArray(filas)?filas[0]:null;
+    if(!fila) throw new Error('row-level security');
+    const seguimiento=api('crm_seguimientos',{method:'POST',body:JSON.stringify({
+      oportunidad_id:id,
+      nota:`Estado cambiado de "${etiquetaEstado(anterior)}" a "${etiquetaEstado(nuevo)}".`,
+      usuario_id:usuarioActual.id
+    })}).catch(e=>{console.warn('[ventas] No se pudo registrar el seguimiento del cambio de estado',e);});
+    return {fila,seguimiento};
   }
 
   C.agregarCss(`
@@ -49,8 +98,16 @@
 .vt-card-monto{font-size:13px;font-weight:700;color:var(--accent);margin-top:6px;}
 .vt-card-pie{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--text-dim);margin-top:6px;}
 .vt-card-acc{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
-.vt-link-off{flex:1;font-size:11px;color:var(--text-muted);background:none;border:0;padding:0;font-family:inherit;cursor:not-allowed;text-align:left;}
-.vt-link-off small{font-size:9px;font-weight:700;text-transform:uppercase;}
+.vt-link{flex:1;font-size:11px;font-weight:600;color:var(--accent);background:none;border:0;padding:0;font-family:inherit;cursor:pointer;text-align:left;}
+.vt-link:hover{text-decoration:underline;}
+.vt-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e11d48;margin-right:6px;vertical-align:middle;flex-shrink:0;}
+.vt-nov{background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r);padding:12px;margin-bottom:14px;}
+.vt-nov-tit{font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;}
+.vt-nov-lista{display:flex;flex-direction:column;gap:6px;}
+.vt-nov-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font-family:inherit;font-size:13px;color:var(--text);background:rgba(255,255,255,.6);border:0;border-radius:6px;padding:8px 10px;cursor:pointer;}
+.vt-nov-item:hover{background:#fff;}
+.vt-nov-item strong{font-weight:600;}
+.vt-nov-cuando{font-size:11px;color:#b45309;white-space:nowrap;}
 .vt-mover{width:100%;font-size:11px;padding:4px 6px;}
 .vt-np{max-width:900px;}
 .vt-h2{font-size:16px;font-weight:700;color:var(--text);margin:10px 0 14px;}
@@ -71,18 +128,26 @@
   // ══════════════════════════════════════════
   //  PANTALLA: TABLERO
   // ══════════════════════════════════════════
-  const tb={cargando:false,error:'',oportunidades:[],responsables:[],filtroResp:'',filtroTipo:'',moviendo:new Set(),drag:null};
+  const tb={cargando:false,error:'',oportunidades:[],responsables:[],novedades:new Map(),filtroResp:'',filtroTipo:'',moviendo:new Set(),drag:null};
+
+  // Las novedades no son críticas: si fallan, el tablero se muestra igual sin panel
+  function cargarNoCritico(ruta){
+    return api(ruta).then(r=>Array.isArray(r)?r:[]).catch(e=>{console.warn('[ventas] No se pudo cargar '+ruta.split('?')[0],e);return [];});
+  }
 
   async function entrarTablero(){
     tb.cargando=true;tb.error='';V.repintar();
     try{
-      const [ops,resp]=await Promise.all([
+      const [ops,resp,,seguimientos,vistas]=await Promise.all([
         api('crm_oportunidades?select=*,crm_prospectos(id,nombre,tipo_cliente_id,contacto_nombre,telefono),crm_tipos_servicio(nombre),usuarios(nombre)&order=created_at.desc'),
         esGerencia()?C.cargarResponsables():Promise.resolve([]),
-        C.cargarCatalogosActivos(['crm_tipos_cliente'])
+        C.cargarCatalogosActivos(['crm_tipos_cliente']),
+        cargarNoCritico('crm_seguimientos?select=oportunidad_id,usuario_id,usuario_nombre_libre,tipo_contacto,nota,created_at,usuarios(nombre)'),
+        cargarNoCritico('crm_vistas?select=oportunidad_id,last_viewed_at&usuario_id=eq.'+encodeURIComponent(usuarioActual.id))
       ]);
       tb.oportunidades=Array.isArray(ops)?ops:[];
       tb.responsables=resp;
+      tb.novedades=calcularNovedades({seguimientos,vistas});
     }catch(e){
       console.error('[ventas] Error cargando el tablero',e);
       tb.error='No se pudo cargar el tablero: '+mensajeError(e);
@@ -106,6 +171,7 @@
     const optTipo=C.catalogo('crm_tipos_cliente').map(t=>`<option value="${escapeHtml(t.id)}"${t.id===tb.filtroTipo?' selected':''}>${escapeHtml(t.nombre)}</option>`).join('');
     return `
 <div data-vt-pantalla="tablero">
+  ${htmlPanelNovedades()}
   <div class="vt-toolbar">
     <div class="vt-filtros">
       ${esGerencia()?`<select class="form-select" data-vt-filtro="resp"><option value="">Todos los responsables</option>${optResp}</select>`:''}
@@ -123,8 +189,25 @@
 </div>`;
   }
 
+  // Panel ámbar de novedades; sin novedades no se muestra nada
+  function htmlPanelNovedades(){
+    const items=itemsNovedades(tb.novedades,tb.oportunidades);
+    if(!items.length) return '';
+    return `
+  <div class="vt-nov">
+    <div class="vt-nov-tit">Novedades (${items.length})</div>
+    <div class="vt-nov-lista">${items.map(it=>`
+      <button type="button" class="vt-nov-item" data-vt-ficha="${escapeHtml(it.oportunidadId)}">
+        <span><strong>${escapeHtml(it.prospectoNombre)}</strong> — ${escapeHtml(it.usuario)}: ${escapeHtml(it.cantidad>1?it.cantidad+' novedades nuevas':(it.nota==null?'agregó un seguimiento':it.nota))}</span>
+        <span class="vt-nov-cuando">${escapeHtml(tiempoRelativo(it.creadoEn))}</span>
+      </button>`).join('')}
+    </div>
+  </div>`;
+  }
+
   function htmlTarjeta(o){
     const p=o.crm_prospectos;
+    const novedad=tb.novedades.has(o.id);
     const monto=o.monto_estimado==null?'-':fmtMonto(o.monto_estimado,o.moneda||'ARS');
     const opts=ESTADOS.filter(e=>e.valor!==o.estado).map(e=>`<option value="${escapeHtml(e.valor)}">${escapeHtml(e.etiqueta)}</option>`).join('');
     const moviendo=tb.moviendo.has(o.id);
@@ -132,13 +215,13 @@
 <div class="vt-card${moviendo?' vt-moviendo':''}" data-op-id="${escapeHtml(o.id)}">
   <span class="vt-drag" data-vt-drag title="Arrastrá para cambiar de estado" aria-hidden="true">⠿</span>
   <div class="vt-card-info">
-    <div class="vt-card-tit">${escapeHtml(p&&p.nombre||'-')}</div>
+    <div class="vt-card-tit">${novedad?'<span class="vt-dot" title="Tiene un seguimiento nuevo que todavía no viste"></span>':''}${escapeHtml(p&&p.nombre||'-')}</div>
     <div class="vt-card-sub">${escapeHtml(o.crm_tipos_servicio&&o.crm_tipos_servicio.nombre||'Sin tipo de servicio')}</div>
     <div class="vt-card-monto">${escapeHtml(monto)}</div>
     <div class="vt-card-pie"><span>${escapeHtml(fmtFecha(o.proxima_fecha_seguimiento))}</span><span>${escapeHtml(nombreResponsable(o))}</span></div>
   </div>
   <div class="vt-card-acc">
-    <button type="button" class="vt-link-off" disabled title="Próximamente">Ver detalle → <small>Próximamente</small></button>
+    <button type="button" class="vt-link" data-vt-ficha="${escapeHtml(o.id)}">Ver detalle →</button>
     ${C.htmlBotonWhatsApp(p&&p.telefono)}
     <select class="form-select vt-mover" data-vt-mover aria-label="Mover a otra columna"${moviendo?' disabled':''}>
       <option value="">Mover a…</option>${opts}
@@ -147,8 +230,7 @@
 </div>`;
   }
 
-  // Cambia el estado con actualización optimista; revierte si el PATCH falla o RLS no devuelve la fila.
-  // Después deja el seguimiento automático (si falla, no se avisa ni se revierte).
+  // Tablero: actualización optimista sobre cambiarEstado; revierte si el PATCH falla o RLS no devuelve la fila.
   async function moverOportunidad(id,nuevo){
     const op=tb.oportunidades.find(o=>o.id===id);
     if(!op||op.estado===nuevo||tb.moviendo.has(id)) return;
@@ -157,27 +239,19 @@
     op.estado=nuevo;
     tb.moviendo.add(id);
     V.repintar();
+    let res=null;
     try{
-      const filas=await api('crm_oportunidades?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify({estado:nuevo})});
-      const fila=Array.isArray(filas)?filas[0]:null;
-      if(!fila) throw new Error('row-level security');
-      Object.assign(op,fila); // la fila no trae los joins: se conservan los ya cargados
+      res=await cambiarEstado(id,anterior,nuevo);
+      Object.assign(op,res.fila); // la fila no trae los joins: se conservan los ya cargados
     }catch(e){
       console.error('[ventas] Error cambiando estado',e);
       op.estado=anterior;
       showToast('Error al cambiar el estado: '+mensajeError(e,{permiso:MSG_PERMISO_OP}),true);
-      return;
     }finally{
       tb.moviendo.delete(id);
       if(enVista('tablero')) V.repintar();
     }
-    try{
-      await api('crm_seguimientos',{method:'POST',body:JSON.stringify({
-        oportunidad_id:id,
-        nota:`Estado cambiado de "${etiquetaEstado(anterior)}" a "${etiquetaEstado(nuevo)}".`,
-        usuario_id:usuarioActual.id
-      })});
-    }catch(e){console.warn('[ventas] No se pudo registrar el seguimiento del cambio de estado',e);}
+    if(res) await res.seguimiento;
   }
 
   // ── Arrastre con eventos de puntero (funciona con mouse y touch) ──
@@ -480,7 +554,7 @@
     }catch(e){console.warn('[ventas] No se pudo registrar el seguimiento inicial',e);}
     np.guardando=false;
     showToast('Oportunidad creada','success');
-    V.ir('tablero');
+    V.ir('ficha',{id:fila.id}); // como el original: después del alta se abre la ficha
   }
 
   V.registrarPantalla({
@@ -528,5 +602,5 @@
     }
   });
 
-  V.oportunidades={filtrarOportunidades,agruparPorEstado,moverOportunidad};
+  V.oportunidades={filtrarOportunidades,agruparPorEstado,moverOportunidad,cambiarEstado,calcularNovedades,itemsNovedades};
 })();

@@ -66,6 +66,17 @@
   function nombreResponsable(o){
     return (o&&o.usuarios&&o.usuarios.nombre)||(o&&o.responsable_nombre_libre)||'-';
   }
+  // Mismo criterio para quién registró un seguimiento
+  function nombreUsuarioSeguimiento(s){
+    return (s&&s.usuarios&&s.usuarios.nombre)||(s&&s.usuario_nombre_libre)||'-';
+  }
+  // 'hace instantes' / 'hace Nh' / 'hace Nd' (igual que PanelNovedades del original)
+  function tiempoRelativo(fecha,ahora=Date.now()){
+    const horas=Math.floor((ahora-new Date(fecha).getTime())/(1000*60*60));
+    if(!(horas>=1)) return 'hace instantes';
+    if(horas<24) return 'hace '+horas+'h';
+    return 'hace '+Math.floor(horas/24)+'d';
+  }
   // Traduce errores de PostgREST a mensajes claros
   function mensajeError(e,{permiso='No tenés permiso para realizar esta acción',duplicado='Ya existe un valor con ese nombre'}={}){
     const m=String(e&&e.message||'');
@@ -75,7 +86,8 @@
   }
 
   // ── Registro de pantallas ──────────────────
-  // Cada pantalla: {id, html() → string, entrar?() → al mostrarla, on?: {click,change,input,submit,keydown,pointerdown,...}}
+  // Cada pantalla: {id, html() → string, entrar?(params) → al mostrarla, on?: {click,change,input,submit,keydown,pointerdown,...}}
+  // Las pantallas internas (interna:true) no tienen ítem en el submenú; resaltar indica qué ítem queda marcado.
   const SUBMENU=[
     {id:'tablero',label:'Tablero'},
     {id:'leads',label:'Leads'},
@@ -88,7 +100,7 @@
   ];
   const EVENTOS=['click','change','input','submit','keydown','focusin','pointerdown'];
   const pantallas={};
-  const nucleo={vista:null,eventos:false};
+  const nucleo={vista:null,params:{},eventos:false};
 
   function registrarPantalla(p){pantallas[p.id]=p;}
   function contenedor(){return document.getElementById('tab-ventas');}
@@ -103,9 +115,12 @@
     inyectarCss();
     engancharEventos(el);
     const disponibles=itemsVisibles().filter(disponible);
-    if(!disponibles.some(it=>it.id===nucleo.vista)) nucleo.vista=disponibles.length?disponibles[0].id:null;
+    const actual=pantallas[nucleo.vista];
+    const valida=actual&&(actual.interna?disponibles.some(it=>it.id===actual.resaltar):disponibles.some(it=>it.id===nucleo.vista));
+    if(!valida){nucleo.vista=disponibles.length?disponibles[0].id:null;nucleo.params={};}
+    const marcado=(pantallas[nucleo.vista]&&pantallas[nucleo.vista].resaltar)||nucleo.vista;
     const sub=itemsVisibles().map(it=>disponible(it)
-      ?`<button type="button" class="vt-sub-btn${it.id===nucleo.vista?' vt-activo':''}" data-vt-ir="${escapeHtml(it.id)}">${escapeHtml(it.label)}</button>`
+      ?`<button type="button" class="vt-sub-btn${it.id===marcado?' vt-activo':''}" data-vt-ir="${escapeHtml(it.id)}">${escapeHtml(it.label)}</button>`
       :`<button type="button" class="vt-sub-btn" disabled title="Próximamente">${escapeHtml(it.label)} <small>Próximamente</small></button>`
     ).join('');
     el.innerHTML=`
@@ -119,7 +134,7 @@
 <div class="vt-body"></div>`;
     repintar();
     const p=pantallaActiva();
-    if(p&&p.entrar) p.entrar();
+    if(p&&p.entrar) p.entrar(nucleo.params);
   }
 
   // Vuelve a dibujar el cuerpo de la pantalla activa con su estado actual
@@ -130,11 +145,13 @@
     b.innerHTML=p?p.html():`<div class="empty-state"><div class="empty-icon">🚧</div><div class="empty-title">Módulo en construcción</div><div>Las pantallas de Ventas van a estar disponibles próximamente.</div></div>`;
   }
 
-  function ir(id){
+  function ir(id,params){
     if(!pantallas[id]) return;
     nucleo.vista=id;
+    nucleo.params=params||{};
     mostrar();
   }
+  function vistaActual(){return {vista:nucleo.vista,params:nucleo.params};}
 
   // Eventos delegados en #tab-ventas (se enganchan una sola vez): el núcleo resuelve la
   // navegación y los SelectConCrear; el resto se despacha a la pantalla activa.
@@ -145,6 +162,8 @@
       if(tipo==='click'){
         const b=e.target.closest('[data-vt-ir]');
         if(b&&el.contains(b)&&!b.disabled){ir(b.dataset.vtIr);return;}
+        const fi=e.target.closest('[data-vt-ficha]');
+        if(fi&&el.contains(fi)&&!fi.disabled&&pantallas.ficha){ir('ficha',{id:fi.dataset.vtFicha});return;}
         if(sccClick(e)) return;
         if(waClick(e)) return;
       }
@@ -174,10 +193,14 @@
 
   // ── SelectConCrear: desplegable de catálogo con "+ Crear nuevo…" inline ──
   const CREAR='__crear__';
-  function htmlSelectConCrear({nombre,tabla,valor='',placeholder,creando=false,clase=''}){
-    const opts=catalogo(tabla).map(r=>`<option value="${escapeHtml(r.id)}"${r.id===valor?' selected':''}>${escapeHtml(r.nombre)}</option>`).join('');
+  // actual {id,nombre}: valor ya guardado que puede estar inactivo; se ofrece igual para no perderlo al editar
+  function htmlSelectConCrear({nombre,tabla,valor='',placeholder,creando=false,clase='',actual=null}){
+    let lista=catalogo(tabla);
+    if(actual&&actual.id&&!lista.some(r=>r.id===actual.id)) lista=lista.concat({id:actual.id,nombre:(actual.nombre||'-')+' (inactivo)'});
+    const opts=lista.map(r=>`<option value="${escapeHtml(r.id)}"${r.id===valor?' selected':''}>${escapeHtml(r.nombre)}</option>`).join('');
+    const attrActual=actual&&actual.id?` data-scc-actual-id="${escapeHtml(actual.id)}" data-scc-actual-nombre="${escapeHtml(actual.nombre||'')}"`:'';
     return `
-<div class="vt-scc ${escapeHtml(clase)}" data-scc-nombre="${escapeHtml(nombre)}" data-scc-tabla="${escapeHtml(tabla)}" data-scc-ph="${escapeHtml(placeholder)}">
+<div class="vt-scc ${escapeHtml(clase)}" data-scc-nombre="${escapeHtml(nombre)}" data-scc-tabla="${escapeHtml(tabla)}" data-scc-ph="${escapeHtml(placeholder)}"${attrActual}>
   <select class="form-select" name="${escapeHtml(nombre)}" data-scc-select data-prev="${escapeHtml(valor)}">
     <option value="">${escapeHtml(placeholder)}</option>${opts}
     <option value="${CREAR}">+ Crear nuevo…</option>
@@ -192,7 +215,8 @@
   function sccRepintar(w,valor,creando){
     const nuevo=document.createElement('div');
     nuevo.innerHTML=htmlSelectConCrear({nombre:w.dataset.sccNombre,tabla:w.dataset.sccTabla,valor,placeholder:w.dataset.sccPh,creando,
-      clase:[...w.classList].filter(c=>c!=='vt-scc').join(' ')});
+      clase:[...w.classList].filter(c=>c!=='vt-scc').join(' '),
+      actual:w.dataset.sccActualId?{id:w.dataset.sccActualId,nombre:w.dataset.sccActualNombre}:null});
     const w2=nuevo.firstElementChild;
     w.replaceWith(w2);
     if(creando){const i=w2.querySelector('[data-scc-input]');if(i)i.focus();}
@@ -495,8 +519,8 @@
   });
 
   window.Ventas={
-    mostrar,ir,repintar,registrarPantalla,
-    util:{fmtFecha,hoyAR,fmtMonto,normalizarTelAR,waLink,ESTADOS,etiquetaEstado,nombreResponsable,mensajeError},
+    mostrar,ir,repintar,registrarPantalla,vistaActual,
+    util:{fmtFecha,hoyAR,fmtMonto,normalizarTelAR,waLink,ESTADOS,etiquetaEstado,nombreResponsable,nombreUsuarioSeguimiento,tiempoRelativo,mensajeError},
     comun:{cargarCatalogosActivos,catalogo,nombreEnCatalogo,cargarResponsables,htmlSelectConCrear,htmlBotonWhatsApp,agregarCss,contenedor,cuerpo}
   };
 })();
