@@ -613,3 +613,25 @@ create policy usuarios_vendedor_acotado on public.usuarios
     or exists (select 1 from public.crm_seguimientos s where s.usuario_id = usuarios.id)
     or exists (select 1 from public.crm_seguimientos_leads sl where sl.usuario_id = usuarios.id)
   );
+
+
+-- ===== 7. Ventas: acceso por persona (casilla "Acceso a Ventas") ================
+-- Reemplaza la versión de crm_puede_usar_ventas() de la sección 2. Gerencia y agentes de ventas
+-- siempre; supervisión y administrativos solo con usuarios.acceso_ventas = true; técnicos nunca.
+alter table public.usuarios add column if not exists acceso_ventas boolean not null default false;
+create or replace function public.crm_puede_usar_ventas()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((
+    select u.jerarquia in ('gerencia', 'vendedor')
+        or (u.jerarquia in ('supervisor_admin', 'administrativo') and u.acceso_ventas is true)
+    from public.usuarios u
+    where u.auth_user_id = auth.uid() and u.activo is true
+    limit 1
+  ), false)
+$$;
+-- Acceso dado a Fernanda: update usuarios set acceso_ventas = true where usuario = 'fernanda';
