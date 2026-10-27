@@ -2600,6 +2600,12 @@ tbody tr:hover{background:#f8faff;}
       <div class="form-group"><label class="form-label">Estado</label>
         <select class="form-select" id="uActivo"><option value="true">Activo</option><option value="false">Inactivo</option></select>
       </div>
+      <div class="form-group full" id="uAccesoVentasWrap" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;">
+          <input type="checkbox" id="uAccesoVentas"/> Acceso a Ventas
+        </label>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Gerencia y agentes de ventas siempre tienen acceso. A los técnicos no se les da.</div>
+      </div>
     </div>
     <div class="form-actions"><button class="btn-secondary" onclick="cerrar('mUser')">Cancelar</button><button class="btn-primary" onclick="guardarUser()">💾 Guardar usuario</button></div>
   </div>
@@ -2621,7 +2627,6 @@ const SURL='https://icsgwkufqbwvslqtblsn.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljc2d3a3VmcWJ3dnNscXRibHNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxOTczMjcsImV4cCI6MjA4ODc3MzMyN30.TLgK48G70whM4XuYgtUd_mjrFWHAOCDI32QTd7dJNNY';
 const AUTH_DOMAIN='chillersystem.app';
 const DAVID_USER_ID='6c2c577e-89f2-4fc4-9824-f21d40cb17f0';
-const VENTAS_PUBLICADO=false; // false: Ventas lo ven gerencia y los agentes de ventas (prueba controlada); true: también supervisión y administrativos
 // Mi Panel es el pipeline comercial personal de David — NO es un permiso por rol, es exclusivo de esta persona.
 // Referente técnico (Lucas Roda): puede agregar, editar y quitar equipos.
 const REFERENTE_TECNICO_ID='ad551b62-1f60-499d-a55e-1f2efc158cb6';
@@ -2655,6 +2660,10 @@ function esVendedor(){return !!usuarioActual&&usuarioActual.jerarquia==='vendedo
 function esOficina(){return esGerencia()||esSupervisorAdmin()||esAdministrativo();}
 // Personal de campo: ficha jornada y registra GPS (oficina y ventas no)
 function esPersonalDeCampo(){return !esOficina()&&!esVendedor();}
+// Ventas: gerencia y agentes de ventas siempre; supervisión y administrativos solo con la casilla
+// "Acceso a Ventas" (usuarios.acceso_ventas); los técnicos nunca. Misma regla que crm_puede_usar_ventas() en la base.
+const CARGOS_CON_CASILLA_VENTAS=['supervisor_admin','administrativo'];
+function tieneAccesoVentas(){return esGerencia()||esVendedor()||(esOficina()&&usuarioActual.acceso_ventas===true);}
 const JERARQUIA_LABEL={gerencia:'Gerencia',supervisor_admin:'Supervisión',administrativo:'Administrativo',vendedor:'Agente de ventas',tecnico:'Técnico'};
 function puedeAdministrar(){return esGerencia()||esReferenteTecnico();}
 function puedeGestionarMaestros(){return esOficina()||esReferenteTecnico();}
@@ -2674,7 +2683,7 @@ function puedeVerModulo(id){
   const modulos=['inicio','clientes','equipos','historial','service','eventual','presupuestos','informes',
     'tareas','aprobaciones','galeria','estadisticas','fichajes','usuarios','mipanel','cronograma','ventas'];
   if(!modulos.includes(id)) return false;
-  if(id==='ventas'&&!VENTAS_PUBLICADO) return esGerencia()||esVendedor();
+  if(id==='ventas') return tieneAccesoVentas();
   if(id==='mipanel'||id==='cronograma') return !!usuarioActual&&usuarioActual.id===DAVID_USER_ID;
   if(esVendedor()) return id==='ventas';
   const restringidosParaTecnicos=['presupuestos','estadisticas','clientes','informes','aprobaciones','fichajes','usuarios','ventas'];
@@ -3127,7 +3136,7 @@ async function iniciarApp(){
   aplicarPermisosUI();
   // Ventas todavía no tiene pantalla: no dejar visible el panel de Clientes que se abre por defecto
   if(esVendedor()){document.getElementById('tab-clientes').style.display='none';document.getElementById('tabCli').classList.remove('active');}
-  // Vendedor cae directo en Ventas (si el módulo ya está publicado para su cargo)
+  // Vendedor cae directo en Ventas (siempre tiene acceso)
   if(esVendedor()&&puedeVerModulo('ventas')) showTab('ventas',document.getElementById('tabVentas'));
   // EXIGIR GPS PARA TÉCNICOS (jefatura se lo salta)
   if(!esJefatura){
@@ -4783,6 +4792,8 @@ function renderUsers(){
   tb.innerHTML=usuarios.map(u=>{
     const rolBadge=u.jerarquia&&u.jerarquia!=='tecnico'?'b-admin':'b-tecnico';
     const rolLabel=JERARQUIA_LABEL[u.jerarquia]||(u.jerarquia?escapeHtml(u.jerarquia):'Sin cargo');
+    const ventasBadge=CARGOS_CON_CASILLA_VENTAS.includes(u.jerarquia)&&u.acceso_ventas===true
+      ?` <span class="badge b-op" style="font-size:10px;">${escapeHtml('💰 Ventas')}</span>`:'';
     const estadoBadge=u.activo?'b-op':'b-fs';
     const estadoLabel=u.activo?'Activo':'Inactivo';
     const delBtn=u.usuario!=='admin'?`<button class="btn-danger" onclick="elimUser('${u.id}','${u.nombre.replace(/'/g,'')}')">🗑</button>`:'';
@@ -4802,7 +4813,7 @@ function renderUsers(){
       <td class="td-name">${u.nombre}</td>
       <td class="td-mono">${u.usuario}</td>
       <td>${resetBtn}</td>
-      <td><span class="badge ${rolBadge}">${rolLabel}</span></td>
+      <td><span class="badge ${rolBadge}">${rolLabel}</span>${ventasBadge}</td>
       <td><span class="badge ${estadoBadge}">${estadoLabel}</span></td>
       <td style="display:flex;gap:4px;">
         <button class="btn-edit" onclick="abrirModalUser('${u.id}')">✏️</button>
@@ -4822,7 +4833,9 @@ async function guardarUser(){
   const jer=document.getElementById('uJerarquia').value;
   if(!JERARQUIA_LABEL[jer]){showToast('Elegí el cargo del usuario',true);return;}
   // rol se deriva de la jerarquía solo por compatibilidad con la base
-  const data={nombre:nom,usuario:usr,jerarquia:jer,rol:jer==='tecnico'?'tecnico':'admin',activo:document.getElementById('uActivo').value==='true'};
+  // La casilla solo cuenta para supervisión y administrativos; en otro cargo queda en false
+  const accesoVentas=CARGOS_CON_CASILLA_VENTAS.includes(jer)&&document.getElementById('uAccesoVentas').checked;
+  const data={nombre:nom,usuario:usr,jerarquia:jer,rol:jer==='tecnico'?'tecnico':'admin',activo:document.getElementById('uActivo').value==='true',acceso_ventas:accesoVentas};
   try{
     if(id) await api('usuarios?id=eq.'+id,{method:'PATCH',body:JSON.stringify(data),headers:{...H,'Prefer':'return=minimal'}});
     else{
@@ -4851,6 +4864,12 @@ async function guardarUser(){
     showToast('Usuario guardado ✓','success');cerrar('mUser');await loadUsuarios();
   }catch(e){showToast('Error: '+e.message,true);}
 }
+// Casilla "Acceso a Ventas" del modal de usuarios: visible solo para supervisión y administrativos
+function actualizarAccesoVentasUI(){
+  const jer=document.getElementById('uJerarquia').value;
+  document.getElementById('uAccesoVentasWrap').style.display=CARGOS_CON_CASILLA_VENTAS.includes(jer)?'':'none';
+}
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='uJerarquia') actualizarAccesoVentasUI();});
 async function elimUser(id,nom){
   if(!exigirPermiso(esGerencia(),'Solo gerencia puede eliminar usuarios')) return;
   if(!confirm('¿Eliminar usuario "'+nom+'"?'))return;
@@ -4862,6 +4881,7 @@ function abrirModalUser(id=null){
   ['userId','uNom','uUser','uPass'].forEach(x=>document.getElementById(x).value='');
   const selJer=document.getElementById('uJerarquia');
   selJer.value='tecnico';selJer.disabled=false;document.getElementById('uActivo').value='true';
+  document.getElementById('uAccesoVentas').checked=false;
   document.getElementById('uPassGroup').style.display=id?'none':'';
   if(id){
     const u=usuarios.find(x=>x.id===id);
@@ -4873,7 +4893,9 @@ function abrirModalUser(id=null){
     // Nadie puede cambiarse su propio cargo (evita quitarse el acceso por error)
     selJer.disabled=!!usuarioActual&&u.id===usuarioActual.id;
     document.getElementById('uActivo').value=String(u.activo);
+    document.getElementById('uAccesoVentas').checked=u.acceso_ventas===true;
   }else document.getElementById('tUser').textContent='Nuevo Usuario';
+  actualizarAccesoVentasUI();
   document.getElementById('mUser').classList.add('open');
 }
 

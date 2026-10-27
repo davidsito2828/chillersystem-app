@@ -187,9 +187,10 @@
   function catalogo(tabla){return catalogosActivos[tabla]||[];}
   function nombreEnCatalogo(tabla,id){const r=catalogo(tabla).find(x=>x.id===id);return r?r.nombre:'';}
 
-  // Usuarios que pueden ser responsables de una oportunidad
+  // Usuarios que pueden ser responsables: activos con acceso a Ventas (gerencia y agentes de ventas
+  // siempre; supervisión y administrativos solo con acceso_ventas). Misma regla que crm_puede_usar_ventas().
   async function cargarResponsables(){
-    const filas=await api('usuarios?select=id,nombre&activo=eq.true&jerarquia=in.(gerencia,supervisor_admin,administrativo,vendedor)&order=nombre.asc');
+    const filas=await api('usuarios?select=id,nombre,jerarquia&activo=eq.true&or=(jerarquia.in.(gerencia,vendedor),and(jerarquia.in.(supervisor_admin,administrativo),acceso_ventas.eq.true))&order=nombre.asc');
     return Array.isArray(filas)?filas:[];
   }
 
