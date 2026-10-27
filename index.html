@@ -2660,6 +2660,10 @@ function puedeAdministrar(){return esGerencia()||esReferenteTecnico();}
 function puedeGestionarMaestros(){return esOficina()||esReferenteTecnico();}
 function puedeGestionarClientes(){return esOficina();}
 function puedeGestionarEventuales(){return esOficina();}
+// Fecha de hoy en Argentina como 'AAAA-MM-DD' (toISOString daría la de UTC: después de las 21 h sería mañana)
+function hoyArgentina(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+// Registrar trabajos (y sus fotos) en un eventual: oficina y técnicos; el agente de ventas no
+function puedeRegistrarTrabajosEventuales(){return esOficina()||esTecnico();}
 function puedeVerPresupuestos(){return !esTecnico();}
 function puedeEditarPresupuestos(){return esOficina();}
 function puedeAvanzarEstadoPpto(){return esOficina();}
@@ -6711,9 +6715,10 @@ function renderEventuales(lista){
     el.innerHTML='<div class="empty-state"><div class="empty-icon">🔖</div><div class="empty-title">Sin clientes eventuales</div><div>Registrá trabajos puntuales que no son abonados</div></div>';
     return;
   }
+  const gestiona=puedeGestionarEventuales(), registra=puedeRegistrarTrabajosEventuales();
   el.innerHTML=lista.map(c=>{
     const isCS=c.empresa==='ChillerSystem';
-    const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const ini=escapeHtml(c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase());
     const trabajos=intervenciones.filter(i=>i.cliente_id===c.id);
     const ult=trabajos.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))[0];
     return `<div class="cliente-card">
@@ -6721,26 +6726,26 @@ function renderEventuales(lista){
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <div class="cliente-avatar ${isCS?'av-cs':'av-cv'}">${ini}</div>
           <div class="cliente-info">
-            <div class="cliente-nombre">${c.nombre}</div>
-            <div class="cliente-meta">${[c.contacto,c.telefono,c.direccion].filter(Boolean).join(' · ')||'Sin datos'}</div>
+            <div class="cliente-nombre">${escapeHtml(c.nombre)}</div>
+            <div class="cliente-meta">${escapeHtml([c.contacto,c.telefono,c.direccion].filter(Boolean).join(' · ')||'Sin datos')}</div>
             <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">${trabajos.length} trabajo(s) registrado(s)${ult?' · Último: '+fmtF(ult.fecha):''}</div>
           </div>
           <span class="badge ${isCS?'emp-cs':'emp-cv'}">${isCS?'🔵 CS':'🟣 CV'}</span>
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto;">
-            <button class="btn-primary" style="padding:5px 12px;font-size:12px;" onclick="abrirTrabajoEvt('${c.id}')">＋ Trabajo</button>
-            <button class="btn-green" onclick="convertirAbonado('${c.id}','${c.nombre.replace(/'/g,"")}')" title="Convertir a abonado">⭐ Abonado</button>
+            ${registra?`<button class="btn-primary" style="padding:5px 12px;font-size:12px;" onclick="abrirTrabajoEvt('${c.id}')">＋ Trabajo</button>`:''}
+            ${gestiona?`<button class="btn-green" onclick="convertirAbonado('${c.id}')" title="Convertir a abonado">⭐ Abonado</button>
             <button class="btn-edit" onclick="abrirModalEventual('${c.id}')">✏️</button>
-            <button class="btn-danger" onclick="elimEventual('${c.id}','${c.nombre.replace(/'/g,"")}')">🗑</button>
+            <button class="btn-danger" onclick="elimEventual('${c.id}')">🗑</button>`:''}
           </div>
         </div>
         ${trabajos.length?`<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
           ${trabajos.slice(0,3).map(t=>`
             <div class="interv-item" style="margin-bottom:5px;">
               <div class="interv-header">
-                <span class="badge ${t.tipo==='Correctivo'?'b-correctivo':t.tipo==='Verificación técnica'?'b-rev':'b-preventivo2'}">${t.tipo}</span>
+                <span class="badge ${t.tipo==='Correctivo'?'b-correctivo':t.tipo==='Verificación técnica'?'b-rev':'b-preventivo2'}">${escapeHtml(t.tipo)}</span>
                 <span class="interv-fecha">${fmtF(t.fecha)}</span>
-                ${t.tecnico?`<span class="interv-tecnico">· ${t.tecnico}</span>`:''}
-                ${t.descripcion?`<span style="font-size:11px;color:var(--text-dim);margin-left:6px;">${t.descripcion.substring(0,60)}${t.descripcion.length>60?'...':''}</span>`:''}
+                ${t.tecnico?`<span class="interv-tecnico">· ${escapeHtml(t.tecnico)}</span>`:''}
+                ${t.descripcion?`<span style="font-size:11px;color:var(--text-dim);margin-left:6px;">${escapeHtml(t.descripcion.substring(0,60))}${t.descripcion.length>60?'...':''}</span>`:''}
                 ${esDavid()?`<button class="btn-danger" onclick="elimInterv('${t.id}')" style="padding:2px 7px;font-size:11px;margin-left:auto;">🗑</button>`:''}
               </div>
               ${fotosHTML(t.fotos,'intervenciones',t.id)}
@@ -6800,7 +6805,17 @@ async function guardarEventual(){
   }catch(e){showToast('Error: '+e.message,true);}
 }
 
-async function elimEventual(id,nom){
+async function elimEventual(id){
+  if(!exigirPermiso(puedeGestionarEventuales(),'No tenés permiso para eliminar clientes eventuales')) return;
+  const cli=clientes.find(x=>x.id===id);
+  const nom=cli?cli.nombre:'';
+  // intervenciones.cliente_id arrastra en cascada: borrar el cliente borra su historial y fotos
+  if(!esDavid()){
+    let r;
+    try{r=await api('intervenciones?cliente_id=eq.'+id+'&select=id&limit=1');}catch(e){r=null;}
+    if(!Array.isArray(r)){showToast('No se pudo verificar el historial, no se borró',true);return;}
+    if(r.length){showToast('Este cliente tiene trabajos registrados. Solo el propietario puede eliminarlo.',true);return;}
+  }
   if(!confirm('¿Eliminar "'+nom+'" y todos sus registros?'))return;
   try{
     await api('clientes?id=eq.'+id,{method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
@@ -6810,7 +6825,10 @@ async function elimEventual(id,nom){
   }catch(e){showToast('Error',true);}
 }
 
-async function convertirAbonado(id,nom){
+async function convertirAbonado(id){
+  if(!exigirPermiso(puedeGestionarEventuales(),'No tenés permiso para convertir clientes eventuales')) return;
+  const cli=clientes.find(x=>x.id===id);
+  const nom=cli?cli.nombre:'';
   if(!confirm('¿Convertir "'+nom+'" en cliente abonado? Pasará a la lista de Clientes.'))return;
   try{
     await api('clientes?id=eq.'+id,{method:'PATCH',body:JSON.stringify({tipo_cliente:'abonado'}),headers:{...H,'Prefer':'return=minimal'}});
@@ -6821,10 +6839,13 @@ async function convertirAbonado(id,nom){
 }
 
 function abrirTrabajoEvt(cliId){
+  if(!exigirPermiso(puedeRegistrarTrabajosEventuales(),'No tenés permiso para registrar trabajos eventuales')) return;
   ['trabajoEvtId','tTrabajoEquipo','tTrabajoTecnico','tTrabajoDesc','tTrabajoSol','tTrabajoRep','tTrabajoHoras'].forEach(x=>document.getElementById(x).value='');
+  // El técnico que registra queda precargado como responsable; para la oficina queda vacío
+  if(esTecnico()&&usuarioActual) document.getElementById('tTrabajoTecnico').value=usuarioActual.nombre||'';
   document.getElementById('trabajoClienteEvtId').value=cliId;
   document.getElementById('tTrabajoTipo').value='Correctivo';
-  document.getElementById('tTrabajoFecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('tTrabajoFecha').value=hoyArgentina();
   document.getElementById('evtFotoPreview').innerHTML='';
   evtFotosNuevas=[];
   const c=clientes.find(x=>x.id===cliId);
@@ -6833,7 +6854,7 @@ function abrirTrabajoEvt(cliId){
 }
 
 async function guardarTrabajoEvt(){
-  if(!exigirPermiso(puedeGestionarEventuales(),'No tenés permiso para registrar trabajos eventuales')) return;
+  if(!exigirPermiso(puedeRegistrarTrabajosEventuales(),'No tenés permiso para registrar trabajos eventuales')) return;
   if(usuarioActual&&esPersonalDeCampo()&&!jornadaActiva){showToast('❌ Debes Iniciar Jornada antes de guardar',true);return;}
   let coords = null;
   if(usuarioActual&&esPersonalDeCampo()){
@@ -6853,6 +6874,11 @@ async function guardarTrabajoEvt(){
   showToast('Guardando...');
   let fotosUrls=[];
   if(evtFotosNuevas.length) fotosUrls=await subirFotos(evtFotosNuevas,'eventuales');
+  // subirFotos devuelve solo las URLs subidas: si falta alguna no se guarda (el formulario y las fotos quedan cargados)
+  if(fotosUrls.length<evtFotosNuevas.length){
+    showToast('No se pudieron subir '+(evtFotosNuevas.length-fotosUrls.length)+' de '+evtFotosNuevas.length+' fotos. Revisá la conexión y reintentá: el trabajo NO se guardó.',true);
+    return;
+  }
   const equipo=document.getElementById('tTrabajoEquipo').value.trim();
   const data={
     cliente_id:cliId,
