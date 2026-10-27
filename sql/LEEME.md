@@ -1,0 +1,1 @@
+migraciones_aplicadas_2026-10.sql es el registro de los cambios ya aplicados en producción en octubre de 2026 (seguridad de acceso, módulo de Ventas y apertura). No volver a correrlo en producción; sirve para reconstruir la base ejecutando sus secciones en orden. chillersystem_schema_v2.sql y chillersystem_seed_2026.sql son anteriores y NO reflejan la base actual.
