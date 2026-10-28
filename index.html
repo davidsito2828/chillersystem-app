@@ -7479,7 +7479,7 @@ function renderPresupuestos(){
           ${p.referencia?'<div class="ppto-ref">'+p.referencia+'</div>':''}
         </div>
         <div class="ppto-card-header-right">
-          <div class="ppto-total">${total}</div>
+          <div class="ppto-total">${total}${etiquetaIncluyeOpcional(p)}</div>
           <div class="ppto-fecha">${fechaMostrar}</div>
         </div>
       </div>
@@ -7986,15 +7986,9 @@ async function mpCambiarEstado(pId, nuevoEstado) {
   }
   if (nuevoEstado === 'aprobado_cliente' && ppto.precio_opcional != null) {
     mElegirPrecio(ppto, function(opcionElegida) {
-      const extra = {};
-      if (opcionElegida === 'opcional') {
-        extra.precio_total = ppto.precio_opcional;
-        extra.moneda = ppto.moneda_opcional;
-        extra.opcion_elegida = 'opcional';
-      } else {
-        extra.opcion_elegida = 'principal';
-      }
-      _mpAplicarCambioEstado(pId, nuevoEstado, ppto, extra);
+      const cambios = aplicarOpcionElegida(ppto, opcionElegida);
+      if (!cambios) { showToast('Principal no disponible: se aprobó antes con Opcional', true); return; }
+      _mpAplicarCambioEstado(pId, nuevoEstado, ppto, cambios);
     });
     return;
   }
@@ -8003,7 +7997,7 @@ async function mpCambiarEstado(pId, nuevoEstado) {
 
 async function _mpAplicarCambioEstado(pId, nuevoEstado, ppto, extra) {
   const hoy = new Date().toISOString().split('T')[0];
-  const historial = [...(ppto.historial_estados||[]), {estado:nuevoEstado, fecha:hoy, usuario:usuarioActual.nombre}];
+  const historial = [...(ppto.historial_estados||[]), {estado:nuevoEstado, fecha:hoy, usuario:usuarioActual.nombre, ...notaOpcionElegida(nuevoEstado, extra)}];
   try {
     await api('presupuestos?id=eq.'+pId, {
       method:'PATCH',
@@ -8104,7 +8098,7 @@ function renderPlanillaMiPanel() {
             + '<td style="text-align:center;cursor:pointer;" onclick="mpToggleControlado(\'' + p.id + '\')" title="Marcar como controlado / verificado">' + ctrlIcon + '</td>'
             + '<td><div class="td-name">' + (p.cliente_nombre||'—') + '</div>' + detalle + '</td>'
             + '<td class="td-mono" style="font-size:11px;"><span style="' + editStyle + '" onclick="mpEditarCampo(\'numero\',\'' + p.id + '\',this)" title="Click para editar">' + nro + '</span></td>'
-            + '<td class="td-mono"><span style="' + editStyle + '" onclick="mpEditarCampo(\'precio_total\',\'' + p.id + '\',this)" title="Click para editar">' + monto + '</span></td>'
+            + '<td class="td-mono"><span style="' + editStyle + '" onclick="mpEditarCampo(\'precio_total\',\'' + p.id + '\',this)" title="Click para editar">' + monto + '</span>' + etiquetaIncluyeOpcional(p) + '</td>'
             + '<td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;' + estStyle + '">' + estLabel + '</span></td>'
             + '<td style="font-weight:700;color:' + cd.color + ';font-family:\'IBM Plex Mono\',monospace;font-size:12px;">' + diasTxt + '</td>'
             + '<td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + obsCell + '</td>'
@@ -8660,14 +8654,54 @@ async function guardarConfigTarifas() {
 // ── MODAL ELEGIR PRECIO (principal vs opcional, al aprobar un presupuesto) ──
 let _epCallback = null;
 
+// Precio principal del presupuesto: el original guardado al aprobar, o el actual si todavía no se guardó.
+// null = desconocido: se aprobó con 'opcional' antes de que existiera precio_principal_original.
+function principalDe(ppto) {
+  if (ppto.precio_principal_original != null) return {precio: ppto.precio_principal_original, moneda: ppto.moneda_principal_original};
+  if (ppto.opcion_elegida === 'opcional') return null;
+  return {precio: ppto.precio_total, moneda: ppto.moneda};
+}
+
+// Cambios a guardar en el presupuesto según la opción que aceptó el cliente, siempre desde el principal.
+// El principal se guarda en precio/moneda_principal_original la primera vez (o se conserva) para poder restaurarlo al retroceder.
+// 'ambas': precio_total = principal + opcional (misma moneda). Devuelve null si el principal es desconocido y la opción lo necesita.
+function aplicarOpcionElegida(ppto, opcion) {
+  const pr = principalDe(ppto);
+  const originales = {precio_principal_original: pr ? pr.precio : null, moneda_principal_original: pr ? pr.moneda : null};
+  if (opcion === 'opcional') return {...originales, precio_total: ppto.precio_opcional, moneda: ppto.moneda_opcional, opcion_elegida: 'opcional'};
+  if (!pr) return null;
+  if (opcion === 'ambas') return {...originales, precio_total: Number(pr.precio || 0) + Number(ppto.precio_opcional || 0), moneda: pr.moneda, opcion_elegida: 'ambas'};
+  return {...originales, precio_total: pr.precio, moneda: pr.moneda, opcion_elegida: 'principal'};
+}
+// Nota para la entrada del historial al aprobar con las dos opciones
+function notaOpcionElegida(estado, cambios) {
+  return estado === 'aprobado_cliente' && cambios && cambios.opcion_elegida === 'ambas' ? {nota: 'Aceptó ambas opciones'} : {};
+}
+// Etiqueta junto al monto cuando el total suma la principal y la opcional
+function etiquetaIncluyeOpcional(p) {
+  return p && p.opcion_elegida === 'ambas' ? ' <span style="font-size:10px;font-weight:400;color:var(--text-muted);">' + escapeHtml('(incluye opcional)') + '</span>' : '';
+}
+
 function mElegirPrecio(ppto, callback) {
   _epCallback = callback;
   const fmtMonto = function(n) { return Number(n || 0).toLocaleString('es-AR'); };
-  const simPrincipal = ppto.moneda === 'USD' ? 'U$D ' : '$';
+  const pr = principalDe(ppto);
+  const simPrincipal = pr && pr.moneda === 'USD' ? 'U$D ' : '$';
   const simOpcional = ppto.moneda_opcional === 'USD' ? 'U$D ' : '$';
+  // Sin moneda cuenta como ARS, igual que en el resto del código
+  const mismaMoneda = !!pr && (pr.moneda || 'ARS') === (ppto.moneda_opcional || 'ARS');
+  const estiloBtn = 'width:100%;padding:14px;font-size:14px;text-align:left;';
+  const btnDeshabilitado = function(txt) { return '<button class="btn-secondary" style="' + estiloBtn + 'opacity:0.5;cursor:not-allowed;" disabled>' + txt + '</button>'; };
+  const SIN_PRINCIPAL = 'Principal no disponible: se aprobó antes con Opcional';
   document.getElementById('epOpciones').innerHTML =
-    '<button class="btn-secondary" style="width:100%;padding:14px;font-size:14px;text-align:left;" onclick="_epElegir(\'principal\')">Principal — ' + simPrincipal + fmtMonto(ppto.precio_total) + '</button>'
-    + '<button class="btn-secondary" style="width:100%;padding:14px;font-size:14px;text-align:left;" onclick="_epElegir(\'opcional\')">Opcional — ' + simOpcional + fmtMonto(ppto.precio_opcional) + '</button>';
+    (pr
+      ? '<button class="btn-secondary" style="' + estiloBtn + '" onclick="_epElegir(\'principal\')">Principal — ' + simPrincipal + fmtMonto(pr.precio) + '</button>'
+      : btnDeshabilitado(SIN_PRINCIPAL))
+    + '<button class="btn-secondary" style="' + estiloBtn + '" onclick="_epElegir(\'opcional\')">Opcional — ' + simOpcional + fmtMonto(ppto.precio_opcional) + '</button>'
+    + (!pr ? btnDeshabilitado(SIN_PRINCIPAL)
+      : mismaMoneda
+      ? '<button class="btn-secondary" style="' + estiloBtn + '" onclick="_epElegir(\'ambas\')">Ambas (Principal + Opcional) — ' + simPrincipal + fmtMonto(Number(pr.precio || 0) + Number(ppto.precio_opcional || 0)) + '</button>'
+      : btnDeshabilitado('Ambas — no se pueden sumar: monedas distintas'));
   document.getElementById('mElegirPrecio').classList.add('open');
 }
 
@@ -9404,13 +9438,9 @@ async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
   }
   if(siguiente==='aprobado_cliente' && ppto && ppto.precio_opcional!=null){
     mElegirPrecio(ppto, function(opcionElegida){
-      if(opcionElegida==='opcional'){
-        extraPatch.precio_total=ppto.precio_opcional;
-        extraPatch.moneda=ppto.moneda_opcional;
-        extraPatch.opcion_elegida='opcional';
-      } else {
-        extraPatch.opcion_elegida='principal';
-      }
+      const cambios=aplicarOpcionElegida(ppto, opcionElegida);
+      if(!cambios){showToast('Principal no disponible: se aprobó antes con Opcional',true);return;}
+      Object.assign(extraPatch, cambios);
       _avanzarEstadoPptoAplicar(pId,siguiente,ppto,esComercial,extraPatch,monto,cliente,numero);
     });
     return;
@@ -9420,7 +9450,7 @@ async function avanzarEstadoPpto(pId,estadoActual,numero,cliente,monto){
 
 async function _avanzarEstadoPptoAplicar(pId,siguiente,ppto,esComercial,extraPatch,monto,cliente,numero){
   const historial=[...(ppto&&ppto.historial_estados||[])];
-  historial.push({estado:siguiente,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
+  historial.push({estado:siguiente,fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre,...notaOpcionElegida(siguiente,extraPatch)});
   try{
     await api('presupuestos?id=eq.'+pId,{
       method:'PATCH',
@@ -9488,11 +9518,14 @@ async function retrocederEstadoPpto(pId,estadoActual,numero){
   if(!confirm('⬅️ Retroceder Presupuesto #'+numero+'\n\nEstado actual: '+etiquetasFlujo[estadoActual]+'\nVolver a: '+etiquetasFlujo[anterior]+'\n\n¿Confirmar?')) return;
   const ppto=presupuestos.find(x=>x.id===pId);
   const historial=[...(ppto&&ppto.historial_estados||[])];
-  historial.push({estado:anterior,accion:'retroceso',fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre});
+  // Al volver de aprobado_cliente a enviado se restaura el precio principal (deshace la opción elegida)
+  const restaurar=estadoActual==='aprobado_cliente'&&ppto&&ppto.precio_principal_original!=null;
+  const restauracion=restaurar?{precio_total:ppto.precio_principal_original,moneda:ppto.moneda_principal_original,opcion_elegida:null}:{};
+  historial.push({estado:anterior,accion:'retroceso',fecha:new Date().toISOString().split('T')[0],usuario:usuarioActual.nombre,...(restaurar?{nota:'Se restauró el precio principal'}:{})});
   try{
     await api('presupuestos?id=eq.'+pId,{
       method:'PATCH',
-      body:JSON.stringify({estado_flujo:anterior,historial_estados:historial}),
+      body:JSON.stringify({estado_flujo:anterior,historial_estados:historial,...restauracion}),
       headers:{...H,'Prefer':'return=minimal'}
     });
     showToast('Estado retrocedido ✓','success');
