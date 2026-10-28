@@ -128,6 +128,7 @@
     <h2 class="vt-h2">${escapeHtml(p&&p.nombre||'-')}</h2>
     <div class="vt-fc-estado">
       <span class="vt-badge vt-badge-${escapeHtml(op.estado)}">${escapeHtml(etiquetaEstado(op.estado))}</span>
+      ${op.es_compulsa===true?`<span class="vt-compulsa" data-vt-fc-compulsa>${escapeHtml('⚖️ Compulsa')}</span>`:''}
       <select class="form-select" data-vt-fc-estado aria-label="Cambiar estado"${estadoOff?' disabled':''}${ed?' title="Guardá o cancelá la edición para cambiar el estado"':''}>
         <option value="">Cambiar estado…</option>${otros}
       </select>
@@ -166,6 +167,7 @@
   function htmlCamposLectura(op,p){
     return [
       campo('N° de referencia',op.numero_referencia||'-'),
+      campo('Compulsa',op.es_compulsa===true?'Sí':'No'),
       campo('Tipo de cliente',(p&&p.crm_tipos_cliente&&p.crm_tipos_cliente.nombre)||'-'),
       campo('Contacto',(p&&p.contacto_nombre)||'-'),
       campo('Teléfono',(p&&p.telefono)||'-'),
@@ -189,6 +191,7 @@
     const prosp=!!p;
     return [
       campoEd('N° de referencia',inp('numero_referencia',op.numero_referencia,' type="text" maxlength="60" placeholder="Ej: 4806-BIS"')),
+      campoEd('Compulsa',`<label class="vt-fc-check"><input type="checkbox" name="es_compulsa"${op.es_compulsa===true?' checked':''}> ${escapeHtml('Compulsa de precios / licitación')}</label>`),
       prosp?campoEd('Tipo de cliente',C.htmlSelectConCrear({nombre:'p_tipo_cliente_id',tabla:'crm_tipos_cliente',valor:p.tipo_cliente_id||'',
         placeholder:'Elegir tipo de cliente',actual:p.tipo_cliente_id?{id:p.tipo_cliente_id,nombre:p.crm_tipos_cliente&&p.crm_tipos_cliente.nombre}:null})):campo('Tipo de cliente','-'),
       prosp?campoEd('Contacto',inp('p_contacto_nombre',p.contacto_nombre,' type="text" maxlength="120"')):campo('Contacto','-'),
@@ -281,6 +284,7 @@
     if(cant!==''&&!(Number.isInteger(Number(cant))&&Number(cant)>=0)){mostrarError('[data-vt-fc-error]','La cantidad de equipos tiene que ser un número entero (0 o más).');return;}
     const cuerpoOp={
       numero_referencia:v('numero_referencia')||null,
+      es_compulsa:!!(f.es_compulsa&&f.es_compulsa.checked),
       tipo_servicio_id:sel('tipo_servicio_id'),
       cantidad_equipos:cant!==''?Number(cant):null,
       monto_estimado:v('monto_estimado')!==''?Number(v('monto_estimado')):null,

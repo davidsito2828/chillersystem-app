@@ -125,6 +125,11 @@
 .vt-bp-item:hover{background:#eff6ff;}
 .vt-np-lead{font-size:13px;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--r);padding:8px 12px;margin:0 0 14px;}
 .vt-np-lead.vt-np-lead-aviso{color:#92400e;background:#fffbeb;border-color:#fde68a;}
+.vt-np-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;}
+.vt-np-ayuda{font-size:11px;color:var(--text-dim);margin:4px 0 0;}
+/* Etiqueta de compulsa (licitación / comparación de precios): tablero y ficha */
+.vt-compulsa{display:inline-block;padding:1px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap;background:#ede9fe;color:#5b21b6;}
+.vt-card-compulsa{margin-top:4px;}
 `);
 
   // ══════════════════════════════════════════
@@ -218,6 +223,7 @@
   <span class="vt-drag" data-vt-drag title="Arrastrá para cambiar de estado" aria-hidden="true">⠿</span>
   <div class="vt-card-info">
     <div class="vt-card-tit">${novedad?'<span class="vt-dot" title="Tiene un seguimiento nuevo que todavía no viste"></span>':''}${escapeHtml(p&&p.nombre||'-')}</div>
+    ${o.es_compulsa===true?`<div class="vt-card-compulsa"><span class="vt-compulsa">${escapeHtml('⚖️ Compulsa')}</span></div>`:''}
     <div class="vt-card-sub">${escapeHtml(o.crm_tipos_servicio&&o.crm_tipos_servicio.nombre||'Sin tipo de servicio')}</div>
     <div class="vt-card-monto">${escapeHtml(monto)}</div>
     <div class="vt-card-pie"><span>${escapeHtml(fmtFecha(o.proxima_fecha_seguimiento))}</span><span>${escapeHtml(nombreResponsable(o))}</span></div>
@@ -491,6 +497,10 @@
       <label class="form-label">Prospecto (cliente que cotiza)</label>
       <div data-vt-np-prospecto>${selNp.html()}</div>
     </div>
+    <div class="form-group">
+      <label class="vt-np-check"><input type="checkbox" name="es_compulsa"> ${escapeHtml('Compulsa de precios / licitación')}</label>
+      <p class="vt-np-ayuda">${escapeHtml('Marcá si el cliente compara cotizaciones de varias empresas.')}</p>
+    </div>
     <div class="vt-np-grid">
       <div class="form-group"><label class="form-label">N° de referencia (opcional)</label>
         <input class="form-input" type="text" name="numero_referencia" placeholder="Ej: 4806-BIS" maxlength="60"></div>
@@ -552,6 +562,7 @@
     const cuerpoReq={
       prospecto_id:np.prospecto.id,
       numero_referencia:v('numero_referencia')||null,
+      es_compulsa:!!(f.es_compulsa&&f.es_compulsa.checked),
       fecha_ingreso:v('fecha_ingreso'),
       tipo_servicio_id:tipoServ&&tipoServ!=='__crear__'?tipoServ:null,
       cantidad_equipos:cant!==''?Number(cant):null,

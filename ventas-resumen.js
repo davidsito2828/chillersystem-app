@@ -13,7 +13,7 @@
   const {fmtMonto,hoyAR,ESTADOS,nombreResponsable,mensajeError}=V.util;
   const C=V.comun;
 
-  const RUTA_RESUMEN='crm_oportunidades?select=id,estado,fecha_ingreso,fecha_cierre,monto_estimado,moneda,comision_monto,comision_liquidada,responsable_id,responsable_nombre_libre,tipo_servicio_id,crm_prospectos(tipo_cliente_id,crm_tipos_cliente(nombre),crm_referidores(nombre)),crm_tipos_servicio(nombre),usuarios(nombre)&order=fecha_ingreso.desc,id.asc';
+  const RUTA_RESUMEN='crm_oportunidades?select=id,estado,fecha_ingreso,fecha_cierre,monto_estimado,moneda,es_compulsa,comision_monto,comision_liquidada,responsable_id,responsable_nombre_libre,tipo_servicio_id,crm_prospectos(tipo_cliente_id,crm_tipos_cliente(nombre),crm_referidores(nombre)),crm_tipos_servicio(nombre),usuarios(nombre)&order=fecha_ingreso.desc,id.asc';
 
   // ── Monedas (probadas en Node) ──
   const MONEDAS=['ARS','USD'];
@@ -94,6 +94,19 @@
     };
   }
   function textoTasa(t){return t===null?'-':(t*100).toFixed(0)+'%';}
+  // Compulsas (licitación / comparación de precios entre empresas) vs. directas: dos filas fijas.
+  // Tasa = aceptadas / (aceptadas + rechazadas), null si no hay ninguna; monto aceptado por moneda.
+  function esCompulsa(o){return !!o&&o.es_compulsa===true;}
+  function compulsasVsDirectas(lista){
+    return [{clave:'compulsa',nombre:'Compulsa'},{clave:'directa',nombre:'Directa'}].map(g=>{
+      const del=(lista||[]).filter(o=>esCompulsa(o)===(g.clave==='compulsa'));
+      const aceptadas=del.filter(o=>o.estado==='aceptado');
+      const rechazadas=del.filter(o=>o.estado==='rechazado').length;
+      const denom=aceptadas.length+rechazadas;
+      return {clave:g.clave,nombre:g.nombre,cantidad:del.length,aceptadas:aceptadas.length,rechazadas,
+        tasaConversion:denom>0?aceptadas.length/denom:null,montoAceptado:sumarPorMoneda(aceptadas)};
+    });
+  }
 
   // ── Desglose mensual (probadas en Node; igual que utils/resumenMensual.ts) ──
   const CATEGORIA_OTROS='Otros';
@@ -372,6 +385,8 @@
   ${htmlDesglose()}
   <h3 class="vt-rs-sec">Por estado</h3>
   ${htmlTablaGrupos('Estado',r.porEstado.map(f=>({nombre:f.etiqueta,cantidad:f.cantidad,monto:f.monto})),r,'estado')}
+  <h3 class="vt-rs-sec">Compulsas vs. directas</h3>
+  ${htmlTablaCompulsas(compulsasVsDirectas(filtradas))}
   <h3 class="vt-rs-sec">Por tipo de cliente</h3>
   ${htmlTablaGrupos('Tipo de cliente',r.porTipoCliente,r,'tipo_cliente')}
   <h3 class="vt-rs-sec">Por referidor</h3>
@@ -397,6 +412,22 @@
   <div class="vt-rs-tabla-wrap"><table class="vt-rs-tabla" data-vt-rs-tabla="${escapeHtml(id)}">
     <thead><tr><th>${escapeHtml(titulo)}</th><th>Cantidad</th><th>% cantidad</th><th>Monto estimado</th><th>% monto</th></tr></thead>
     <tbody>${cuerpoT}</tbody>
+  </table></div>`;
+  }
+
+  function htmlTablaCompulsas(filas){
+    return `
+  <div class="vt-rs-tabla-wrap"><table class="vt-rs-tabla" data-vt-rs-tabla="compulsas">
+    <thead><tr><th>Tipo</th><th>Cantidad</th><th>Aceptadas</th><th>Rechazadas</th><th>Tasa de conversión</th><th>Monto aceptado</th></tr></thead>
+    <tbody>${filas.map(f=>`
+      <tr>
+        <td>${escapeHtml(f.nombre)}</td>
+        <td>${f.cantidad}</td>
+        <td>${f.aceptadas}</td>
+        <td>${f.rechazadas}</td>
+        <td>${escapeHtml(textoTasa(f.tasaConversion))}</td>
+        <td>${lineas(lineasMonto(f.montoAceptado,'-'))}</td>
+      </tr>`).join('')}</tbody>
   </table></div>`;
   }
 
@@ -504,7 +535,7 @@
   });
 
   V.resumen={MONEDAS,monedaDe,sumarPorMoneda,monedasConMonto,lineasMonto,porcentaje,lineasPorcentaje,
-    filtrarResumen,calcularResumen,textoTasa,
+    filtrarResumen,calcularResumen,textoTasa,esCompulsa,compulsasVsDirectas,
     CATEGORIA_OTROS,COLORES_CATEGORIA,COLOR_OTROS,mesClave,etiquetaMes,enumerarMeses,mesesAtras,rangoDesglose,
     topCategorias,agruparPorMesYCategoria,colorDeCategoria,desgloseMensual,svgBarras};
 })();

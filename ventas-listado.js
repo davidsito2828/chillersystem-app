@@ -39,6 +39,7 @@
       case 'tipo_servicio': return (o.crm_tipos_servicio&&o.crm_tipos_servicio.nombre)||'';
       case 'monto_estimado': return String(o.monto_estimado==null?0:o.monto_estimado);
       case 'estado': return o.estado||'';
+      case 'es_compulsa': return o.es_compulsa===true?'1':'0';
       case 'fecha_envio': return o.fecha_envio||'';
       case 'proxima_fecha_seguimiento': return o.proxima_fecha_seguimiento||'';
       case 'responsable': return nombreResponsable(o);
@@ -46,11 +47,13 @@
     return '';
   }
 
-  function filtrarListado(lista,{busqueda='',estado='',responsable='',tipoCliente=''}={}){
+  // compulsa: '' todas, 'si' solo compulsas, 'no' sin compulsa
+  function filtrarListado(lista,{busqueda='',estado='',responsable='',tipoCliente='',compulsa=''}={}){
     const q=String(busqueda||'').trim().toLowerCase();
     return (lista||[]).filter(o=>
       (!q||incluye(pr(o).nombre,q)||incluye(o.numero_referencia,q)||incluye(o.comentarios,q))&&
       (!estado||o.estado===estado)&&
+      (!compulsa||(compulsa==='si')===(o.es_compulsa===true))&&
       (!responsable||o.responsable_id===responsable)&&
       (!tipoCliente||pr(o).tipo_cliente_id===tipoCliente));
   }
@@ -78,6 +81,7 @@
     {key:'moneda',header:'Moneda',width:10},
     {key:'monto_estimado',header:'Monto estimado',width:16,tipo:'monto'},
     {key:'estado',header:'Estado',width:15},
+    {key:'compulsa',header:'Compulsa',width:11},
     {key:'fecha_envio',header:'Fecha de envío',width:14,tipo:'fecha'},
     {key:'proxima_fecha_seguimiento',header:'Próximo seguimiento',width:14,tipo:'fecha'},
     {key:'comentarios',header:'Comentarios',width:40},
@@ -103,6 +107,7 @@
         moneda:o.moneda==='USD'?'USD':'ARS',
         monto_estimado:numeroExcel(o.monto_estimado),
         estado:etiquetaEstado(o.estado),
+        compulsa:o.es_compulsa===true?'Sí':'No',
         fecha_envio:fechaExcel(o.fecha_envio),
         proxima_fecha_seguimiento:fechaExcel(o.proxima_fecha_seguimiento),
         comentarios:textoExcel(o.comentarios),
@@ -204,11 +209,11 @@
   // ══════════════════════════════════════════
   //  Pantalla de listado genérica: carga paginada, filtros (búsqueda, estado, responsable solo
   //  para gerencia, tipo de cliente), orden por encabezado y "Exportar a Excel" de lo visible.
-  //  cfg: {id, interna?, resaltar?, ruta, error, cabecera?, placeholder, estados(), filtrar, ordenar,
+  //  cfg: {id, interna?, resaltar?, ruta, error, cabecera?, placeholder, estados(), filtroCompulsa?, filtrar, ordenar,
   //        htmlTabla(lista, th), vacio, excel(lista) → {hoja, columnas, filas, archivo}}
   // ══════════════════════════════════════════
   function crearPantallaListado(cfg){
-    const st={cargando:false,error:'',datos:[],responsables:[],busqueda:'',estado:'',resp:'',tipo:'',
+    const st={cargando:false,error:'',datos:[],responsables:[],busqueda:'',estado:'',resp:'',tipo:'',compulsa:'',
       orden:{col:'fecha_ingreso',dir:'desc'},exportando:false,seq:0};
     const enVista=()=>V.vistaActual().vista===cfg.id;
 
@@ -235,7 +240,7 @@
     }
 
     function visibles(){
-      const f=cfg.filtrar(st.datos,{busqueda:st.busqueda,estado:st.estado,responsable:esGerencia()?st.resp:'',tipoCliente:st.tipo});
+      const f=cfg.filtrar(st.datos,{busqueda:st.busqueda,estado:st.estado,responsable:esGerencia()?st.resp:'',tipoCliente:st.tipo,compulsa:st.compulsa});
       return cfg.ordenar(f,st.orden.col,st.orden.dir);
     }
 
@@ -251,6 +256,7 @@
       <select class="form-select" data-vt-ls="estado"><option value="">Todos los estados</option>${cfg.estados().map(e=>opt(e.valor,e.etiqueta,st.estado)).join('')}</select>
       ${esGerencia()?`<select class="form-select" data-vt-ls="resp"><option value="">Todos los responsables</option>${st.responsables.map(r=>opt(r.id,r.nombre,st.resp)).join('')}</select>`:''}
       <select class="form-select" data-vt-ls="tipo"><option value="">Todos los tipos de cliente</option>${C.catalogo('crm_tipos_cliente').map(t=>opt(t.id,t.nombre,st.tipo)).join('')}</select>
+      ${cfg.filtroCompulsa?`<select class="form-select" data-vt-ls="compulsa" aria-label="Compulsa">${opt('','Todas',st.compulsa)}${opt('si','Solo compulsas',st.compulsa)}${opt('no','Sin compulsa',st.compulsa)}</select>`:''}
     </div>
     <button type="button" class="btn-secondary" data-vt-ls-exportar${st.exportando?' disabled':''}>${st.exportando?'Generando…':'Exportar a Excel'}</button>
   </div>
@@ -296,6 +302,7 @@
       else if(k==='estado') st.estado=el.value;
       else if(k==='resp') st.resp=el.value;
       else if(k==='tipo') st.tipo=el.value;
+      else if(k==='compulsa'&&cfg.filtroCompulsa) st.compulsa=el.value;
       else return;
       repintarResultados();
     }
@@ -329,6 +336,7 @@
     error:'No se pudo cargar el listado: ',
     placeholder:'Buscar por cliente, N° o comentarios...',
     estados:()=>ESTADOS,
+    filtroCompulsa:true,
     filtrar:filtrarListado,
     ordenar:ordenarListado,
     vacio:'No hay oportunidades que coincidan.',
@@ -350,6 +358,7 @@
         <td>${txt(o.crm_tipos_servicio&&o.crm_tipos_servicio.nombre)}</td>
         <td>${escapeHtml(o.monto_estimado==null?'-':fmtMonto(o.monto_estimado,o.moneda))}</td>
         <td><span class="vt-badge vt-badge-${escapeHtml(o.estado)}">${escapeHtml(etiquetaEstado(o.estado))}</span></td>
+        <td>${escapeHtml(o.es_compulsa===true?'Sí':'-')}</td>
         <td>${escapeHtml(fecha(o.fecha_envio))}</td>
         <td>${escapeHtml(fecha(o.proxima_fecha_seguimiento))}</td>
         <td class="vt-ls-com" title="${escapeHtml(o.comentarios||'')}">${txt(o.comentarios)}</td>
@@ -362,7 +371,7 @@
       <thead><tr>
         ${th('numero_referencia','N°')}${th('fecha_ingreso','Fecha ingreso')}${th('cliente','Cliente')}${th('tipo_cliente','Tipo cliente')}
         <th>Contacto</th><th>Teléfono/Email</th><th>Referido por</th><th>Cant. equipos</th>
-        ${th('tipo_servicio','Tipo servicio')}${th('monto_estimado','Monto estimado')}${th('estado','Estado')}${th('fecha_envio','Fecha envío')}${th('proxima_fecha_seguimiento','Prox. seguimiento')}
+        ${th('tipo_servicio','Tipo servicio')}${th('monto_estimado','Monto estimado')}${th('estado','Estado')}${th('es_compulsa','Compulsa')}${th('fecha_envio','Fecha envío')}${th('proxima_fecha_seguimiento','Prox. seguimiento')}
         <th>Comentarios</th><th>Comisión</th>
         ${th('responsable','Responsable')}
       </tr></thead>
