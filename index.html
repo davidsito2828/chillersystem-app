@@ -6342,27 +6342,18 @@ async function mostrarInformePublico(aprobacionId){
   debug('[Informe] URL param:', aprobacionId);
   document.body.innerHTML='<div style="font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f4f6f9;"><div style="text-align:center;color:#666;">Cargando informe...</div></div>';
   try{
-    // Paso 1: traer aprobación
-    console.log('[Informe] Query a preventivos_aprobacion...');
-    const dataAprob=await api('preventivos_aprobacion?id=eq.'+encodeURIComponent(aprobacionId)+'&select=*');
-    console.log('[Informe] Registros recibidos:', dataAprob ? dataAprob.length : 0);
-    const aprob=(dataAprob||[])[0];
-    if(!aprob){
+    // Paso 1: una sola llamada a la función pública de la base (sin sesión).
+    // Devuelve solo lo que el informe necesita, o null si la aprobación no existe o no está aprobada.
+    console.log('[Informe] RPC informe_publico...');
+    const data=await api('rpc/informe_publico',{method:'POST',body:JSON.stringify({p_id:aprobacionId})});
+    if(!data||!Array.isArray(data.grupo)||!data.grupo.length){
       _mostrarInformeNoEncontrado(aprobacionId);
       return;
     }
+    console.log('[Informe] Registros en grupo:', data.grupo.length);
 
-    // Paso 2: agrupar por numero_ipd si existe
-    let grupo=[aprob];
-    if(aprob.numero_ipd){
-      debug('[Informe] Agrupando por numero_ipd:', aprob.numero_ipd);
-      const resGrupo=await api('preventivos_aprobacion?numero_ipd=eq.'+aprob.numero_ipd+'&select=*');
-      if(Array.isArray(resGrupo)&&resGrupo.length>0) grupo=resGrupo;
-    }
-    console.log('[Informe] Registros en grupo:', grupo.length);
-
-    // Paso 3: normalizar campos opcionales
-    grupo=grupo.map(r=>({
+    // Paso 2: normalizar campos opcionales
+    const grupo=data.grupo.map(r=>({
       ...r,
       fecha_servicio: r.fecha_servicio||r.fecha||null,
       equipos_detalle: r.equipos_detalle||[],
@@ -6371,28 +6362,21 @@ async function mostrarInformePublico(aprobacionId){
       nombre_firmante: r.nombre_firmante||''
     }));
 
-    // Paso 4: cargar datos de soporte en paralelo
-    console.log('[Informe] Cargando clientes, equipos, intervenciones, tareas...');
-    const [resClientes,resEquipos,resInterv,resTareas]=await Promise.all([
-      api('clientes?select=*'),
-      api('equipos?select=*'),
-      api('intervenciones?select=*'),
-      api('tareas_realizadas?select=*')
-    ]);
-    clientes=resClientes||[];
-    equipos=resEquipos||[];
-    intervenciones=resInterv||[];
-    tareasRealizadas=resTareas||[];
+    // Paso 3: datos de soporte que devuelve la función
+    clientes=data.clientes||[];
+    equipos=data.equipos||[];
+    intervenciones=data.intervenciones||[];
+    tareasRealizadas=data.tareas||[];
     aprobaciones=grupo;
 
-    // Paso 5: generar HTML
+    // Paso 4: generar HTML
     const grupoIds=grupo.map(x=>x.id);
     const principal=grupo.find(x=>x.id===aprobacionId)||grupo[0];
     const htmlInforme=(grupo.length>1&&typeof generarHtmlInformeConsolidado==='function')
       ?generarHtmlInformeConsolidado(grupoIds,principal)
       :generarHtmlInforme(principal);
 
-    // Paso 6: renderizar
+    // Paso 5: renderizar
     document.open();
     document.write(htmlInforme);
     document.close();
