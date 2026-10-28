@@ -6330,21 +6330,25 @@ async function eliminarAprobacion(idRepresentante,btn){
   }catch(e){showToast('Error al eliminar: '+e.message,true);}
 }
 
+// Mismo aviso para un id inexistente o con formato inválido (el id viene de la URL: se escapa)
+function _mostrarInformeNoEncontrado(aprobacionId){
+  const msg='No se encontró ningún informe con ID '+escapeHtml(aprobacionId);
+  console.error('[Informe] ERROR:', msg);
+  document.open();
+  document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;"><p style="color:#e11d48;font-size:18px;">⚠️ Error al cargar informe</p><p style="color:#555;font-size:13px;">'+msg+'</p></body></html>');
+  document.close();
+}
 async function mostrarInformePublico(aprobacionId){
   debug('[Informe] URL param:', aprobacionId);
   document.body.innerHTML='<div style="font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f4f6f9;"><div style="text-align:center;color:#666;">Cargando informe...</div></div>';
   try{
     // Paso 1: traer aprobación
     console.log('[Informe] Query a preventivos_aprobacion...');
-    const dataAprob=await api('preventivos_aprobacion?id=eq.'+aprobacionId+'&select=*');
+    const dataAprob=await api('preventivos_aprobacion?id=eq.'+encodeURIComponent(aprobacionId)+'&select=*');
     console.log('[Informe] Registros recibidos:', dataAprob ? dataAprob.length : 0);
     const aprob=(dataAprob||[])[0];
     if(!aprob){
-      const msg='No se encontró ningún informe con ID '+aprobacionId;
-      console.error('[Informe] ERROR:', msg);
-      document.open();
-      document.write('<html><body style="font-family:Arial,sans-serif;text-align:center;padding:40px;"><p style="color:#e11d48;font-size:18px;">⚠️ Error al cargar informe</p><p style="color:#555;font-size:13px;">'+msg+'</p></body></html>');
-      document.close();
+      _mostrarInformeNoEncontrado(aprobacionId);
       return;
     }
 
@@ -10823,7 +10827,7 @@ if('serviceWorker' in navigator){
 // WhatsApp envío modal
 let _waAprobId=null;
 function generarUrlInforme(aprobId){
-  return `https://chillersystem-gestion-app.vercel.app?informe=true&id=${aprobId}`;
+  return window.location.origin+window.location.pathname+'?informe='+aprobId;
 }
 function mostrarModalWhatsApp(aprobId){
   _waAprobId=aprobId;
@@ -10863,8 +10867,14 @@ function enviarWhatsAppA(cual){
 }
 
 // ── VISOR DE INFORME PÚBLICO (sin login) ──────────────────
-const _informePublicoId = new URLSearchParams(window.location.search).get('informe');
-if(_informePublicoId) mostrarInformePublico(_informePublicoId);
+// Acepta ?informe=<id> y el formato viejo ?informe=true&id=<id>; un id que no es UUID no consulta la base
+const _qs=new URLSearchParams(window.location.search);
+const _informePublicoId=_qs.get('informe')==='true'?_qs.get('id'):_qs.get('informe');
+const _UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if(_qs.get('informe')){
+  if(_UUID_RE.test(_informePublicoId||'')) mostrarInformePublico(_informePublicoId);
+  else _mostrarInformeNoEncontrado(_informePublicoId||'');
+}
 
 // PWA Install prompt
 let deferredPrompt;
