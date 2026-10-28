@@ -635,3 +635,12 @@ as $$
   ), false)
 $$;
 -- Acceso dado a Fernanda: update usuarios set acceso_ventas = true where usuario = 'fernanda';
+
+-- ===== 8. Ventas: casilla Compulsa (licitación o comparación de precios) ========
+alter table public.crm_oportunidades add column if not exists es_compulsa boolean not null default false;
+
+-- ===== 9. Presupuestos: precio principal original (opción "Ambas") ==============
+-- Guarda el precio y la moneda del principal la primera vez que se elige una opción, para no sumar dos veces al aprobar de nuevo y para restaurarlo al retroceder.
+alter table public.presupuestos
+  add column if not exists precio_principal_original numeric,
+  add column if not exists moneda_principal_original text;
